@@ -1,0 +1,107 @@
+# Key Features and Implementation Details
+
+## 1. Smart Paragraph Parsing
+
+### Multiple Paragraph Detection Strategies
+The solution implements several strategies to identify paragraph boundaries:
+
+- **Visual separation**: Detects paragraphs by examining line breaks and spacing
+- **Structural elements**: Identifies headers, lists, and tables
+- **Contextual clues**: Uses text formatting and content patterns
+
+### Header Association
+Headers are identified using several methods:
+- Style information in DOCX files
+- Text length and punctuation patterns
+- Capitalization and formatting cues
+
+Headers are automatically associated with the paragraph that immediately follows them, providing context for analysis.
+
+### List and Table Handling
+- **Lists**: Bullet points, numbered lists, and other list formats are detected and kept as a single unit
+- **Tables**: Table structure is preserved, with rows and columns maintained for analysis
+- **Boilerplate text**: Common elements like disclaimers and footers are automatically tagged
+
+## 2. Similarity Analysis
+
+### Multiple Similarity Metrics
+The solution employs several methods to detect similar paragraphs:
+
+- **Exact matching**: Identifies identical paragraphs across documents
+- **TF-IDF with Cosine Similarity**: Considers word frequency and importance
+- **Jaccard Similarity**: Compares word sets between paragraphs
+
+### Configurable Threshold
+- Users can adjust the similarity threshold via an intuitive slider
+- Results update dynamically based on the chosen threshold
+- Different similarity types are color-coded for easy identification
+
+## 3. User Interface
+
+### Modern Dashboard
+- Clean Bootstrap 5 interface with responsive design
+- Intuitive navigation and document management
+- Real-time feedback with flash messages
+
+### Paragraph Viewer
+- Visual indicators for paragraph types (headers, lists, tables)
+- Filtering by document and paragraph type
+- Preserved formatting for special content types like tables
+
+### Tagging System
+- Create custom tags with user-defined colors
+- Apply tags to paragraphs for organization and categorization
+- Filter and search by tags to identify related content
+
+## 4. Data Management
+
+### Document Management
+- Upload multiple documents simultaneously
+- Import from folder path for batch processing
+- Delete individual documents or clear all data
+
+### Database Design
+The SQLite database includes:
+- Documents table: Stores document metadata
+- Paragraphs table: Contains extracted paragraphs with type and position
+- SimilarityResults table: Records paragraph similarities
+- Tags and ParagraphTags tables: Support the tagging system
+
+### Excel Export
+- Comprehensive export of all analysis data
+- Multiple sheets for paragraphs and similarities
+- Formatted for readability and further analysis
+
+## 5. Robust Logging and Error Handling
+
+### Detailed Logging
+- Comprehensive logging of all operations
+- Log rotation to manage file size
+- Context-rich error messages for troubleshooting
+
+### Graceful Error Handling
+- User-friendly error pages (404, 500)
+- Flash messages for operation status
+- Defensive programming throughout the codebase
+
+## Implementation Highlights
+
+### Document Parser
+- Uses `python-docx` for DOCX parsing and `pdfplumber` for PDF parsing
+- Extracts text with layout information to identify paragraph boundaries
+- Multi-stage processing pipeline for accurate paragraph extraction
+
+### Similarity Analysis
+- Utilizes scikit-learn for TF-IDF vectorization and cosine similarity calculation
+- Custom implementation of Jaccard similarity for alternative comparison
+- Merges results from multiple algorithms for comprehensive similarity detection
+
+### Database Manager
+- SQLite for simplicity and portability
+- Comprehensive data access layer with proper error handling
+- Efficient database schema with appropriate indices
+
+### Flask Application
+- Clean separation of concerns with modular design
+- Robust request handling with appropriate HTTP methods
+- Asynchronous AJAX for dynamic user interactions

@@ -1,0 +1,187 @@
+{% extends 'base.html' %}
+
+{% block title %}Paragraphs{% endblock %}
+
+{% block content %}
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+        <h1 class="h2">Paragraphs</h1>
+        <div class="btn-toolbar mb-2 mb-md-0">
+            <a href="/export" class="btn btn-sm btn-outline-success">
+                <i class="bi bi-file-excel"></i> Export to Excel
+            </a>
+        </div>
+    </div>
+
+    <!-- Filter by document -->
+    <div class="row mb-3">
+        <div class="col-md-6">
+            <label for="documentFilter" class="form-label">Filter by Document</label>
+            <select class="form-select" id="documentFilter" onchange="filterByDocument(this.value)">
+                <option value="">All Documents</option>
+                {% for doc in documents %}
+                    <option value="{{ doc.id }}" {% if selected_document == doc.id %}selected{% endif %}>{{ doc.filename }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-6">
+            <label for="paragraphTypeFilter" class="form-label">Filter by Type</label>
+            <select class="form-select" id="paragraphTypeFilter" onchange="filterByType(this.value)">
+                <option value="">All Types</option>
+                <option value="header">Headers</option>
+                <option value="normal">Normal Paragraphs</option>
+                <option value="list">Lists</option>
+                <option value="table">Tables</option>
+                <option value="boilerplate">Boilerplate</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-12">
+            {% if paragraphs %}
+                <div id="paragraphsList">
+                    {% for para in paragraphs %}
+                        <div class="card paragraph-card {{ para.paragraph_type }}" data-type="{{ para.paragraph_type }}" data-id="{{ para.id }}">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <div>
+                                    <span class="badge bg-secondary">{{ para.paragraph_type }}</span>
+                                    <small class="text-muted">From: {{ para.filename }}</small>
+                                </div>
+                                <div class="paragraph-tags">
+                                    {% for tag in para.tags %}
+                                        <span class="badge tag-badge" style="background-color: {{ tag.color }}">
+                                            {{ tag.name }}
+                                            <i class="bi bi-x" onclick="removeTag({{ para.id }}, {{ tag.id }})"></i>
+                                        </span>
+                                    {% endfor %}
+                                    <button class="btn btn-sm btn-outline-primary" onclick="showTagModal({{ para.id }})">
+                                        <i class="bi bi-tag"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                {% if para.header_content %}
+                                    <div class="mb-2">
+                                        <strong>Header:</strong> {{ para.header_content }}
+                                    </div>
+                                {% endif %}
+                                
+                                {% if para.paragraph_type == 'table' %}
+                                    <pre class="table-content">{{ para.content }}</pre>
+                                {% else %}
+                                    <p>{{ para.content }}</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="alert alert-info">
+                    No paragraphs found. Please upload some documents first.
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Tag Modal -->
+    <div class="modal fade" id="tagModal" tabindex="-1" aria-labelledby="tagModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="tagModalLabel">Add Tag</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="paragraphIdForTag">
+                    <div class="mb-3">
+                        <label class="form-label">Select Tag</label>
+                        <div class="d-flex flex-wrap gap-2">
+                            {% for tag in tags %}
+                                <span class="badge tag-badge" style="background-color: {{ tag.color }}" onclick="addTag({{ tag.id }})">
+                                    {{ tag.name }}
+                                </span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function filterByDocument(documentId) {
+        window.location.href = '/paragraphs' + (documentId ? '?document_id=' + documentId : '');
+    }
+    
+    function filterByType(type) {
+        const paragraphs = document.querySelectorAll('.paragraph-card');
+        if (!type) {
+            paragraphs.forEach(p => p.style.display = 'block');
+            return;
+        }
+        
+        paragraphs.forEach(p => {
+            if (p.dataset.type === type) {
+                p.style.display = 'block';
+            } else {
+                p.style.display = 'none';
+            }
+        });
+    }
+    
+    function showTagModal(paragraphId) {
+        document.getElementById('paragraphIdForTag').value = paragraphId;
+        new bootstrap.Modal(document.getElementById('tagModal')).show();
+    }
+    
+    function addTag(tagId) {
+        const paragraphId = document.getElementById('paragraphIdForTag').value;
+        
+        $.ajax({
+            url: '/tag-paragraph',
+            method: 'POST',
+            data: {
+                paragraph_id: paragraphId,
+                tag_id: tagId
+            },
+            success: function(response) {
+                if (response.success) {
+                    window.location.reload();
+                } else {
+                    alert('Failed to add tag: ' + response.message);
+                }
+            },
+            error: function() {
+                alert('An error occurred while adding the tag');
+            }
+        });
+    }
+    
+    function removeTag(paragraphId, tagId) {
+        if (!confirm('Are you sure you want to remove this tag?')) {
+            return;
+        }
+        
+        $.ajax({
+            url: '/untag-paragraph',
+            method: 'POST',
+            data: {
+                paragraph_id: paragraphId,
+                tag_id: tagId
+            },
+            success: function(response) {
+                if (response.success) {
+                    window.location.reload();
+                } else {
+                    alert('Failed to remove tag: ' + response.message);
+                }
+            },
+            error: function() {
+                alert('An error occurred while removing the tag');
+            }
+        });
+    }
+</script>
+{% endblock %}

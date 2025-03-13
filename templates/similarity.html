@@ -1,0 +1,83 @@
+{% extends 'base.html' %}
+
+{% block title %}Similarity Analysis{% endblock %}
+
+{% block content %}
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+        <h1 class="h2">Similarity Analysis</h1>
+        <div class="btn-toolbar mb-2 mb-md-0">
+            <a href="/export" class="btn btn-sm btn-outline-success">
+                <i class="bi bi-file-excel"></i> Export to Excel
+            </a>
+        </div>
+    </div>
+
+    <!-- Similarity Analysis Controls -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form action="/analyze-similarity" method="post">
+                <div class="row align-items-end">
+                    <div class="col-md-6">
+                        <label for="thresholdSlider" class="form-label">Similarity Threshold: <span id="thresholdValue">{{ threshold }}</span></label>
+                        <input type="range" class="form-range similarity-slider" id="thresholdSlider" name="threshold" min="0.1" max="1.0" step="0.05" value="{{ threshold }}">
+                    </div>
+                    <div class="col-md-6">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-search"></i> Run Similarity Analysis
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Similarity Results -->
+    <h3>Similarity Results</h3>
+    <div class="row">
+        <div class="col-md-12">
+            {% if similarities %}
+                <div id="similarityResults">
+                    {% for sim in similarities %}
+                        <div class="similarity-container">
+                            <div class="d-flex justify-content-between mb-2">
+                                <div>
+                                    <span class="badge {% if sim.similarity_type == 'exact' %}bg-success{% else %}bg-primary{% endif %}">{{ sim.similarity_type | upper }}</span>
+                                </div>
+                                <div class="similarity-score">
+                                    {{ "%.2f"|format(sim.similarity_score * 100) }}%
+                                </div>
+                            </div>
+                            
+                            <div class="content-compare">
+                                <div class="content-column">
+                                    <h5>{{ sim.para1_filename }}</h5>
+                                    <p>{{ sim.para1_content }}</p>
+                                </div>
+                                <div class="content-column">
+                                    <h5>{{ sim.para2_filename }}</h5>
+                                    <p>{{ sim.para2_content }}</p>
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="alert alert-info">
+                    No similarity results found. Run the similarity analysis to find similar paragraphs.
+                </div>
+            {% endif %}
+        </div>
+    </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Update threshold value display when slider changes
+    const thresholdSlider = document.getElementById('thresholdSlider');
+    const thresholdValue = document.getElementById('thresholdValue');
+    
+    thresholdSlider.addEventListener('input', function() {
+        thresholdValue.textContent = this.value;
+    });
+</script>
+{% endblock %}

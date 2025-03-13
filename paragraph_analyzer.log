@@ -1,0 +1,8 @@
+2025-03-13 12:56:51,683 INFO: Paragraph Analyzer startup [in C:\Simplicity\app.py:47]
+2025-03-13 12:56:53,889 INFO: Paragraph Analyzer startup [in C:\Simplicity\app.py:47]
+2025-03-13 12:57:28,960 INFO: Processed 1 paragraphs from sample_7.pdf [in C:\Simplicity\app.py:110]
+2025-03-13 12:57:29,027 INFO: Processed 1 paragraphs from sample_9.pdf [in C:\Simplicity\app.py:110]
+2025-03-13 12:57:29,111 INFO: Processed 1 paragraphs from sample_8.pdf [in C:\Simplicity\app.py:110]
+2025-03-13 12:57:29,171 INFO: Processed 1 paragraphs from sample_10.pdf [in C:\Simplicity\app.py:110]
+2025-03-13 12:57:29,243 INFO: Processed 1 paragraphs from sample_4.pdf [in C:\Simplicity\app.py:110]
+2025-03-13 12:57:29,302 INFO: Processed 1 paragraphs from sample_3.pdf [in C:\Simplicity\app.py:110]

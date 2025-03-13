@@ -1,0 +1,53 @@
+{% extends 'base.html' %}
+
+{% block title %}Tag Management{% endblock %}
+
+{% block content %}
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+        <h1 class="h2">Tag Management</h1>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Create New Tag</h5>
+                </div>
+                <div class="card-body">
+                    <form action="/add-tag" method="post">
+                        <div class="mb-3">
+                            <label for="tagName" class="form-label">Tag Name</label>
+                            <input type="text" class="form-control" id="tagName" name="name" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="tagColor" class="form-label">Tag Color</label>
+                            <input type="color" class="form-control form-control-color" id="tagColor" name="color" value="#563d7c" title="Choose tag color">
+                        </div>
+                        <button type="submit" class="btn btn-primary">Create Tag</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Existing Tags</h5>
+                </div>
+                <div class="card-body">
+                    {% if tags %}
+                        <div class="d-flex flex-wrap gap-2">
+                            {% for tag in tags %}
+                                <span class="badge p-2" style="background-color: {{ tag.color }}">
+                                    {{ tag.name }}
+                                </span>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="text-muted">No tags created yet.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}

@@ -1,0 +1,85 @@
+# Paragraph Analyzer - Setup and Installation Instructions
+
+## Prerequisites
+- Python 3.8 or higher
+- pip (Python package installer)
+
+## Installation Steps
+
+### 1. Clone or download the project files
+Save all the provided code files according to the project structure.
+
+### 2. Create a virtual environment (recommended)
+```bash
+# Navigate to the project directory
+cd paragraph_analyzer
+
+# Create a virtual environment
+python -m venv venv
+
+# Activate the virtual environment
+# On Windows:
+venv\Scripts\activate
+# On macOS/Linux:
+source venv/bin/activate
+```
+
+### 3. Install dependencies
+```bash
+pip install -r requirements.txt
+```
+
+### 4. Create required directories
+```bash
+mkdir -p uploads
+```
+
+## Running the Application
+
+### Start the Flask development server
+```bash
+python app.py
+```
+
+The application will be available at http://127.0.0.1:5000/
+
+## Usage Instructions
+
+1. **Upload Documents**:
+   - Click "Upload Documents" on the dashboard
+   - Select one or more PDF or Word documents
+   - OR specify a folder path with the "Import from Folder" option
+
+2. **View Paragraphs**:
+   - Navigate to the "Paragraphs" section
+   - Use filters to view paragraphs by document or type
+   - Add tags to paragraphs for organization
+
+3. **Analyze Similarities**:
+   - Go to "Similarity Analysis"
+   - Adjust the similarity threshold slider
+   - Click "Run Similarity Analysis"
+   - Review matched paragraphs
+
+4. **Manage Tags**:
+   - Create custom tags with specific colors
+   - Use tags to categorize paragraphs
+
+5. **Export Results**:
+   - Click "Export to Excel" to save analysis results
+   - The Excel file includes all paragraphs and similarity matches
+
+## Troubleshooting
+
+Check the `paragraph_analyzer.log` file for detailed logs of any errors or issues.
+
+Common issues:
+- **PDF parsing errors**: Ensure PDFs are not password-protected or corrupted
+- **Memory issues with large documents**: Try processing fewer documents at a time
+- **Import errors**: Ensure all dependencies are correctly installed
+
+## Notes for Developers
+
+- The application uses SQLite for simplicity. For production use with multiple users, consider migrating to a more robust database like PostgreSQL.
+- The paragraph parsing logic can be extended with custom rules in the `ParagraphExtractor` class.
+- Add more similarity algorithms by extending the `SimilarityAnalyzer` class.
