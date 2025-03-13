@@ -13,9 +13,14 @@ from database_manager import DatabaseManager
 
 # Configuration
 UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads')
-DATABASE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'paragraph_analyzer.db')
 ALLOWED_EXTENSIONS = {'pdf', 'doc', 'docx'}
 LOG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'paragraph_analyzer.log')
+
+# PostgreSQL connection URL - update with your credentials
+DB_URL = "postgresql://paragraph_user:pass@localhost/paragraph_analyzer"
+
+# For SQLite fallback (if needed):
+# DB_URL = f"sqlite:///{os.path.join(os.path.dirname(os.path.abspath(__file__)), 'paragraph_analyzer.db')}"
 
 # Create upload folder if it doesn't exist
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -53,7 +58,7 @@ logger = setup_logging(app)
 # Initialize components
 document_parser = DocumentParser(logging_level='INFO')
 similarity_analyzer = SimilarityAnalyzer(logging_level='INFO')
-db_manager = DatabaseManager(DATABASE_PATH, logging_level='INFO')
+db_manager = DatabaseManager(DB_URL, logging_level='INFO')
 
 # Utility functions
 def allowed_file(filename):
@@ -106,8 +111,11 @@ def upload_documents():
                 if paragraphs:
                     # Add paragraphs to database
                     paragraph_ids = db_manager.add_paragraphs(paragraphs)
-                    success_count += 1
-                    logger.info(f"Processed {len(paragraphs)} paragraphs from {filename}")
+                    if paragraph_ids:
+                        success_count += 1
+                        logger.info(f"Processed {len(paragraphs)} paragraphs from {filename}")
+                    else:
+                        logger.warning(f"Failed to add paragraphs from {filename}")
                 else:
                     logger.warning(f"No paragraphs extracted from {filename}")
             else:
@@ -167,8 +175,11 @@ def upload_folder():
             if paragraphs:
                 # Add paragraphs to database
                 paragraph_ids = db_manager.add_paragraphs(paragraphs)
-                success_count += 1
-                logger.info(f"Processed {len(paragraphs)} paragraphs from {new_filename}")
+                if paragraph_ids:
+                    success_count += 1
+                    logger.info(f"Processed {len(paragraphs)} paragraphs from {new_filename}")
+                else:
+                    logger.warning(f"Failed to add paragraphs from {new_filename}")
             else:
                 logger.warning(f"No paragraphs extracted from {new_filename}")
         else:
