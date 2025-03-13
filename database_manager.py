@@ -18,6 +18,23 @@ class DatabaseManager:
         self.logger = self._setup_logger(logging_level)
         self._init_db()
     
+    def _setup_logger(self, level: str) -> logging.Logger:
+        """Set up a logger instance."""
+        logger = logging.getLogger(f'{__name__}.DatabaseManager')
+        
+        if level.upper() == 'DEBUG':
+            logger.setLevel(logging.DEBUG)
+        elif level.upper() == 'INFO':
+            logger.setLevel(logging.INFO)
+        elif level.upper() == 'WARNING':
+            logger.setLevel(logging.WARNING)
+        elif level.upper() == 'ERROR':
+            logger.setLevel(logging.ERROR)
+        else:
+            logger.setLevel(logging.INFO)
+        
+        return logger
+    
     def _init_db(self):
         """Initialize the database schema if it doesn't exist."""
         self.logger.info(f"Initializing database at {self.db_path}")
@@ -472,42 +489,38 @@ class DatabaseManager:
             return False
     
     def export_to_excel(self, output_path: str) -> bool:
-        """Export database contents to Excel."""
+        """Export database contents to Excel with collapsed duplicates."""
         self.logger.info(f"Exporting data to Excel: {output_path}")
         
         try:
+            # Get paragraphs with duplicates collapsed
+            paragraphs = self.get_paragraphs(collapse_duplicates=True)
+            
+            # Prepare data for DataFrame
+            rows = []
+            for para in paragraphs:
+                # Convert document_references from list to string
+                doc_references = ', '.join(para['document_references'])
+                
+                # Convert tags from list of dicts to string
+                tags_str = ', '.join([tag['name'] for tag in para.get('tags', [])])
+                
+                row = {
+                    'id': para['id'],
+                    'content': para['content'],
+                    'paragraph_type': para['paragraph_type'],
+                    'header_content': para.get('header_content', ''),
+                    'document_references': doc_references,
+                    'appears_in_multiple': 'Yes' if para['appears_in_multiple'] else 'No',
+                    'tags': tags_str
+                }
+                rows.append(row)
+            
+            # Create DataFrame from rows
+            paragraphs_df = pd.DataFrame(rows)
+            
+            # Connect to the database for similarity data
             conn = sqlite3.connect(self.db_path)
-            
-            # Get all paragraphs with document info
-            paragraphs_df = pd.read_sql_query(
-                '''SELECT p.id, p.content, p.paragraph_type, p.header_content, 
-                          d.filename, d.upload_date
-                   FROM paragraphs p
-                   JOIN documents d ON p.document_id = d.id
-                   ORDER BY d.filename, p.position''',
-                conn
-            )
-            
-            # Get all tags for each paragraph
-            paragraph_tags = pd.read_sql_query(
-                '''SELECT pt.paragraph_id, GROUP_CONCAT(t.name, ', ') as tags
-                   FROM paragraph_tags pt
-                   JOIN tags t ON pt.tag_id = t.id
-                   GROUP BY pt.paragraph_id''',
-                conn
-            )
-            
-            # Merge paragraphs with their tags
-            if not paragraph_tags.empty:
-                paragraphs_df = pd.merge(
-                    paragraphs_df, 
-                    paragraph_tags, 
-                    left_on='id', 
-                    right_on='paragraph_id', 
-                    how='left'
-                )
-            else:
-                paragraphs_df['tags'] = None
             
             # Get similarity data
             similarity_df = pd.read_sql_query(
@@ -542,7 +555,11 @@ class DatabaseManager:
                 sheet1 = writer.sheets['Paragraphs']
                 sheet1.set_column('A:A', 10)  # ID column
                 sheet1.set_column('B:B', 80)  # Content column
-                sheet1.set_column('C:E', 20)  # Other columns
+                sheet1.set_column('C:C', 15)  # Paragraph Type column
+                sheet1.set_column('D:D', 30)  # Header Content column
+                sheet1.set_column('E:E', 40)  # Document References column
+                sheet1.set_column('F:F', 15)  # Appears In Multiple column
+                sheet1.set_column('G:G', 30)  # Tags column
                 
                 # Format for the Similarities sheet if it exists
                 if not similarity_df.empty:
@@ -551,7 +568,7 @@ class DatabaseManager:
                     sheet2.set_column('B:B', 15)  # Type column
                     sheet2.set_column('C:D', 80)  # Content columns
                     sheet2.set_column('E:F', 30)  # Document columns
-            
+        
             self.logger.info(f"Data exported successfully to {output_path}")
             return True
             
@@ -632,20 +649,3 @@ class DatabaseManager:
         finally:
             if 'conn' in locals():
                 conn.close()
-    
-    def _setup_logger(self, level: str) -> logging.Logger:
-        """Set up a logger instance."""
-        logger = logging.getLogger(f'{__name__}.DatabaseManager')
-        
-        if level.upper() == 'DEBUG':
-            logger.setLevel(logging.DEBUG)
-        elif level.upper() == 'INFO':
-            logger.setLevel(logging.INFO)
-        elif level.upper() == 'WARNING':
-            logger.setLevel(logging.WARNING)
-        elif level.upper() == 'ERROR':
-            logger.setLevel(logging.ERROR)
-        else:
-            logger.setLevel(logging.INFO)
-        
-        return logger
