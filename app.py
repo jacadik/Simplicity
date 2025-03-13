@@ -205,7 +205,12 @@ def clear_database():
 def view_paragraphs():
     """View paragraphs with filtering options."""
     document_id = request.args.get('document_id', type=int)
-    paragraphs = db_manager.get_paragraphs(document_id)
+    show_all_duplicates = request.args.get('show_all_duplicates', type=int, default=0)
+    
+    # When viewing a specific document, or when explicitly requested, don't collapse duplicates
+    collapse_duplicates = not (document_id is not None or show_all_duplicates == 1)
+    
+    paragraphs = db_manager.get_paragraphs(document_id, collapse_duplicates=collapse_duplicates)
     documents = db_manager.get_documents()
     tags = db_manager.get_tags()
     
@@ -214,7 +219,8 @@ def view_paragraphs():
         paragraphs=paragraphs, 
         documents=documents, 
         tags=tags, 
-        selected_document=document_id
+        selected_document=document_id,
+        show_all_duplicates=show_all_duplicates
     )
 
 @app.route('/similarity')

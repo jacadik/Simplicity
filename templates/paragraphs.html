@@ -12,9 +12,9 @@
         </div>
     </div>
 
-    <!-- Filter by document -->
+    <!-- Control Panel -->
     <div class="row mb-3">
-        <div class="col-md-6">
+        <div class="col-md-4">
             <label for="documentFilter" class="form-label">Filter by Document</label>
             <select class="form-select" id="documentFilter" onchange="filterByDocument(this.value)">
                 <option value="">All Documents</option>
@@ -23,7 +23,7 @@
                 {% endfor %}
             </select>
         </div>
-        <div class="col-md-6">
+        <div class="col-md-4">
             <label for="paragraphTypeFilter" class="form-label">Filter by Type</label>
             <select class="form-select" id="paragraphTypeFilter" onchange="filterByType(this.value)">
                 <option value="">All Types</option>
@@ -32,6 +32,13 @@
                 <option value="list">Lists</option>
                 <option value="table">Tables</option>
                 <option value="boilerplate">Boilerplate</option>
+            </select>
+        </div>
+        <div class="col-md-4">
+            <label for="duplicateFilter" class="form-label">Show Duplicates</label>
+            <select class="form-select" id="duplicateFilter" onchange="filterByDuplicates(this.value)">
+                <option value="collapsed" {% if not show_all_duplicates %}selected{% endif %}>Show Once (Collapsed)</option>
+                <option value="all" {% if show_all_duplicates %}selected{% endif %}>Show All Instances</option>
             </select>
         </div>
     </div>
@@ -45,7 +52,9 @@
                             <div class="card-header d-flex justify-content-between align-items-center">
                                 <div>
                                     <span class="badge bg-secondary">{{ para.paragraph_type }}</span>
-                                    <small class="text-muted">From: {{ para.filename }}</small>
+                                    {% if para.appears_in_multiple %}
+                                        <span class="badge bg-warning">Duplicate</span>
+                                    {% endif %}
                                 </div>
                                 <div class="paragraph-tags">
                                     {% for tag in para.tags %}
@@ -59,7 +68,21 @@
                                     </button>
                                 </div>
                             </div>
+                            
                             <div class="card-body">
+                                {% if para.appears_in_multiple %}
+                                    <div class="document-references mb-3">
+                                        <p class="text-muted mb-1"><i class="bi bi-files"></i> Appears in:</p>
+                                        <div class="d-flex flex-wrap gap-2">
+                                            {% for filename in para.document_references %}
+                                                <span class="badge bg-info">{{ filename }}</span>
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+                                {% else %}
+                                    <small class="text-muted mb-2 d-block">From: {{ para.filename }}</small>
+                                {% endif %}
+                                
                                 {% if para.header_content %}
                                     <div class="mb-2">
                                         <strong>Header:</strong> {{ para.header_content }}
@@ -112,7 +135,17 @@
 {% block scripts %}
 <script>
     function filterByDocument(documentId) {
-        window.location.href = '/paragraphs' + (documentId ? '?document_id=' + documentId : '');
+        const duplicateFilter = document.getElementById('duplicateFilter').value;
+        window.location.href = '/paragraphs' + 
+            (documentId ? '?document_id=' + documentId : '') + 
+            (duplicateFilter === 'all' ? (documentId ? '&' : '?') + 'show_all_duplicates=1' : '');
+    }
+    
+    function filterByDuplicates(mode) {
+        const documentId = new URLSearchParams(window.location.search).get('document_id');
+        window.location.href = '/paragraphs' + 
+            (documentId ? '?document_id=' + documentId : '') + 
+            (mode === 'all' ? (documentId ? '&' : '?') + 'show_all_duplicates=1' : '');
     }
     
     function filterByType(type) {

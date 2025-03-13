@@ -44,3 +44,6 @@
 2025-03-13 13:27:32,305 INFO: Processed 2 paragraphs from table_test.pdf [in C:\Simplicity\app.py:171]
 2025-03-13 13:27:32,372 INFO: Processed 1 paragraphs from unicode_test.docx [in C:\Simplicity\app.py:171]
 2025-03-13 13:27:32,419 INFO: Processed 1 paragraphs from unicode_test.pdf [in C:\Simplicity\app.py:171]
+2025-03-13 13:42:16,242 INFO: Paragraph Analyzer startup [in C:\Simplicity\app.py:47]
+2025-03-13 13:55:41,118 INFO: Paragraph Analyzer startup [in C:\Simplicity\app.py:47]
+2025-03-13 13:55:44,264 INFO: Paragraph Analyzer startup [in C:\Simplicity\app.py:47]

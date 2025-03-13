@@ -223,8 +223,11 @@ class DatabaseManager:
             self.logger.error(f"Error retrieving documents: {str(e)}", exc_info=True)
             return []
     
-    def get_paragraphs(self, document_id: Optional[int] = None) -> List[Dict]:
-        """Get paragraphs, optionally filtered by document."""
+    def get_paragraphs(self, document_id: Optional[int] = None, collapse_duplicates: bool = True) -> List[Dict]:
+        """
+        Get paragraphs, optionally filtered by document.
+        If collapse_duplicates is True, exact matching paragraphs are displayed only once with document references.
+        """
         try:
             conn = sqlite3.connect(self.db_path)
             conn.row_factory = sqlite3.Row
@@ -268,6 +271,69 @@ class DatabaseManager:
                 para['tags'] = [dict(tag) for tag in tag_rows]
                 
                 paragraphs.append(para)
+            
+            # Handle duplicate collapse if requested and not filtering by document
+            if collapse_duplicates and document_id is None:
+                # Get exact matching paragraphs based on content
+                cursor.execute(
+                    '''SELECT p1.content, GROUP_CONCAT(p1.id) as para_ids, GROUP_CONCAT(d.id) as doc_ids, 
+                              GROUP_CONCAT(d.filename) as filenames
+                       FROM paragraphs p1
+                       JOIN documents d ON p1.document_id = d.id
+                       GROUP BY p1.content
+                       HAVING COUNT(*) > 1'''
+                )
+                duplicate_rows = cursor.fetchall()
+                
+                # Process duplicate paragraphs
+                if duplicate_rows:
+                    # Create a lookup of paragraph IDs that are duplicates
+                    duplicate_ids = set()
+                    duplicate_map = {}
+                    
+                    for dup in duplicate_rows:
+                        content = dup['content']
+                        para_ids = [int(pid) for pid in dup['para_ids'].split(',')]
+                        doc_ids = [int(did) for did in dup['doc_ids'].split(',')]
+                        filenames = dup['filenames'].split(',')
+                        
+                        # Keep track of all duplicate paragraph IDs (except the one we'll keep)
+                        duplicate_ids.update(para_ids[1:])
+                        
+                        # Map the paragraph we'll keep to its document appearances
+                        duplicate_map[para_ids[0]] = {
+                            'doc_ids': doc_ids,
+                            'filenames': filenames
+                        }
+                    
+                    # Filter out duplicates and add document reference to kept paragraphs
+                    filtered_paragraphs = []
+                    for para in paragraphs:
+                        if para['id'] in duplicate_ids:
+                            # Skip this duplicate paragraph
+                            continue
+                        elif para['id'] in duplicate_map:
+                            # This is the representative paragraph from a duplicate group
+                            para['document_references'] = duplicate_map[para['id']]['filenames']
+                            para['appears_in_multiple'] = True
+                        else:
+                            # Regular paragraph (no duplicates)
+                            para['document_references'] = [para['filename']]
+                            para['appears_in_multiple'] = False
+                        
+                        filtered_paragraphs.append(para)
+                    
+                    paragraphs = filtered_paragraphs
+                else:
+                    # No duplicates found, just add default document references
+                    for para in paragraphs:
+                        para['document_references'] = [para['filename']]
+                        para['appears_in_multiple'] = False
+            else:
+                # Not collapsing duplicates, just add default document references
+                for para in paragraphs:
+                    para['document_references'] = [para['filename']]
+                    para['appears_in_multiple'] = False
             
             conn.close()
             
