@@ -14,7 +14,7 @@
 
     <!-- Control Panel -->
     <div class="row mb-3">
-        <div class="col-md-4">
+        <div class="col-md-3">
             <label for="documentFilter" class="form-label">Filter by Document</label>
             <select class="form-select" id="documentFilter" onchange="filterByDocument(this.value)">
                 <option value="">All Documents</option>
@@ -23,7 +23,7 @@
                 {% endfor %}
             </select>
         </div>
-        <div class="col-md-4">
+        <div class="col-md-3">
             <label for="paragraphTypeFilter" class="form-label">Filter by Type</label>
             <select class="form-select" id="paragraphTypeFilter" onchange="filterByType(this.value)">
                 <option value="">All Types</option>
@@ -34,11 +34,33 @@
                 <option value="boilerplate">Boilerplate</option>
             </select>
         </div>
-        <div class="col-md-4">
+        <div class="col-md-3">
+            <label for="tagFilter" class="form-label">Filter by Tag</label>
+            <select class="form-select" id="tagFilter" onchange="filterByTag(this.value)">
+                <option value="">All Tags</option>
+                {% for tag in tags %}
+                    <option value="{{ tag.id }}">{{ tag.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3">
             <label for="duplicateFilter" class="form-label">Show Duplicates</label>
             <select class="form-select" id="duplicateFilter" onchange="filterByDuplicates(this.value)">
                 <option value="collapsed" {% if not show_all_duplicates %}selected{% endif %}>Show Once (Collapsed)</option>
                 <option value="all" {% if show_all_duplicates %}selected{% endif %}>Show All Instances</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- Sorting Options -->
+    <div class="row mb-3">
+        <div class="col-md-4">
+            <label for="sortOption" class="form-label">Sort By</label>
+            <select class="form-select" id="sortOption" onchange="sortParagraphs(this.value)">
+                <option value="position">Default Order</option>
+                <option value="occurrences_desc">Occurrences (High to Low)</option>
+                <option value="occurrences_asc">Occurrences (Low to High)</option>
+                <option value="document">Document Name</option>
             </select>
         </div>
     </div>
@@ -48,13 +70,21 @@
             {% if paragraphs %}
                 <div id="paragraphsList">
                     {% for para in paragraphs %}
-                        <div class="card paragraph-card {{ para.paragraph_type }}" data-type="{{ para.paragraph_type }}" data-id="{{ para.id }}">
+                        <div class="card paragraph-card {{ para.paragraph_type }}" 
+                             data-type="{{ para.paragraph_type }}" 
+                             data-id="{{ para.id }}" 
+                             data-occurrences="{{ para.document_references|length }}" 
+                             data-document="{{ para.filename }}"
+                             data-tags="{{ para.tags|map(attribute='id')|join(',') }}">
                             <div class="card-header d-flex justify-content-between align-items-center">
                                 <div>
                                     <span class="badge bg-secondary">{{ para.paragraph_type }}</span>
                                     {% if para.appears_in_multiple %}
                                         <span class="badge bg-warning">Duplicate</span>
                                     {% endif %}
+                                    <span class="badge bg-info occurrence-badge">
+                                        <i class="bi bi-files"></i> {{ para.document_references|length }}
+                                    </span>
                                 </div>
                                 <div class="paragraph-tags">
                                     {% for tag in para.tags %}
@@ -71,13 +101,13 @@
                             
                             <div class="card-body">
                               <div class="document-references mb-3">
-								<p class="text-muted mb-1"><i class="bi bi-files"></i> {% if para.appears_in_multiple %}Appears in:{% else %}Source:{% endif %}</p>
-							<div class="d-flex flex-wrap gap-2">
-								{% for filename in para.document_references %}
-								<span class="badge bg-info">{{ filename }}</span>
-									{% endfor %}
-    </div>
-</div>
+                                <p class="text-muted mb-1"><i class="bi bi-files"></i> {% if para.appears_in_multiple %}Appears in:{% else %}Source:{% endif %}</p>
+                                <div class="d-flex flex-wrap gap-2">
+                                    {% for filename in para.document_references %}
+                                        <span class="badge bg-info">{{ filename }}</span>
+                                    {% endfor %}
+                                </div>
+                              </div>
                                 
                                 {% if para.header_content %}
                                     <div class="mb-2">
@@ -148,6 +178,7 @@
         const paragraphs = document.querySelectorAll('.paragraph-card');
         if (!type) {
             paragraphs.forEach(p => p.style.display = 'block');
+            applySortingAndTagFilters(); // Reapply other filters
             return;
         }
         
@@ -158,6 +189,78 @@
                 p.style.display = 'none';
             }
         });
+        
+        // Make sure tag filter is still applied
+        const tagFilter = document.getElementById('tagFilter').value;
+        if (tagFilter) {
+            filterByTag(tagFilter);
+        }
+    }
+    
+    function filterByTag(tagId) {
+        if (!tagId) {
+            // If no tag selected, just reapply type filter
+            filterByType(document.getElementById('paragraphTypeFilter').value);
+            return;
+        }
+        
+        // Apply tag filter while respecting type filter
+        const typeFilter = document.getElementById('paragraphTypeFilter').value;
+        const paragraphs = document.querySelectorAll('.paragraph-card');
+        
+        paragraphs.forEach(p => {
+            // First check if it passes the type filter
+            const passesTypeFilter = !typeFilter || p.dataset.type === typeFilter;
+            
+            // Then check if it has the selected tag
+            const tags = p.dataset.tags.split(',');
+            const passesTagFilter = tags.includes(tagId);
+            
+            // Only show if passes both filters
+            if (passesTypeFilter && passesTagFilter) {
+                p.style.display = 'block';
+            } else {
+                p.style.display = 'none';
+            }
+        });
+    }
+    
+    function sortParagraphs(sortOption) {
+        const paragraphsList = document.getElementById('paragraphsList');
+        const paragraphs = Array.from(paragraphsList.children);
+        
+        // Sort based on selected option
+        paragraphs.sort((a, b) => {
+            switch(sortOption) {
+                case 'occurrences_desc':
+                    return parseInt(b.dataset.occurrences) - parseInt(a.dataset.occurrences);
+                case 'occurrences_asc':
+                    return parseInt(a.dataset.occurrences) - parseInt(b.dataset.occurrences);
+                case 'document':
+                    return a.dataset.document.localeCompare(b.dataset.document);
+                default: // position (default)
+                    return 0; // Keep original order
+            }
+        });
+        
+        // Re-append elements in sorted order
+        paragraphs.forEach(p => paragraphsList.appendChild(p));
+        
+        // Reapply filters after sorting
+        applySortingAndTagFilters();
+    }
+    
+    function applySortingAndTagFilters() {
+        const typeFilter = document.getElementById('paragraphTypeFilter').value;
+        const tagFilter = document.getElementById('tagFilter').value;
+        
+        if (typeFilter) {
+            filterByType(typeFilter);
+        }
+        
+        if (tagFilter) {
+            filterByTag(tagFilter);
+        }
     }
     
     function showTagModal(paragraphId) {
@@ -212,5 +315,14 @@
             }
         });
     }
+    
+    // Initialize sorting and filtering on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        // Apply any default sorting
+        const sortOption = document.getElementById('sortOption');
+        if (sortOption.value !== 'position') {
+            sortParagraphs(sortOption.value);
+        }
+    });
 </script>
 {% endblock %}

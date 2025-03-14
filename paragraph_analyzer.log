@@ -248,3 +248,7 @@
 2025-03-14 16:23:46,104 INFO: Processed 22 paragraphs from Non_Eligible_Gross_93383a_PRT_TPP_0001.pdf [in C:\Simplicity2\app.py:196]
 2025-03-14 16:23:46,784 INFO: Processed 22 paragraphs from Provider_Switch_Gross_Previously_RGA_TPP_LE_0088.pdf [in C:\Simplicity2\app.py:196]
 2025-03-14 16:23:47,702 INFO: Processed 32 paragraphs from Provider_Switch_Net_Previously_RGA_TPP_LE_0087.pdf [in C:\Simplicity2\app.py:196]
+2025-03-14 18:00:02,375 INFO: Paragraph Analyzer startup [in C:\Simplicity2\app.py:58]
+2025-03-14 18:00:05,602 INFO: Paragraph Analyzer startup [in C:\Simplicity2\app.py:58]
+2025-03-14 18:06:14,113 INFO: Paragraph Analyzer startup [in C:\Simplicity2\app.py:58]
+2025-03-14 18:06:17,803 INFO: Paragraph Analyzer startup [in C:\Simplicity2\app.py:58]

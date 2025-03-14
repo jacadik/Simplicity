@@ -228,4 +228,54 @@ pre.table-content {
     .similarity-score-badge {
         font-size: 18px;
     }
+}/* Add to your custom.css file */
+
+/* Styling for occurrence badge */
+.occurrence-badge {
+    display: inline-flex;
+    align-items: center;
+    margin-left: 5px;
+}
+
+.occurrence-badge i {
+    margin-right: 4px;
+}
+
+/* Make filter controls more consistent */
+.filter-controls {
+    margin-bottom: 15px;
+}
+
+/* Improve tag filter dropdown */
+#tagFilter option {
+    padding: 5px;
+}
+
+/* Hover effect for paragraph cards */
+.paragraph-card {
+    transition: transform 0.1s ease-in-out, box-shadow 0.2s ease-in-out;
+}
+
+.paragraph-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Additional styling for the sorting dropdown */
+#sortOption {
+    font-weight: 500;
+}
+
+/* Paragraph sorting animation */
+@keyframes highlightSort {
+    0% {
+        background-color: rgba(255, 251, 204, 0.8);
+    }
+    100% {
+        background-color: transparent;
+    }
+}
+
+.highlight-sort {
+    animation: highlightSort 1.5s ease-out;
 }
