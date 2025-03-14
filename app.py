@@ -322,6 +322,33 @@ def add_tag():
     
     return redirect(url_for('manage_tags'))
 
+@app.route('/delete-tag', methods=['POST'])
+def delete_tag():
+    """Delete a tag and remove all its associations."""
+    tag_id = request.form.get('tag_id', type=int)
+    
+    if not tag_id:
+        if g.is_xhr:
+            return jsonify({'success': False, 'message': 'Invalid tag ID'})
+        flash('Invalid tag ID', 'danger')
+        return redirect(url_for('manage_tags'))
+    
+    success = db_manager.delete_tag(tag_id)
+    
+    # Check if it's an AJAX request
+    if g.is_xhr:
+        return jsonify({
+            'success': success,
+            'message': 'Tag deleted successfully' if success else 'Failed to delete tag'
+        })
+    
+    if success:
+        flash('Tag deleted successfully', 'success')
+    else:
+        flash('Failed to delete tag', 'danger')
+    
+    return redirect(url_for('manage_tags'))
+
 @app.route('/tag-paragraph', methods=['POST'])
 def tag_paragraph():
     """Tag a paragraph."""

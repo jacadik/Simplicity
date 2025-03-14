@@ -38,8 +38,11 @@
                     {% if tags %}
                         <div class="d-flex flex-wrap gap-2">
                             {% for tag in tags %}
-                                <span class="badge p-2" style="background-color: {{ tag.color }}">
+                                <span class="badge p-2 tag-item" id="tag-{{ tag.id }}" style="background-color: {{ tag.color }}">
                                     {{ tag.name }}
+                                    <button type="button" class="btn-close btn-close-white ms-2" 
+                                            aria-label="Delete" style="font-size: 0.5rem;" 
+                                            onclick="deleteTag({{ tag.id }}, '{{ tag.name }}', this)"></button>
                                 </span>
                             {% endfor %}
                         </div>
@@ -50,4 +53,53 @@
             </div>
         </div>
     </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function deleteTag(tagId, tagName, element) {
+    if (confirm(`Are you sure you want to delete the tag "${tagName}"? This will remove it from all paragraphs.`)) {
+        $.ajax({
+            url: '/delete-tag',
+            method: 'POST',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            data: {
+                tag_id: tagId
+            },
+            success: function(response) {
+                if (response.success) {
+                    // Remove the tag element from DOM
+                    $(element).closest('.tag-item').fadeOut(300, function() { 
+                        $(this).remove(); 
+                        
+                        // Show empty message if no tags left
+                        if ($('.tag-item').length === 0) {
+                            $('.card-body').append('<p class="text-muted">No tags created yet.</p>');
+                        }
+                    });
+                    
+                    // Show success message
+                    const alert = $('<div class="alert alert-success alert-dismissible fade show" role="alert">' +
+                        'Tag "' + tagName + '" deleted successfully' +
+                        '<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>' +
+                        '</div>');
+                    $('.card-header').after(alert);
+                    
+                    // Auto-dismiss the alert after 3 seconds
+                    setTimeout(function() {
+                        $('.alert').alert('close');
+                    }, 3000);
+                } else {
+                    alert('Failed to delete tag: ' + response.message);
+                }
+            },
+            error: function() {
+                alert('An error occurred while deleting the tag');
+            }
+        });
+    }
+}
+</script>
 {% endblock %}

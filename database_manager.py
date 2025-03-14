@@ -533,6 +533,33 @@ class DatabaseManager:
         finally:
             session.close()
     
+    def delete_tag(self, tag_id: int) -> bool:
+        """Delete a tag and all its associations."""
+        self.logger.info(f"Deleting tag with ID: {tag_id}")
+        
+        session = self.Session()
+        try:
+            # Get the tag
+            tag = session.query(Tag).get(tag_id)
+            
+            if not tag:
+                self.logger.warning(f"Tag with ID {tag_id} not found")
+                return False
+            
+            # Delete the tag (cascade will handle associations)
+            session.delete(tag)
+            session.commit()
+            
+            self.logger.info(f"Deleted tag with ID: {tag_id}")
+            return True
+            
+        except Exception as e:
+            session.rollback()
+            self.logger.error(f"Error deleting tag: {str(e)}", exc_info=True)
+            return False
+        finally:
+            session.close()
+    
     def tag_paragraph(self, paragraph_id: int, tag_id: int) -> bool:
         """Associate a tag with a paragraph."""
         self.logger.info(f"Tagging paragraph {paragraph_id} with tag {tag_id}")
