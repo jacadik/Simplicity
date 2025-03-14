@@ -31,6 +31,106 @@
         </div>
     </div>
 
+    <!-- Summary Statistics -->
+    <div class="card mb-4">
+        <div class="card-header bg-light">
+            <h5 class="mb-0">Analysis Summary</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-3">
+                    <div class="d-flex align-items-center">
+                        <div class="p-3 rounded-circle bg-success text-white me-3">
+                            <i class="bi bi-check2-circle"></i>
+                        </div>
+                        <div>
+                            <h6 class="mb-0">Exact Matches</h6>
+                            <h3 class="mb-0">{{ similarities|selectattr('similarity_type', 'equalto', 'exact')|list|length }}</h3>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="d-flex align-items-center">
+                        <div class="p-3 rounded-circle bg-primary text-white me-3">
+                            <i class="bi bi-arrow-left-right"></i>
+                        </div>
+                        <div>
+                            <h6 class="mb-0">Similar Paragraphs</h6>
+                            <h3 class="mb-0">{{ similarities|selectattr('similarity_type', 'equalto', 'similar')|list|length }}</h3>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="d-flex align-items-center">
+                        <div class="p-3 rounded-circle bg-warning text-white me-3">
+                            <i class="bi bi-file-earmark-text"></i>
+                        </div>
+                        <div>
+                            <h6 class="mb-0">Documents Compared</h6>
+                            <h3 class="mb-0">{{ similarities|map(attribute='para1_filename')|list|unique|list|length }}</h3>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="d-flex align-items-center">
+                        <div class="p-3 rounded-circle bg-info text-white me-3">
+                            <i class="bi bi-percent"></i>
+                        </div>
+                        <div>
+                            <h6 class="mb-0">Avg. Similarity</h6>
+                            <h3 class="mb-0">
+                                {% if similarities %}
+                                    {{ (similarities|sum(attribute='similarity_score') / similarities|length * 100)|round(1) }}%
+                                {% else %}
+                                    0%
+                                {% endif %}
+                            </h3>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtering Options -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="mb-0">
+                        <label for="similarityTypeFilter" class="form-label">Filter by Type</label>
+                        <select class="form-select" id="similarityTypeFilter">
+                            <option value="all">All Types</option>
+                            <option value="exact">Exact Matches</option>
+                            <option value="similar">Similar Paragraphs</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="mb-0">
+                        <label for="documentFilter" class="form-label">Filter by Document</label>
+                        <select class="form-select" id="documentFilter">
+                            <option value="all">All Documents</option>
+                            {% for filename in similarities|map(attribute='para1_filename')|list|unique %}
+                                <option value="{{ filename }}">{{ filename }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="mb-0">
+                        <label for="sortOrder" class="form-label">Sort By</label>
+                        <select class="form-select" id="sortOrder">
+                            <option value="score_desc">Similarity Score (High to Low)</option>
+                            <option value="score_asc">Similarity Score (Low to High)</option>
+                            <option value="doc_name">Document Name</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Similarity Results -->
     <h3>Similarity Results</h3>
     <div class="row">
@@ -38,24 +138,96 @@
             {% if similarities %}
                 <div id="similarityResults">
                     {% for sim in similarities %}
-                        <div class="similarity-container">
-                            <div class="d-flex justify-content-between mb-2">
-                                <div>
-                                    <span class="badge {% if sim.similarity_type == 'exact' %}bg-success{% else %}bg-primary{% endif %}">{{ sim.similarity_type | upper }}</span>
-                                </div>
-                                <div class="similarity-score">
-                                    {{ "%.2f"|format(sim.similarity_score * 100) }}%
-                                </div>
-                            </div>
+                        {% set para1_doc_name = sim.para1_filename.split('.')|first %}
+                        {% set para2_doc_name = sim.para2_filename.split('.')|first %}
+                        
+                        <div class="similarity-container" 
+                             data-type="{{ sim.similarity_type }}"
+                             data-score="{{ sim.similarity_score }}"
+                             data-doc1="{{ sim.para1_filename }}"
+                             data-doc2="{{ sim.para2_filename }}">
                             
-                            <div class="content-compare">
-                                <div class="content-column">
-                                    <h5>{{ sim.para1_filename }}</h5>
-                                    <p>{{ sim.para1_content }}</p>
+                            <div class="card mb-4">
+                                <div class="card-header d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <span class="badge {% if sim.similarity_type == 'exact' %}bg-success{% else %}bg-primary{% endif %} p-2">
+                                            {{ sim.similarity_type | upper }}
+                                        </span>
+                                        <span class="ms-2 text-muted">ID: {{ sim.id }}</span>
+                                    </div>
+                                    <div class="similarity-score-badge">
+                                        <span class="fw-bold">{{ "%.2f"|format(sim.similarity_score * 100) }}%</span>
+                                    </div>
                                 </div>
-                                <div class="content-column">
-                                    <h5>{{ sim.para2_filename }}</h5>
-                                    <p>{{ sim.para2_content }}</p>
+                                
+                                <div class="card-body">
+                                    <div class="row">
+                                        <!-- First Paragraph -->
+                                        <div class="col-md-6">
+                                            <div class="content-panel">
+                                                <div class="content-header d-flex justify-content-between align-items-center mb-2">
+                                                    <h5 class="mb-0 text-primary">{{ para1_doc_name }}-{{ sim.paragraph1_id }}</h5>
+                                                    <span class="badge bg-light text-dark">{{ sim.para1_filename }}</span>
+                                                </div>
+                                                <div class="content-body p-3 border rounded{% if sim.similarity_type == 'exact' %} bg-light{% endif %}">
+                                                    <p>{{ sim.para1_content }}</p>
+                                                </div>
+                                                <div class="mt-2 text-end">
+                                                    <a href="/paragraphs?document_id={{ sim.para1_doc_id }}" class="btn btn-sm btn-outline-secondary">
+                                                        <i class="bi bi-eye"></i> View in Context
+                                                    </a>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Second Paragraph -->
+                                        <div class="col-md-6">
+                                            <div class="content-panel">
+                                                <div class="content-header d-flex justify-content-between align-items-center mb-2">
+                                                    <h5 class="mb-0 text-primary">{{ para2_doc_name }}-{{ sim.paragraph2_id }}</h5>
+                                                    <span class="badge bg-light text-dark">{{ sim.para2_filename }}</span>
+                                                </div>
+                                                <div class="content-body p-3 border rounded{% if sim.similarity_type == 'exact' %} bg-light{% endif %}">
+                                                    <p>{{ sim.para2_content }}</p>
+                                                </div>
+                                                <div class="mt-2 text-end">
+                                                    <a href="/paragraphs?document_id={{ sim.para2_doc_id }}" class="btn btn-sm btn-outline-secondary">
+                                                        <i class="bi bi-eye"></i> View in Context
+                                                    </a>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    {% if sim.similarity_type != 'exact' %}
+                                    <!-- Difference Highlight (for non-exact matches) -->
+                                    <div class="row mt-3">
+                                        <div class="col-12">
+                                            <div class="diff-info p-3 border rounded bg-light">
+                                                <h6 class="mb-2"><i class="bi bi-info-circle"></i> Key Differences</h6>
+                                                <div id="diff-{{ sim.id }}">
+                                                    <!-- Diff content will be populated by JavaScript -->
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                                
+                                <div class="card-footer bg-light">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <span class="text-muted">Document Comparison: </span>
+                                            <span class="badge bg-secondary">{{ sim.para1_filename }}</span>
+                                            <i class="bi bi-arrow-left-right mx-1"></i>
+                                            <span class="badge bg-secondary">{{ sim.para2_filename }}</span>
+                                        </div>
+                                        <div>
+                                            <button class="btn btn-sm btn-outline-primary add-tag-btn" data-id1="{{ sim.paragraph1_id }}" data-id2="{{ sim.paragraph2_id }}">
+                                                <i class="bi bi-tag"></i> Tag Both
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -68,9 +240,37 @@
             {% endif %}
         </div>
     </div>
+
+    <!-- Tag Modal -->
+    <div class="modal fade" id="tagModal" tabindex="-1" aria-labelledby="tagModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="tagModalLabel">Add Tag to Similar Paragraphs</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="paragraph1Id">
+                    <input type="hidden" id="paragraph2Id">
+                    <div class="mb-3">
+                        <label class="form-label">Select Tag</label>
+                        <div class="tag-selection">
+                            <!-- Tags will be loaded via AJAX -->
+                            <div class="text-center p-3">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 {% endblock %}
 
 {% block scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/diff/5.1.0/diff.min.js"></script>
 <script>
     // Update threshold value display when slider changes
     const thresholdSlider = document.getElementById('thresholdSlider');
@@ -79,5 +279,168 @@
     thresholdSlider.addEventListener('input', function() {
         thresholdValue.textContent = this.value;
     });
+    
+    // Filtering functionality
+    document.getElementById('similarityTypeFilter').addEventListener('change', filterResults);
+    document.getElementById('documentFilter').addEventListener('change', filterResults);
+    document.getElementById('sortOrder').addEventListener('change', sortResults);
+    
+    function filterResults() {
+        const typeFilter = document.getElementById('similarityTypeFilter').value;
+        const docFilter = document.getElementById('documentFilter').value;
+        
+        const containers = document.querySelectorAll('.similarity-container');
+        
+        containers.forEach(container => {
+            const typeMatch = typeFilter === 'all' || container.dataset.type === typeFilter;
+            const docMatch = docFilter === 'all' || 
+                            container.dataset.doc1 === docFilter || 
+                            container.dataset.doc2 === docFilter;
+            
+            container.style.display = (typeMatch && docMatch) ? 'block' : 'none';
+        });
+    }
+    
+    function sortResults() {
+        const sortOrder = document.getElementById('sortOrder').value;
+        const resultsContainer = document.getElementById('similarityResults');
+        const containers = Array.from(document.querySelectorAll('.similarity-container'));
+        
+        containers.sort((a, b) => {
+            if (sortOrder === 'score_desc') {
+                return parseFloat(b.dataset.score) - parseFloat(a.dataset.score);
+            } else if (sortOrder === 'score_asc') {
+                return parseFloat(a.dataset.score) - parseFloat(b.dataset.score);
+            } else if (sortOrder === 'doc_name') {
+                return a.dataset.doc1.localeCompare(b.dataset.doc1);
+            }
+        });
+        
+        // Clear and re-append in new order
+        while (resultsContainer.firstChild) {
+            resultsContainer.removeChild(resultsContainer.firstChild);
+        }
+        
+        containers.forEach(container => {
+            resultsContainer.appendChild(container);
+        });
+    }
+    
+    // Diff visualization for similar (non-exact) paragraphs
+    document.addEventListener('DOMContentLoaded', function() {
+        const similarItems = document.querySelectorAll('.similarity-container[data-type="similar"]');
+        
+        similarItems.forEach(item => {
+            const id = item.querySelector('.card-header .text-muted').textContent.split(': ')[1];
+            const text1 = item.querySelector('.col-md-6:first-child .content-body p').textContent;
+            const text2 = item.querySelector('.col-md-6:last-child .content-body p').textContent;
+            
+            const diffContainer = document.getElementById(`diff-${id}`);
+            
+            if (diffContainer) {
+                // Generate word-by-word diff
+                const words1 = text1.split(/\s+/);
+                const words2 = text2.split(/\s+/);
+                
+                const diffResult = Diff.diffWords(text1, text2);
+                
+                let diffHtml = '';
+                diffResult.forEach(part => {
+                    const color = part.added ? 'text-success' : 
+                                 part.removed ? 'text-danger' : 'text-muted';
+                    const prefix = part.added ? '+ ' : 
+                                  part.removed ? '- ' : '';
+                    
+                    if (part.added || part.removed) {
+                        diffHtml += `<span class="${color} fw-bold">${prefix}${part.value}</span>`;
+                    } else if (part.value.length > 50) {
+                        // For unchanged sections, truncate long parts
+                        diffHtml += `<span class="${color}">${part.value.substring(0, 25)}...${part.value.substring(part.value.length - 25)}</span>`;
+                    } else {
+                        diffHtml += `<span class="${color}">${part.value}</span>`;
+                    }
+                });
+                
+                diffContainer.innerHTML = diffHtml;
+            }
+        });
+    });
+    
+    // Tag functionality
+    const tagButtons = document.querySelectorAll('.add-tag-btn');
+    const tagModal = new bootstrap.Modal(document.getElementById('tagModal'));
+    
+    tagButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const para1Id = this.dataset.id1;
+            const para2Id = this.dataset.id2;
+            
+            document.getElementById('paragraph1Id').value = para1Id;
+            document.getElementById('paragraph2Id').value = para2Id;
+            
+            // Load tags via AJAX
+            fetch('/get-tags')
+                .then(response => response.json())
+                .then(tags => {
+                    const tagSelection = document.querySelector('.tag-selection');
+                    tagSelection.innerHTML = '';
+                    
+                    tags.forEach(tag => {
+                        const tagElement = document.createElement('div');
+                        tagElement.className = 'tag-item d-inline-block m-1';
+                        tagElement.innerHTML = `
+                            <span class="badge p-2" style="background-color: ${tag.color}; cursor: pointer;" 
+                                  onclick="tagBothParagraphs(${tag.id})">
+                                ${tag.name}
+                            </span>
+                        `;
+                        tagSelection.appendChild(tagElement);
+                    });
+                })
+                .catch(error => {
+                    console.error('Error fetching tags:', error);
+                });
+                
+            tagModal.show();
+        });
+    });
+    
+    function tagBothParagraphs(tagId) {
+        const para1Id = document.getElementById('paragraph1Id').value;
+        const para2Id = document.getElementById('paragraph2Id').value;
+        
+        // Tag first paragraph
+        fetch('/tag-paragraph', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: `paragraph_id=${para1Id}&tag_id=${tagId}`
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Tag second paragraph
+                return fetch('/tag-paragraph', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: `paragraph_id=${para2Id}&tag_id=${tagId}`
+                });
+            }
+        })
+        .then(response => response ? response.json() : null)
+        .then(data => {
+            if (data && data.success) {
+                tagModal.hide();
+                // Show success message
+                alert('Both paragraphs have been successfully tagged');
+            }
+        })
+        .catch(error => {
+            console.error('Error tagging paragraphs:', error);
+        });
+    }
 </script>
 {% endblock %}

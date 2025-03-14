@@ -350,6 +350,12 @@ def untag_paragraph():
     else:
         return jsonify({'success': False, 'message': 'Failed to untag paragraph'})
 
+@app.route('/get-tags')
+def get_tags_json():
+    """Get all tags as JSON."""
+    tags = db_manager.get_tags()
+    return jsonify(tags)
+	
 @app.route('/export')
 def export_data():
     """Export data to Excel."""

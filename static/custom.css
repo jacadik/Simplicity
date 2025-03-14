@@ -148,3 +148,84 @@ pre.table-content {
         font-size: 20px;
     }
 }
+/* Enhanced styles for similarity analysis page */
+
+/* Similarity container styling */
+.similarity-container {
+    margin-bottom: 30px;
+}
+
+.similarity-score-badge {
+    font-size: 24px;
+    text-align: center;
+    min-width: 80px;
+}
+
+/* Content panel styling */
+.content-panel {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.content-body {
+    flex-grow: 1;
+    overflow-y: auto;
+    max-height: 300px;
+}
+
+/* Highlight differences */
+.diff-info {
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+
+/* Filter controls */
+.filter-controls {
+    margin-bottom: 20px;
+}
+
+/* Summary statistics */
+.summary-item {
+    text-align: center;
+    padding: 15px;
+}
+
+.summary-item .icon {
+    font-size: 2rem;
+    margin-bottom: 10px;
+}
+
+.summary-item .value {
+    font-size: 1.5rem;
+    font-weight: bold;
+}
+
+.summary-item .label {
+    font-size: 0.9rem;
+    color: #6c757d;
+}
+
+/* Tag selection */
+.tag-item .badge {
+    transition: transform 0.2s;
+}
+
+.tag-item .badge:hover {
+    transform: scale(1.1);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .row.content-row {
+        flex-direction: column;
+    }
+    
+    .content-panel {
+        margin-bottom: 20px;
+    }
+    
+    .similarity-score-badge {
+        font-size: 18px;
+    }
+}
