@@ -37,14 +37,14 @@
                             <td>{{ doc.id }}</td>
                             <td>{{ doc.filename }}</td>
                             <td>{{ doc.file_type.upper() }}</td>
-                            <td>{{ doc.upload_date }}</td>
-                            <td>
-                                <a href="/paragraphs?document_id={{ doc.id }}" class="btn btn-sm btn-info">
-                                    <i class="bi bi-eye"></i> View Paragraphs
-                                </a>
-                                <a href="/delete/{{ doc.id }}" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure you want to delete this document?');">
-                                    <i class="bi bi-trash"></i> Delete
-                                </a>
+                            <td>{{ doc.upload_date.split('T')[0].split('-')[2] }}-{{ doc.upload_date.split('T')[0].split('-')[1] }}-{{ doc.upload_date.split('T')[0].split('-')[0] }} {{ doc.upload_date.split('T')[1].split('.')[0][:5] }}</td>
+							<td>
+								<a href="/delete/{{ doc.id }}" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure you want to delete this document?');">
+									<i class="bi bi-trash"></i> Delete
+								</a>
+								<a href="/paragraphs?document_id={{ doc.id }}" class="btn btn-sm btn-info">
+									<i class="bi bi-eye"></i> View Paragraphs
+								</a>
                             </td>
                         </tr>
                     {% endfor %}
