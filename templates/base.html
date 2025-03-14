@@ -69,6 +69,72 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+	
+
+<script>
+$(document).ready(function() {
+    // Only target the file upload form specifically, not the folder form
+    $('#uploadForm').on('submit', function(e) {
+        console.log('Upload form submitted'); // Add debug log
+        e.preventDefault();
+        
+        var files = $('#files')[0].files;
+        if (files.length === 0) {
+            alert('Please select at least one file');
+            return;
+        }
+        
+        // Create FormData object
+        var formData = new FormData(this);
+        
+        // Show progress bar and disable submit button
+        $('#uploadProgress').show();
+        $('#uploadButton').prop('disabled', true);
+        
+        // Send AJAX request
+        $.ajax({
+            url: '/upload',
+            type: 'POST',
+            data: formData,
+            contentType: false,
+            processData: false,
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            xhr: function() {
+                var xhr = new window.XMLHttpRequest();
+                
+                // Upload progress
+                xhr.upload.addEventListener("progress", function(evt) {
+                    if (evt.lengthComputable) {
+                        var percentComplete = (evt.loaded / evt.total) * 100;
+                        $('.progress-bar').css('width', percentComplete + '%');
+                        console.log('Upload progress: ' + percentComplete + '%');
+                    }
+                }, false);
+                
+                return xhr;
+            },
+            success: function(response) {
+                console.log('Upload complete', response);
+                // When upload is complete, redirect to refresh the page
+                window.location.href = '/';
+            },
+            error: function(xhr, status, error) {
+                console.error('Upload error:', error);
+                // On error, show alert and reset form
+                alert('Error uploading files: ' + error);
+                $('#uploadProgress').hide();
+                $('#uploadButton').prop('disabled', false);
+                $('.progress-bar').css('width', '0%');
+            }
+        });
+    });
+
+    // Do NOT add event handler to the folder form - let it submit normally
+});
+</script>
+
     {% block scripts %}{% endblock %}
 </body>
 </html>

@@ -73,17 +73,26 @@
                     <h5 class="modal-title" id="uploadModalLabel">Upload Documents</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                <form action="/upload" method="post" enctype="multipart/form-data">
+                <form action="/upload" method="post" enctype="multipart/form-data" id="uploadForm">
                     <div class="modal-body">
                         <div class="mb-3">
                             <label for="files" class="form-label">Select PDF or Word documents</label>
                             <input class="form-control" type="file" id="files" name="files[]" multiple accept=".pdf,.doc,.docx" required>
                             <div class="form-text">You can select multiple files at once.</div>
                         </div>
+                        
+                        <!-- Progress bar (initially hidden) -->
+                        <div id="uploadProgress" class="mt-3" style="display: none;">
+                            <label class="form-label">Uploading files...</label>
+                            <div class="progress">
+                                <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
+                            </div>
+                            <small class="text-muted mt-1">Please wait while your files are being processed.</small>
+                        </div>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-primary">Upload</button>
+                        <button type="submit" class="btn btn-primary" id="uploadButton">Upload</button>
                     </div>
                 </form>
             </div>
@@ -98,20 +107,108 @@
                     <h5 class="modal-title" id="folderModalLabel">Import from Folder</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                <form action="/upload-folder" method="post">
+                <form action="/upload-folder" method="post" id="folderForm">
                     <div class="modal-body">
                         <div class="mb-3">
                             <label for="folderPath" class="form-label">Enter folder path</label>
                             <input type="text" class="form-control" id="folderPath" name="folder_path" required>
                             <div class="form-text">Enter the full path to a folder containing PDF or Word documents.</div>
                         </div>
+                        
+                        <!-- Add this progress section (initially hidden) -->
+                        <div id="folderImportStatus" style="display: none;">
+                            <div class="d-flex align-items-center mt-3">
+                                <div class="spinner-border text-primary me-2" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                                <div>Importing files... This may take a while.</div>
+                            </div>
+                        </div>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-primary">Import</button>
+                        <button type="submit" class="btn btn-primary" id="importButton">Import</button>
                     </div>
                 </form>
             </div>
         </div>
     </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+$(document).ready(function() {
+    // Handle the file upload form
+    $('#uploadForm').on('submit', function(e) {
+        console.log('Upload form submitted');
+        e.preventDefault();
+        
+        var files = $('#files')[0].files;
+        if (files.length === 0) {
+            alert('Please select at least one file');
+            return;
+        }
+        
+        // Create FormData object
+        var formData = new FormData(this);
+        
+        // Show progress bar and disable submit button
+        $('#uploadProgress').show();
+        $('#uploadButton').prop('disabled', true);
+        
+        // Send AJAX request
+        $.ajax({
+            url: '/upload',
+            type: 'POST',
+            data: formData,
+            contentType: false,
+            processData: false,
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            xhr: function() {
+                var xhr = new window.XMLHttpRequest();
+                
+                // Upload progress
+                xhr.upload.addEventListener("progress", function(evt) {
+                    if (evt.lengthComputable) {
+                        var percentComplete = (evt.loaded / evt.total) * 100;
+                        $('.progress-bar').css('width', percentComplete + '%');
+                        console.log('Upload progress: ' + percentComplete + '%');
+                    }
+                }, false);
+                
+                return xhr;
+            },
+            success: function(response) {
+                console.log('Upload complete', response);
+                // When upload is complete, redirect to refresh the page
+                window.location.href = '/';
+            },
+            error: function(xhr, status, error) {
+                console.error('Upload error:', error);
+                // On error, show alert and reset form
+                alert('Error uploading files: ' + error);
+                $('#uploadProgress').hide();
+                $('#uploadButton').prop('disabled', false);
+                $('.progress-bar').css('width', '0%');
+            }
+        });
+    });
+    
+    // Handle the folder import form
+    $('#folderForm').on('submit', function() {
+        var folderPath = $('#folderPath').val();
+        if (!folderPath) {
+            return false;
+        }
+        
+        // Show spinner and disable button
+        $('#folderImportStatus').show();
+        $('#importButton').prop('disabled', true);
+        
+        return true; // Allow the form to submit normally
+    });
+});
+</script>
 {% endblock %}

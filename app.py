@@ -4,7 +4,7 @@ from logging.handlers import RotatingFileHandler
 import tempfile
 import shutil
 from datetime import datetime
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, send_file
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, send_file, g
 from werkzeug.utils import secure_filename
 
 from document_parser import DocumentParser
@@ -30,6 +30,12 @@ app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16 MB max upload size
 app.secret_key = 'paragraph_analyzer_secret_key'  # For flash messages
+
+# Add before_request function to detect AJAX requests
+@app.before_request
+def before_request():
+    # Store XHR status in g object
+    g.is_xhr = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
 
 # Configure logging
 def setup_logging(app):
@@ -75,12 +81,16 @@ def index():
 def upload_documents():
     """Handle document upload."""
     if 'files[]' not in request.files:
+        if g.is_xhr:  # Check if it's an AJAX request using g object
+            return jsonify({'success': False, 'message': 'No files selected'})
         flash('No files selected', 'danger')
         return redirect(url_for('index'))
         
     files = request.files.getlist('files[]')
     
     if not files or files[0].filename == '':
+        if g.is_xhr:
+            return jsonify({'success': False, 'message': 'No files selected'})
         flash('No files selected', 'danger')
         return redirect(url_for('index'))
     
@@ -120,6 +130,12 @@ def upload_documents():
                     logger.warning(f"No paragraphs extracted from {filename}")
             else:
                 logger.error(f"Failed to add document to database: {filename}")
+    
+    if g.is_xhr:
+        return jsonify({
+            'success': success_count > 0,
+            'message': f'Successfully uploaded and processed {success_count} document(s)' if success_count > 0 else 'Failed to process uploaded documents'
+        })
     
     if success_count > 0:
         flash(f'Successfully uploaded and processed {success_count} document(s)', 'success')
