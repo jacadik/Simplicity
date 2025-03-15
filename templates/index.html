@@ -38,14 +38,17 @@
                             <td>{{ doc.filename }}</td>
                             <td>{{ doc.file_type.upper() }}</td>
                             <td>{{ doc.upload_date.split('T')[0].split('-')[2] }}-{{ doc.upload_date.split('T')[0].split('-')[1] }}-{{ doc.upload_date.split('T')[0].split('-')[0] }} {{ doc.upload_date.split('T')[1].split('.')[0][:5] }}</td>
-							<td>
+							<<td>
 								<a href="/delete/{{ doc.id }}" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure you want to delete this document?');">
 									<i class="bi bi-trash"></i> Delete
 								</a>
 								<a href="/paragraphs?document_id={{ doc.id }}" class="btn btn-sm btn-info">
 									<i class="bi bi-eye"></i> View Paragraphs
 								</a>
-                            </td>
+								<a href="/document/{{ doc.id }}" class="btn btn-sm btn-success">
+									<i class="bi bi-file-earmark"></i> View Document
+								</a>
+							</td>
                         </tr>
                     {% endfor %}
                 {% else %}

@@ -9,7 +9,7 @@ from werkzeug.utils import secure_filename
 
 from document_parser import DocumentParser
 from similarity_analyzer import SimilarityAnalyzer
-from database_manager import DatabaseManager
+from database_manager import DatabaseManager, Document, Paragraph, Tag, SimilarityResult
 
 # Configuration
 UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads')
@@ -250,6 +250,46 @@ def view_paragraphs():
         show_all_duplicates=show_all_duplicates
     )
 
+@app.route('/document/<int:document_id>')
+def view_document(document_id):
+    """View a document with its extracted paragraphs."""
+    # Get document information
+    session = db_manager.Session()
+    document = session.query(Document).get(document_id)
+    
+    if not document:
+        flash('Document not found', 'danger')
+        return redirect(url_for('index'))
+    
+    # Get paragraphs for this document
+    paragraphs = db_manager.get_paragraphs(document_id, collapse_duplicates=False)
+    
+    # Determine file type for proper rendering
+    file_type = document.file_type.lower()
+    
+    return render_template(
+        'document_view.html',
+        document=document,
+        paragraphs=paragraphs,
+        file_type=file_type
+    )
+
+@app.route('/serve-document/<int:document_id>')
+def serve_document(document_id):
+    """Serve the document file for viewing."""
+    session = db_manager.Session()
+    document = session.query(Document).get(document_id)
+    
+    if not document or not os.path.exists(document.file_path):
+        flash('Document not found', 'danger')
+        return redirect(url_for('index'))
+    
+    return send_file(
+        document.file_path,
+        as_attachment=False,
+        download_name=document.filename
+    )
+	
 @app.route('/similarity')
 def view_similarity():
     """View similarity analysis with threshold adjustment."""

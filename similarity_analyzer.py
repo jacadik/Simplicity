@@ -153,6 +153,7 @@ class SimilarityAnalyzer:
                 else:
                     content_dict[normalized] = [i]
             
+            # Add exact matches to results
             results.extend(exact_matches)
             self.logger.debug(f"Found {len(exact_matches)} exact matches")
                 

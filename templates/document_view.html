@@ -1,0 +1,425 @@
+{% extends 'base.html' %}
+
+{% block title %}Document View - {{ document.filename }}{% endblock %}
+
+{% block content %}
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+        <h1 class="h2">Document View: {{ document.filename }}</h1>
+        <div class="btn-toolbar mb-2 mb-md-0">
+            <a href="/paragraphs?document_id={{ document.id }}" class="btn btn-sm btn-outline-primary me-2">
+                <i class="bi bi-list-ul"></i> View Paragraphs
+            </a>
+            <a href="/" class="btn btn-sm btn-outline-secondary">
+                <i class="bi bi-arrow-left"></i> Back to Dashboard
+            </a>
+        </div>
+    </div>
+
+    <!-- Document Viewer - Full Width -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Document Content</h5>
+                </div>
+                <div class="card-body p-0 document-viewer-container">
+                    {% if file_type == 'pdf' %}
+                        <!-- PDF Viewer with direct file embedding -->
+                        <div class="pdf-container position-relative">
+                            <object id="pdfViewer" data="/serve-document/{{ document.id }}" type="application/pdf" width="100%" height="700">
+                                <p>Your browser does not support embedded PDFs. <a href="/serve-document/{{ document.id }}">Click here to download the PDF</a>.</p>
+                            </object>
+                            
+
+                        </div>
+                    {% elif file_type in ['doc', 'docx'] %}
+                        <!-- DOCX Viewer (limited support) -->
+                        <div class="p-4 text-center">
+                            <div class="alert alert-info">
+                                <i class="bi bi-file-earmark-word"></i> 
+                                Word documents cannot be rendered directly in the browser.
+                            </div>
+                            <a href="/serve-document/{{ document.id }}" class="btn btn-primary" target="_blank">
+                                <i class="bi bi-download"></i> Download Document
+                            </a>
+                        </div>
+                    {% else %}
+                        <div class="p-4 text-center">
+                            <div class="alert alert-warning">
+                                <i class="bi bi-exclamation-triangle"></i>
+                                Unsupported file type: {{ file_type }}
+                            </div>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Paragraphs List - Now Below Document -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5>Extracted Paragraphs</h5>
+                    <div>
+                        <button class="btn btn-sm btn-outline-primary" id="expandAllBtn">
+                            <i class="bi bi-arrows-expand"></i> Expand All
+                        </button>
+                        <button class="btn btn-sm btn-outline-secondary" id="collapseAllBtn">
+                            <i class="bi bi-arrows-collapse"></i> Collapse All
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="list-group paragraphs-list">
+                        {% for para in paragraphs %}
+                            <div class="list-group-item paragraph-item" data-id="{{ para.id }}" data-type="{{ para.paragraph_type }}">
+                                <div class="d-flex w-100 justify-content-between mb-2">
+                                    <h6>
+                                        <span class="badge bg-secondary">{{ para.paragraph_type }}</span>
+                                        <span class="ms-2">Paragraph {{ para.position + 1 }}</span>
+                                    </h6>
+                                    <div class="btn-group">
+                                        <button class="btn btn-sm btn-outline-primary toggle-content-btn" title="Expand/Collapse">
+                                            <i class="bi bi-arrows-expand"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary add-tag-btn" title="Add Tag" data-paragraph-id="{{ para.id }}">
+                                            <i class="bi bi-tag"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <!-- Paragraph content - collapsed by default -->
+                                <div class="paragraph-content-wrapper">
+                                    <p class="paragraph-content-preview mb-1">
+                                        {{ para.content|truncate(100) }}
+                                    </p>
+                                    <div class="paragraph-content-full mb-2" style="display: none;">
+                                        {{ para.content }}
+                                    </div>
+                                </div>
+                                
+                                <!-- Paragraph tags -->
+                                <div class="paragraph-tags mt-2">
+                                    {% if para.tags %}
+                                        {% for tag in para.tags %}
+                                            <span class="badge tag-badge" style="background-color: {{ tag.color }}">
+                                                {{ tag.name }}
+                                                <i class="bi bi-x remove-tag-btn" data-paragraph-id="{{ para.id }}" data-tag-id="{{ tag.id }}"></i>
+                                            </span>
+                                        {% endfor %}
+                                    {% endif %}
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tag Modal -->
+    <div class="modal fade" id="tagModal" tabindex="-1" aria-labelledby="tagModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="tagModalLabel">Add Tag</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="paragraphIdForTag">
+                    <div class="mb-3">
+                        <label class="form-label">Select Tag</label>
+                        <div class="d-flex flex-wrap gap-2 tag-selection">
+                            <!-- Tags will be loaded via AJAX -->
+                            <div class="text-center p-3 loading-indicator">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+    /* Document viewer styles */
+    .document-viewer-container {
+        background-color: #f5f5f5;
+        border: 1px solid #ddd;
+    }
+    
+    #pdfViewer {
+        width: 100%;
+        height: 700px;
+        border: 1px solid #ddd;
+    }
+    
+    .pdf-container {
+        position: relative;
+    }
+    
+    .pdf-page-controls {
+        position: absolute;
+        bottom: 20px;
+        left: 0;
+        right: 0;
+        display: flex;
+        justify-content: center;
+        gap: 20px;
+        z-index: 100;
+    }
+    
+    /* Paragraph list styles */
+    .paragraph-item {
+        border-left: 3px solid #6c757d;
+        transition: all 0.2s ease;
+        margin-bottom: 10px;
+    }
+    
+    .paragraph-item:hover {
+        background-color: #f8f9fa;
+    }
+    
+    .paragraph-item[data-type="header"] {
+        border-left-color: #007bff;
+    }
+    
+    .paragraph-item[data-type="list"] {
+        border-left-color: #28a745;
+    }
+    
+    .paragraph-item[data-type="table"] {
+        border-left-color: #dc3545;
+    }
+    
+    .paragraph-item[data-type="boilerplate"] {
+        border-left-color: #ffc107;
+    }
+    
+    .paragraph-content-full {
+        padding: 10px;
+        background-color: #f8f9fa;
+        border-radius: 4px;
+        border-left: 3px solid #6c757d;
+        white-space: pre-wrap;
+    }
+    
+    /* Tag styles */
+    .tag-badge {
+        padding: 5px 10px;
+        margin-right: 5px;
+        cursor: default;
+    }
+    
+    .tag-badge .remove-tag-btn {
+        cursor: pointer;
+        margin-left: 5px;
+    }
+    
+    .tag-badge .remove-tag-btn:hover {
+        color: #f8f9fa;
+    }
+    
+    .tag-selection .tag-badge {
+        cursor: pointer;
+        transition: transform 0.2s;
+    }
+    
+    .tag-selection .tag-badge:hover {
+        transform: scale(1.05);
+    }
+    
+    .paragraphs-list {
+        max-height: none;
+    }
+</style>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // PDF Viewer Reference
+        const pdfViewer = document.getElementById('pdfViewer');
+        
+        // Paragraph Content Toggle
+        const toggleButtons = document.querySelectorAll('.toggle-content-btn');
+        toggleButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const paragraphItem = this.closest('.paragraph-item');
+                const preview = paragraphItem.querySelector('.paragraph-content-preview');
+                const fullContent = paragraphItem.querySelector('.paragraph-content-full');
+                
+                if (fullContent.style.display === 'none') {
+                    // Expand
+                    preview.style.display = 'none';
+                    fullContent.style.display = 'block';
+                    this.innerHTML = '<i class="bi bi-arrows-collapse"></i>';
+                    this.title = 'Collapse';
+                } else {
+                    // Collapse
+                    preview.style.display = 'block';
+                    fullContent.style.display = 'none';
+                    this.innerHTML = '<i class="bi bi-arrows-expand"></i>';
+                    this.title = 'Expand';
+                }
+            });
+        });
+        
+        // Expand/Collapse All Buttons
+        const expandAllBtn = document.getElementById('expandAllBtn');
+        const collapseAllBtn = document.getElementById('collapseAllBtn');
+        
+        if (expandAllBtn) {
+            expandAllBtn.addEventListener('click', function() {
+                document.querySelectorAll('.paragraph-content-preview').forEach(preview => {
+                    preview.style.display = 'none';
+                });
+                document.querySelectorAll('.paragraph-content-full').forEach(fullContent => {
+                    fullContent.style.display = 'block';
+                });
+                document.querySelectorAll('.toggle-content-btn').forEach(button => {
+                    button.innerHTML = '<i class="bi bi-arrows-collapse"></i>';
+                    button.title = 'Collapse';
+                });
+            });
+        }
+        
+        if (collapseAllBtn) {
+            collapseAllBtn.addEventListener('click', function() {
+                document.querySelectorAll('.paragraph-content-preview').forEach(preview => {
+                    preview.style.display = 'block';
+                });
+                document.querySelectorAll('.paragraph-content-full').forEach(fullContent => {
+                    fullContent.style.display = 'none';
+                });
+                document.querySelectorAll('.toggle-content-btn').forEach(button => {
+                    button.innerHTML = '<i class="bi bi-arrows-expand"></i>';
+                    button.title = 'Expand';
+                });
+            });
+        }
+        
+        // Tag Modal & Tag Management
+        const tagModal = new bootstrap.Modal(document.getElementById('tagModal'));
+        const tagButtons = document.querySelectorAll('.add-tag-btn');
+        
+        // Load tags for the modal
+        function loadTags() {
+            const tagSelection = document.querySelector('.tag-selection');
+            const loadingIndicator = document.querySelector('.loading-indicator');
+            
+            fetch('/get-tags')
+                .then(response => response.json())
+                .then(tags => {
+                    // Remove loading indicator
+                    if (loadingIndicator) {
+                        loadingIndicator.remove();
+                    }
+                    
+                    // Clear existing tags
+                    tagSelection.innerHTML = '';
+                    
+                    // Add tag options
+                    tags.forEach(tag => {
+                        const tagElement = document.createElement('span');
+                        tagElement.className = 'badge tag-badge';
+                        tagElement.style.backgroundColor = tag.color;
+                        tagElement.innerText = tag.name;
+                        tagElement.dataset.tagId = tag.id;
+                        tagElement.addEventListener('click', function() {
+                            addTagToParagraph(
+                                document.getElementById('paragraphIdForTag').value,
+                                this.dataset.tagId
+                            );
+                        });
+                        
+                        tagSelection.appendChild(tagElement);
+                    });
+                })
+                .catch(error => {
+                    console.error('Error loading tags:', error);
+                    tagSelection.innerHTML = '<div class="alert alert-danger">Error loading tags</div>';
+                });
+        }
+        
+        // Show tag modal
+        tagButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const paragraphId = this.dataset.paragraphId;
+                document.getElementById('paragraphIdForTag').value = paragraphId;
+                
+                // Load tags and show modal
+                loadTags();
+                tagModal.show();
+            });
+        });
+        
+        // Add tag to paragraph
+        function addTagToParagraph(paragraphId, tagId) {
+            fetch('/tag-paragraph', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: `paragraph_id=${paragraphId}&tag_id=${tagId}`
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Close the modal
+                    tagModal.hide();
+                    
+                    // Refresh page to show updated tags
+                    window.location.reload();
+                } else {
+                    alert('Failed to add tag: ' + (data.message || 'Unknown error'));
+                }
+            })
+            .catch(error => {
+                console.error('Error adding tag:', error);
+                alert('An error occurred while adding the tag');
+            });
+        }
+        
+        // Remove tag from paragraph
+        const removeTagButtons = document.querySelectorAll('.remove-tag-btn');
+        removeTagButtons.forEach(button => {
+            button.addEventListener('click', function(e) {
+                e.stopPropagation(); // Prevent event bubbling
+                
+                if (confirm('Are you sure you want to remove this tag?')) {
+                    const paragraphId = this.dataset.paragraphId;
+                    const tagId = this.dataset.tagId;
+                    
+                    fetch('/untag-paragraph', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        body: `paragraph_id=${paragraphId}&tag_id=${tagId}`
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            // Refresh page to show updated tags
+                            window.location.reload();
+                        } else {
+                            alert('Failed to remove tag: ' + (data.message || 'Unknown error'));
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error removing tag:', error);
+                        alert('An error occurred while removing the tag');
+                    });
+                }
+            });
+        });
+    });
+</script>
+{% endblock %}
