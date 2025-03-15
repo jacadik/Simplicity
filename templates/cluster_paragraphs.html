@@ -1,0 +1,278 @@
+{% extends 'base.html' %}
+
+{% block title %}Cluster: {{ cluster.name }}{% endblock %}
+
+{% block content %}
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+        <h1 class="h2">Cluster: {{ cluster.name }}</h1>
+        <div class="btn-toolbar mb-2 mb-md-0">
+            <a href="/clusters" class="btn btn-sm btn-outline-secondary">
+                <i class="bi bi-arrow-left"></i> Back to Clusters
+            </a>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header bg-light">
+            <h5 class="mb-0">Cluster Information</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <p><strong>Description:</strong> {{ cluster.description }}</p>
+                    <p><strong>Creation Date:</strong> {{ cluster.creation_date.split('T')[0] }}</p>
+                </div>
+                <div class="col-md-6">
+                    <p><strong>Similarity Threshold:</strong> {{ cluster.similarity_threshold }}</p>
+                    <p><strong>Paragraphs:</strong> {{ paragraphs|length }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <h3>Paragraphs in Cluster</h3>
+    <div class="row">
+        <div class="col-md-12">
+            {% if paragraphs %}
+                <div class="mb-3">
+                    <button type="button" class="btn btn-primary mb-3" id="compareAllBtn">
+                        <i class="bi bi-arrows-angle-expand"></i> Compare All Paragraphs
+                    </button>
+                </div>
+                
+                <div id="comparisonView" class="mb-4" style="display: none;">
+                    <div class="card">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="mb-0">Cluster Comparison</h5>
+                        </div>
+                        <div class="card-body">
+                            <div id="enhancedDiffContainer"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                {% for para in paragraphs %}
+                    <div class="card paragraph-card mb-3">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <div>
+                                <span class="badge bg-secondary">{{ para.paragraph_type }}</span>
+                                <span class="text-muted ms-2">ID: {{ para.id }}</span>
+                            </div>
+                            <div>
+                                <span class="badge bg-info">{{ para.filename }}</span>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            {% if para.header_content %}
+                                <div class="mb-2">
+                                    <strong>Header:</strong> {{ para.header_content }}
+                                </div>
+                            {% endif %}
+                            
+                            <p class="paragraph-content">{{ para.content }}</p>
+                            
+                            <div class="paragraph-tags mt-2">
+                                {% for tag in para.tags %}
+                                    <span class="badge" style="background-color: {{ tag.color }}">
+                                        {{ tag.name }}
+                                    </span>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <div class="alert alert-info">
+                    No paragraphs found in this cluster.
+                </div>
+            {% endif %}
+        </div>
+    </div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/diff_match_patch/20121119/diff_match_patch.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const compareAllBtn = document.getElementById('compareAllBtn');
+        const comparisonView = document.getElementById('comparisonView');
+        const paragraphs = document.querySelectorAll('.paragraph-content');
+        
+        compareAllBtn.addEventListener('click', function() {
+            if (paragraphs.length < 2) {
+                alert('Need at least 2 paragraphs to compare');
+                return;
+            }
+            
+            // Get all paragraph texts
+            const paraTexts = [];
+            paragraphs.forEach(p => paraTexts.push(p.textContent.trim()));
+            
+            // Show the comparison view
+            comparisonView.style.display = 'block';
+            
+            // Create enhanced diff visualization
+            enhancedDiffVisualization(paraTexts, 'enhancedDiffContainer');
+        });
+    });
+    
+    function enhancedDiffVisualization(paragraphs, containerId) {
+        // Use the first paragraph as reference
+        const referenceText = paragraphs[0];
+        
+        // Use diff-match-patch for advanced diff algorithm
+        const dmp = new diff_match_patch();
+        
+        // Create a heatmap of word changes
+        const allWords = new Set();
+        const wordFrequency = {};
+        
+        // Extract words from all paragraphs
+        paragraphs.forEach(para => {
+            const words = para.split(/\s+/);
+            words.forEach(word => {
+                if (word.length > 0) {
+                    allWords.add(word);
+                    wordFrequency[word] = (wordFrequency[word] || 0) + 1;
+                }
+            });
+        });
+        
+        // Calculate consistency score for each word
+        const wordConsistency = {};
+        allWords.forEach(word => {
+            wordConsistency[word] = wordFrequency[word] / paragraphs.length;
+        });
+        
+        // Calculate overall consistency
+        const consistencyScores = Object.values(wordConsistency);
+        const averageConsistency = consistencyScores.reduce((a, b) => a + b, 0) / consistencyScores.length;
+        
+        // Generate statistics
+        const uniqueWordCount = allWords.size;
+        const perfectConsistencyCount = Object.values(wordConsistency).filter(score => score === 1).length;
+        const consistencyPercentage = (perfectConsistencyCount / uniqueWordCount * 100).toFixed(1);
+        
+        // Generate HTML visualization
+        let html = `
+            <div class="cluster-stats mb-4">
+                <h4>Cluster Analysis</h4>
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="card bg-light">
+                            <div class="card-body text-center">
+                                <h5 class="card-title">Total Paragraphs</h5>
+                                <p class="card-text h3">${paragraphs.length}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card bg-light">
+                            <div class="card-body text-center">
+                                <h5 class="card-title">Unique Words</h5>
+                                <p class="card-text h3">${uniqueWordCount}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card bg-light">
+                            <div class="card-body text-center">
+                                <h5 class="card-title">Content Consistency</h5>
+                                <p class="card-text h3">${consistencyPercentage}%</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="mb-4">
+                <h4>Word Variation Heatmap</h4>
+                <p class="text-muted">This heatmap shows how consistently each word appears across paragraphs:</p>
+                <div class="word-heatmap p-3 bg-light rounded">`;
+        
+        // Sort words by frequency for better visualization
+        const sortedWords = Array.from(allWords).sort((a, b) => wordFrequency[b] - wordFrequency[a]);
+        
+        // Create the heatmap (limit to top 100 words for performance)
+        sortedWords.slice(0, 100).forEach(word => {
+            const consistency = wordConsistency[word];
+            
+            // Calculate color based on consistency (green for high, red for low)
+            const hue = consistency * 120; // 0 = red, 120 = green
+            
+            html += `<span class="word-heat d-inline-block m-1 p-1 rounded" 
+                         style="background-color: hsl(${hue}, 80%, 80%);" 
+                         title="${(consistency * 100).toFixed(0)}% consistent">
+                        ${word}
+                    </span>`;
+        });
+        
+        html += `</div>
+            </div>
+            
+            <div class="mb-4">
+                <h4>Paragraph Comparison</h4>
+                <p class="text-muted">Compare each paragraph against the first paragraph in the cluster:</p>
+            </div>`;
+        
+        // Compare all paragraphs against the reference
+        for (let i = 1; i < paragraphs.length; i++) {
+            const diffs = dmp.diff_main(referenceText, paragraphs[i]);
+            dmp.diff_cleanupSemantic(diffs);
+            
+            // Calculate similarity percentage
+            let added = 0, removed = 0, unchanged = 0;
+            for (const [op, text] of diffs) {
+                if (op === 1) added += text.length;
+                else if (op === -1) removed += text.length;
+                else unchanged += text.length;
+            }
+            
+            const similarity = (unchanged / (unchanged + added + removed) * 100).toFixed(1);
+            
+            // Create comparison card
+            html += `
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h5 class="mb-0">Paragraph ${i+1} (${similarity}% similar)</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="diff-content">`;
+            
+            // Add the diff content with color-coding
+            for (const [op, text] of diffs) {
+                if (op === 1) { // Addition
+                    html += `<span class="diff-added bg-success bg-opacity-25">${text}</span>`;
+                } else if (op === -1) { // Deletion
+                    html += `<span class="diff-removed bg-danger bg-opacity-25">${text}</span>`;
+                } else { // Unchanged
+                    html += `<span class="diff-unchanged">${text}</span>`;
+                }
+            }
+            
+            html += `
+                        </div>
+                    </div>
+                </div>`;
+        }
+        
+        // Set the HTML content
+        document.getElementById(containerId).innerHTML = html;
+    }
+</script>
+
+<style>
+    .diff-added {
+        background-color: rgba(40, 167, 69, 0.2);
+    }
+    
+    .diff-removed {
+        background-color: rgba(220, 53, 69, 0.2);
+        text-decoration: line-through;
+    }
+    
+    .word-heat {
+        font-size: 0.9rem;
+    }
+</style>
+{% endblock %}

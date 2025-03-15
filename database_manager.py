@@ -6,7 +6,7 @@ from typing import List, Dict, Tuple, Optional, Any
 
 from sqlalchemy import create_engine, Column, Integer, String, Float, ForeignKey, Text, Table, and_, func
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship, sessionmaker, Session
+from sqlalchemy.orm import relationship, sessionmaker, Session, aliased
 from document_parser import Paragraph as ParserParagraph
 from similarity_analyzer import SimilarityResult as AnalyzerSimilarityResult
 
@@ -433,35 +433,31 @@ class DatabaseManager:
         try:
             session = self.Session()
             
-            # Build base query
+            # Create aliases for second paragraph and document
+            Paragraph2 = aliased(Paragraph)
+            Document2 = aliased(Document)
+            
+            # Build query with proper aliases
             query = session.query(
                 SimilarityResult,
                 Paragraph.content.label('para1_content'),
                 Paragraph.document_id.label('para1_doc_id'),
-                Document.filename.label('para1_filename')
+                Document.filename.label('para1_filename'),
+                Paragraph2.content.label('para2_content'),
+                Paragraph2.document_id.label('para2_doc_id'),
+                Document2.filename.label('para2_filename')
             ).join(
                 Paragraph,
                 SimilarityResult.paragraph1_id == Paragraph.id
             ).join(
                 Document,
                 Paragraph.document_id == Document.id
-            )
-            
-            # Add a subquery for the second paragraph's data
-            subq = session.query(
-                Paragraph.id,
-                Paragraph.content.label('para2_content'),
-                Paragraph.document_id.label('para2_doc_id'),
-                Document.filename.label('para2_filename')
             ).join(
-                Document,
-                Paragraph.document_id == Document.id
-            ).subquery()
-            
-            # Join with the subquery
-            query = query.join(
-                subq,
-                SimilarityResult.paragraph2_id == subq.c.id
+                Paragraph2,
+                SimilarityResult.paragraph2_id == Paragraph2.id
+            ).join(
+                Document2,
+                Paragraph2.document_id == Document2.id
             )
             
             # Apply threshold filter if provided
@@ -477,7 +473,9 @@ class DatabaseManager:
             # Process results into dictionaries
             similarities = []
             for row in results:
-                sim_result, para1_content, para1_doc_id, para1_filename = row
+                (sim_result, 
+                 para1_content, para1_doc_id, para1_filename,
+                 para2_content, para2_doc_id, para2_filename) = row
                 
                 similarity_dict = {
                     'id': sim_result.id,
@@ -488,9 +486,9 @@ class DatabaseManager:
                     'para1_content': para1_content,
                     'para1_doc_id': para1_doc_id,
                     'para1_filename': para1_filename,
-                    'para2_content': subq.c.para2_content,
-                    'para2_doc_id': subq.c.para2_doc_id,
-                    'para2_filename': subq.c.para2_filename
+                    'para2_content': para2_content,
+                    'para2_doc_id': para2_doc_id,
+                    'para2_filename': para2_filename
                 }
                 
                 similarities.append(similarity_dict)
@@ -687,32 +685,42 @@ class DatabaseManager:
             similarity_data = []
             
             # Query similarity results with paragraph content and document names
+            # Create aliases for the second paragraph and document
+            Paragraph2 = aliased(Paragraph)
+            Document2 = aliased(Document)
+            
+            # Build query with proper aliases
             similarity_results = session.query(
                 SimilarityResult,
                 Paragraph.content.label('paragraph1_content'),
-                Document.filename.label('document1')
+                Document.filename.label('document1'),
+                Paragraph2.content.label('paragraph2_content'),
+                Document2.filename.label('document2')
             ).join(
                 Paragraph,
                 SimilarityResult.paragraph1_id == Paragraph.id
             ).join(
                 Document,
                 Paragraph.document_id == Document.id
+            ).join(
+                Paragraph2,
+                SimilarityResult.paragraph2_id == Paragraph2.id
+            ).join(
+                Document2,
+                Paragraph2.document_id == Document2.id
             ).filter(
                 SimilarityResult.similarity_score >= 0.8
             ).all()
             
-            # Get paragraph2 and document2 data
-            for sim, para1_content, doc1_filename in similarity_results:
-                para2 = session.query(Paragraph).get(sim.paragraph2_id)
-                doc2 = session.query(Document).get(para2.document_id)
-                
+            # Process similarity results
+            for sim, para1_content, doc1_filename, para2_content, doc2_filename in similarity_results:
                 similarity_data.append({
                     'similarity_score': sim.similarity_score,
                     'similarity_type': sim.similarity_type,
                     'paragraph1_content': para1_content,
                     'document1': doc1_filename,
-                    'paragraph2_content': para2.content,
-                    'document2': doc2.filename
+                    'paragraph2_content': para2_content,
+                    'document2': doc2_filename
                 })
             
             # Convert to DataFrame
