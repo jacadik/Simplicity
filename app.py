@@ -382,6 +382,89 @@ def get_tags_json():
     """Get all tags as JSON."""
     tags = db_manager.get_tags()
     return jsonify(tags)
+
+# Add these routes to app.py
+
+@app.route('/clusters')
+def view_clusters():
+    """View all paragraph clusters."""
+    clusters = db_manager.get_clusters()
+    return render_template('clusters.html', clusters=clusters)
+
+@app.route('/clusters/<int:cluster_id>')
+def view_cluster(cluster_id):
+    """View paragraphs in a specific cluster."""
+    cluster = next((c for c in db_manager.get_clusters() if c['id'] == cluster_id), None)
+    if not cluster:
+        flash('Cluster not found', 'danger')
+        return redirect(url_for('view_clusters'))
+        
+    paragraphs = db_manager.get_cluster_paragraphs(cluster_id)
+    return render_template('cluster_paragraphs.html', cluster=cluster, paragraphs=paragraphs)
+
+@app.route('/create-clusters', methods=['POST'])
+def create_clusters():
+    """Create paragraph clusters based on similarity analysis."""
+    threshold = float(request.form.get('threshold', 0.8))
+    
+    # Get all similarity results
+    similarities = db_manager.get_similar_paragraphs(threshold)
+    
+    if not similarities:
+        flash('No similarities found for clustering', 'warning')
+        return redirect(url_for('view_similarity'))
+    
+    # Convert database results to SimilarityResult objects for the algorithm
+    similarity_results = []
+    for sim in similarities:
+        result = SimilarityResult(
+            paragraph1_id=sim['paragraph1_id'],
+            paragraph2_id=sim['paragraph2_id'],
+            paragraph1_content=sim['para1_content'],
+            paragraph2_content=sim['para2_content'],
+            paragraph1_doc_id=sim['para1_doc_id'],
+            paragraph2_doc_id=sim['para2_doc_id'],
+            similarity_score=sim['similarity_score'],
+            similarity_type=sim['similarity_type']
+        )
+        similarity_results.append(result)
+    
+    # Cluster the paragraphs
+    clusters = similarity_analyzer.cluster_paragraphs(similarity_results, threshold)
+    
+    if not clusters:
+        flash('No clusters found', 'warning')
+        return redirect(url_for('view_similarity'))
+    
+    # Save clusters to database
+    cluster_count = 0
+    for cluster in clusters:
+        cluster_id = db_manager.create_cluster(
+            name=cluster['name'],
+            description=cluster['description'],
+            similarity_threshold=cluster['similarity_threshold']
+        )
+        
+        if cluster_id > 0:
+            if db_manager.add_paragraphs_to_cluster(cluster_id, cluster['paragraph_ids']):
+                cluster_count += 1
+    
+    if cluster_count > 0:
+        flash(f'Successfully created {cluster_count} clusters', 'success')
+    else:
+        flash('Failed to create clusters', 'danger')
+    
+    return redirect(url_for('view_clusters'))
+
+@app.route('/delete-cluster/<int:cluster_id>')
+def delete_cluster(cluster_id):
+    """Delete a specific cluster."""
+    if db_manager.delete_cluster(cluster_id):
+        flash('Cluster deleted successfully', 'success')
+    else:
+        flash('Failed to delete cluster', 'danger')
+    
+    return redirect(url_for('view_clusters'))
 	
 @app.route('/export')
 def export_data():

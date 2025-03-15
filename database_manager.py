@@ -48,6 +48,7 @@ class Paragraph(Base):
     # Relationships
     document = relationship("Document", back_populates="paragraphs")
     tags = relationship("Tag", secondary=paragraph_tags, back_populates="paragraphs")
+    clusters = relationship("ParagraphCluster", secondary="paragraph_cluster_items", back_populates="paragraphs")
     
     # Similarity relationships
     similarity_as_para1 = relationship(
@@ -88,6 +89,26 @@ class SimilarityResult(Base):
     # Relationships
     paragraph1 = relationship("Paragraph", foreign_keys=[paragraph1_id], back_populates="similarity_as_para1")
     paragraph2 = relationship("Paragraph", foreign_keys=[paragraph2_id], back_populates="similarity_as_para2")
+
+class ParagraphCluster(Base):
+    """Model for storing paragraph clusters."""
+    __tablename__ = 'paragraph_clusters'
+    
+    id = Column(Integer, primary_key=True)
+    name = Column(String, nullable=False)
+    description = Column(Text, nullable=True)
+    creation_date = Column(String, nullable=False)
+    similarity_threshold = Column(Float, nullable=False)
+    
+    # Relationships
+    paragraphs = relationship("Paragraph", secondary="paragraph_cluster_items", back_populates="clusters")
+
+class ParagraphClusterItem(Base):
+    """Association table for paragraphs and clusters."""
+    __tablename__ = 'paragraph_cluster_items'
+    
+    cluster_id = Column(Integer, ForeignKey('paragraph_clusters.id', ondelete='CASCADE'), primary_key=True)
+    paragraph_id = Column(Integer, ForeignKey('paragraphs.id', ondelete='CASCADE'), primary_key=True)
 
 
 class DatabaseManager:
@@ -805,6 +826,174 @@ class DatabaseManager:
         except Exception as e:
             session.rollback()
             self.logger.error(f"Error clearing database: {str(e)}", exc_info=True)
+            return False
+        finally:
+            session.close()
+            
+    def create_cluster(self, name: str, description: str, similarity_threshold: float) -> int:
+        """Create a new paragraph cluster and return its ID."""
+        self.logger.info(f"Creating cluster: {name} with threshold {similarity_threshold}")
+        
+        session = self.Session()
+        try:
+            creation_date = datetime.now().isoformat()
+            
+            cluster = ParagraphCluster(
+                name=name,
+                description=description,
+                creation_date=creation_date,
+                similarity_threshold=similarity_threshold
+            )
+            
+            session.add(cluster)
+            session.commit()
+            
+            cluster_id = cluster.id
+            self.logger.info(f"Created cluster with ID: {cluster_id}")
+            return cluster_id
+            
+        except Exception as e:
+            session.rollback()
+            self.logger.error(f"Error creating cluster: {str(e)}", exc_info=True)
+            return -1
+        finally:
+            session.close()
+
+    def add_paragraphs_to_cluster(self, cluster_id: int, paragraph_ids: List[int]) -> bool:
+        """Add paragraphs to a cluster."""
+        self.logger.info(f"Adding {len(paragraph_ids)} paragraphs to cluster {cluster_id}")
+        
+        session = self.Session()
+        try:
+            # Get the cluster
+            cluster = session.query(ParagraphCluster).get(cluster_id)
+            
+            if not cluster:
+                self.logger.warning(f"Cluster with ID {cluster_id} not found")
+                return False
+            
+            # Get the paragraphs
+            paragraphs = session.query(Paragraph).filter(Paragraph.id.in_(paragraph_ids)).all()
+            
+            if not paragraphs:
+                self.logger.warning(f"No paragraphs found with the given IDs")
+                return False
+            
+            # Add paragraphs to cluster
+            for paragraph in paragraphs:
+                if paragraph not in cluster.paragraphs:
+                    cluster.paragraphs.append(paragraph)
+            
+            session.commit()
+            self.logger.info(f"Added {len(paragraphs)} paragraphs to cluster {cluster_id}")
+            return True
+            
+        except Exception as e:
+            session.rollback()
+            self.logger.error(f"Error adding paragraphs to cluster: {str(e)}", exc_info=True)
+            return False
+        finally:
+            session.close()
+
+    def get_clusters(self) -> List[Dict]:
+        """Get all paragraph clusters."""
+        self.logger.info("Retrieving all paragraph clusters")
+        
+        session = self.Session()
+        try:
+            clusters = session.query(ParagraphCluster).all()
+            
+            cluster_dicts = []
+            for cluster in clusters:
+                # Get count of paragraphs in this cluster
+                paragraph_count = len(cluster.paragraphs)
+                
+                cluster_dicts.append({
+                    'id': cluster.id,
+                    'name': cluster.name,
+                    'description': cluster.description,
+                    'creation_date': cluster.creation_date,
+                    'similarity_threshold': cluster.similarity_threshold,
+                    'paragraph_count': paragraph_count
+                })
+            
+            self.logger.info(f"Retrieved {len(cluster_dicts)} clusters")
+            return cluster_dicts
+            
+        except Exception as e:
+            self.logger.error(f"Error retrieving clusters: {str(e)}", exc_info=True)
+            return []
+        finally:
+            session.close()
+
+    def get_cluster_paragraphs(self, cluster_id: int) -> List[Dict]:
+        """Get paragraphs in a specific cluster."""
+        self.logger.info(f"Retrieving paragraphs for cluster {cluster_id}")
+        
+        session = self.Session()
+        try:
+            # Get the cluster
+            cluster = session.query(ParagraphCluster).get(cluster_id)
+            
+            if not cluster:
+                self.logger.warning(f"Cluster with ID {cluster_id} not found")
+                return []
+            
+            # Get paragraphs with document information
+            paragraphs = []
+            for para in cluster.paragraphs:
+                document = session.query(Document).get(para.document_id)
+                
+                # Get tags for this paragraph
+                tags = [{
+                    'id': tag.id,
+                    'name': tag.name,
+                    'color': tag.color
+                } for tag in para.tags]
+                
+                paragraphs.append({
+                    'id': para.id,
+                    'content': para.content,
+                    'document_id': para.document_id,
+                    'paragraph_type': para.paragraph_type,
+                    'position': para.position,
+                    'header_content': para.header_content,
+                    'filename': document.filename if document else 'Unknown',
+                    'tags': tags
+                })
+            
+            self.logger.info(f"Retrieved {len(paragraphs)} paragraphs from cluster {cluster_id}")
+            return paragraphs
+            
+        except Exception as e:
+            self.logger.error(f"Error retrieving cluster paragraphs: {str(e)}", exc_info=True)
+            return []
+        finally:
+            session.close()
+
+    def delete_cluster(self, cluster_id: int) -> bool:
+        """Delete a paragraph cluster."""
+        self.logger.info(f"Deleting cluster with ID: {cluster_id}")
+        
+        session = self.Session()
+        try:
+            # Get the cluster
+            cluster = session.query(ParagraphCluster).get(cluster_id)
+            
+            if not cluster:
+                self.logger.warning(f"Cluster with ID {cluster_id} not found")
+                return False
+            
+            # Delete the cluster (cascade will handle associations)
+            session.delete(cluster)
+            session.commit()
+            
+            self.logger.info(f"Deleted cluster with ID: {cluster_id}")
+            return True
+            
+        except Exception as e:
+            session.rollback()
+            self.logger.error(f"Error deleting cluster: {str(e)}", exc_info=True)
             return False
         finally:
             session.close()

@@ -6,9 +6,15 @@
     <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
         <h1 class="h2">Similarity Analysis</h1>
         <div class="btn-toolbar mb-2 mb-md-0">
-            <a href="/export" class="btn btn-sm btn-outline-success">
+            <a href="/export" class="btn btn-sm btn-outline-success me-2">
                 <i class="bi bi-file-excel"></i> Export to Excel
             </a>
+            <form action="/create-clusters" method="post">
+                <input type="hidden" name="threshold" value="{{ threshold }}">
+                <button type="submit" class="btn btn-sm btn-outline-primary">
+                    <i class="bi bi-diagram-3"></i> Create Clusters
+                </button>
+            </form>
         </div>
     </div>
 
@@ -200,13 +206,13 @@
                                     </div>
                                     
                                     {% if sim.similarity_type != 'exact' %}
-                                    <!-- Difference Highlight (for non-exact matches) -->
+                                    <!-- Enhanced Difference Comparison -->
                                     <div class="row mt-3">
                                         <div class="col-12">
                                             <div class="diff-info p-3 border rounded bg-light">
-                                                <h6 class="mb-2"><i class="bi bi-info-circle"></i> Key Differences</h6>
+                                                <h6 class="mb-2"><i class="bi bi-info-circle"></i> Enhanced Comparison</h6>
                                                 <div id="diff-{{ sim.id }}">
-                                                    <!-- Diff content will be populated by JavaScript -->
+                                                    <!-- Enhanced diff content will be populated by JavaScript -->
                                                 </div>
                                             </div>
                                         </div>
@@ -270,7 +276,29 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="https://cdnjs.cloudflare.com/ajax/libs/diff/5.1.0/diff.min.js"></script>
+<style>
+    .diff-added {
+        background-color: rgba(40, 167, 69, 0.2);
+        padding: 2px 0;
+    }
+    
+    .diff-removed {
+        background-color: rgba(220, 53, 69, 0.2);
+        text-decoration: line-through;
+        padding: 2px 0;
+    }
+    
+    .added-words {
+        color: #28a745;
+        font-weight: bold;
+    }
+    
+    .removed-words {
+        color: #dc3545;
+        font-weight: bold;
+    }
+</style>
+
 <script>
     // Update threshold value display when slider changes
     const thresholdSlider = document.getElementById('thresholdSlider');
@@ -325,45 +353,133 @@
             resultsContainer.appendChild(container);
         });
     }
-    
-    // Diff visualization for similar (non-exact) paragraphs
+
+    // Enhanced Diff Visualization
     document.addEventListener('DOMContentLoaded', function() {
-        const similarItems = document.querySelectorAll('.similarity-container[data-type="similar"]');
+        // Check if diff-match-patch library is loaded, if not, load it
+        if (typeof diff_match_patch === 'undefined') {
+            const script = document.createElement('script');
+            script.src = "https://cdnjs.cloudflare.com/ajax/libs/diff_match_patch/20121119/diff_match_patch.js";
+            script.onload = function() {
+                // Initialize enhanced diffs after library loads
+                initializeEnhancedDiffs();
+            };
+            document.head.appendChild(script);
+        } else {
+            initializeEnhancedDiffs();
+        }
         
-        similarItems.forEach(item => {
-            const id = item.querySelector('.card-header .text-muted').textContent.split(': ')[1];
-            const text1 = item.querySelector('.col-md-6:first-child .content-body p').textContent;
-            const text2 = item.querySelector('.col-md-6:last-child .content-body p').textContent;
+        function initializeEnhancedDiffs() {
+            const similarItems = document.querySelectorAll('.similarity-container[data-type="similar"]');
             
-            const diffContainer = document.getElementById(`diff-${id}`);
+            similarItems.forEach(item => {
+                const id = item.querySelector('.card-header .text-muted').textContent.split(': ')[1];
+                const text1 = item.querySelector('.col-md-6:first-child .content-body p').textContent;
+                const text2 = item.querySelector('.col-md-6:last-child .content-body p').textContent;
+                
+                const diffContainer = document.getElementById(`diff-${id}`);
+                
+                if (diffContainer) {
+                    enhancedDiffVisualization(text1, text2, `diff-${id}`);
+                }
+            });
+        }
+        
+        function enhancedDiffVisualization(text1, text2, containerId) {
+            // Use diff-match-patch for advanced diff algorithm
+            const dmp = new diff_match_patch();
+            const diffs = dmp.diff_main(text1, text2);
+            dmp.diff_cleanupSemantic(diffs);
             
-            if (diffContainer) {
-                // Generate word-by-word diff
-                const words1 = text1.split(/\s+/);
-                const words2 = text2.split(/\s+/);
-                
-                const diffResult = Diff.diffWords(text1, text2);
-                
-                let diffHtml = '';
-                diffResult.forEach(part => {
-                    const color = part.added ? 'text-success' : 
-                                 part.removed ? 'text-danger' : 'text-muted';
-                    const prefix = part.added ? '+ ' : 
-                                  part.removed ? '- ' : '';
-                    
-                    if (part.added || part.removed) {
-                        diffHtml += `<span class="${color} fw-bold">${prefix}${part.value}</span>`;
-                    } else if (part.value.length > 50) {
-                        // For unchanged sections, truncate long parts
-                        diffHtml += `<span class="${color}">${part.value.substring(0, 25)}...${part.value.substring(part.value.length - 25)}</span>`;
-                    } else {
-                        diffHtml += `<span class="${color}">${part.value}</span>`;
-                    }
-                });
-                
-                diffContainer.innerHTML = diffHtml;
+            // Generate statistics
+            let added = 0, removed = 0, unchanged = 0;
+            for (const [op, text] of diffs) {
+                if (op === 1) added += text.length;
+                else if (op === -1) removed += text.length;
+                else unchanged += text.length;
             }
-        });
+            
+            // Calculate similarity percentage
+            const similarity = (unchanged / (unchanged + added + removed) * 100).toFixed(1);
+            
+            // Extract word-level changes for better metrics
+            const words1 = text1.split(/\s+/).filter(w => w.length > 0);
+            const words2 = text2.split(/\s+/).filter(w => w.length > 0);
+            
+            // Count word changes
+            let addedWords = 0, removedWords = 0, unchangedWords = 0;
+            
+            // Perform word-by-word diff
+            const wordDiffs = dmp.diff_main(words1.join(' '), words2.join(' '));
+            dmp.diff_cleanupSemantic(wordDiffs);
+            
+            for (const [op, text] of wordDiffs) {
+                const changeWords = text.split(/\s+/).filter(w => w.length > 0);
+                
+                if (op === 1) {
+                    addedWords += changeWords.length;
+                } else if (op === -1) {
+                    removedWords += changeWords.length;
+                } else {
+                    unchangedWords += changeWords.length;
+                }
+            }
+            
+            // Generate HTML visualization
+            let html = `
+                <div class="diff-stats mb-3">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="card text-white bg-success">
+                                <div class="card-body text-center p-2">
+                                    <h6 class="card-title mb-0">Same</h6>
+                                    <p class="card-text mb-0">${unchanged} chars / ${unchangedWords} words</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card text-white bg-danger">
+                                <div class="card-body text-center p-2">
+                                    <h6 class="card-title mb-0">Removed</h6>
+                                    <p class="card-text mb-0">${removed} chars / ${removedWords} words</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card text-white bg-primary">
+                                <div class="card-body text-center p-2">
+                                    <h6 class="card-title mb-0">Added</h6>
+                                    <p class="card-text mb-0">${added} chars / ${addedWords} words</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="progress mt-2">
+                        <div class="progress-bar bg-success" style="width: ${similarity}%">${similarity}% similar</div>
+                        <div class="progress-bar bg-danger" style="width: ${100-similarity}%">${(100-similarity).toFixed(1)}% different</div>
+                    </div>
+                </div>
+                
+                <div class="diff-details mt-3 p-2 bg-white rounded">
+                    <h6 class="mb-2">Word-by-word Comparison</h6>
+                    <div class="diff-content">`;
+            
+            // Add the diff content with word-level color-coding
+            for (const [op, text] of diffs) {
+                if (op === 1) { // Addition
+                    html += `<mark class="diff-added">${text}</mark>`;
+                } else if (op === -1) { // Deletion
+                    html += `<mark class="diff-removed">${text}</mark>`;
+                } else { // Unchanged
+                    html += `<span class="diff-unchanged">${text}</span>`;
+                }
+            }
+            
+            html += '</div></div>';
+            
+            // Set the HTML content
+            document.getElementById(containerId).innerHTML = html;
+        }
     });
     
     // Tag functionality

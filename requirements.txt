@@ -19,3 +19,6 @@ psycopg2-binary==2.9.9
 
 # Other utilities
 Pillow==10.0.0
+
+# Graph algorithms for clustering
+networkx==3.2.1
