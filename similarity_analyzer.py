@@ -1,12 +1,13 @@
 import logging
 import re
-from typing import List, Dict, Tuple, Set, Any
+from typing import List, Dict, Tuple, Set, Any, Optional
 from dataclasses import dataclass
 import numpy as np
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import networkx as nx
 from datetime import datetime
+from difflib import SequenceMatcher
 
 
 @dataclass
@@ -18,7 +19,8 @@ class SimilarityResult:
     paragraph2_content: str
     paragraph1_doc_id: int
     paragraph2_doc_id: int
-    similarity_score: float
+    content_similarity_score: float  # Semantic/content similarity (TF-IDF or Jaccard)
+    text_similarity_score: float     # Character-based similarity (SequenceMatcher)
     similarity_type: str  # 'exact' or 'similar'
 
 
@@ -83,7 +85,8 @@ class SimilarityAnalyzer:
                                 paragraph2_content=para_group[j]['content'],
                                 paragraph1_doc_id=para_group[i]['doc_id'],
                                 paragraph2_doc_id=para_group[j]['doc_id'],
-                                similarity_score=1.0,
+                                content_similarity_score=1.0,  # Perfect content match
+                                text_similarity_score=1.0,     # Perfect text match
                                 similarity_type='exact'
                             )
                             results.append(result)
@@ -146,7 +149,8 @@ class SimilarityAnalyzer:
                             paragraph2_content=para['content'],
                             paragraph1_doc_id=valid_paragraphs[prev_idx]['doc_id'],
                             paragraph2_doc_id=para['doc_id'],
-                            similarity_score=1.0,
+                            content_similarity_score=1.0,   # Perfect content match
+                            text_similarity_score=1.0,      # Perfect text match
                             similarity_type='exact'
                         ))
                     content_dict[normalized].append(i)
@@ -207,19 +211,21 @@ class SimilarityAnalyzer:
         
         return results
     
-    def cluster_paragraphs(self, similarity_results, threshold=None):
+    def cluster_paragraphs(self, similarity_results: List[SimilarityResult], threshold: float = None, 
+                          similarity_type: str = 'content') -> List[Dict]:
         """
         Cluster paragraphs using graph-based community detection.
         
         Args:
             similarity_results: List of similarity results
             threshold: Minimum similarity score to consider paragraphs related
-            
+            similarity_type: Which similarity metric to use ('content' or 'text')
+                
         Returns:
             List of clusters, where each cluster is a dict with name and paragraph IDs
         """
         threshold = float(threshold) if threshold is not None else self.threshold
-        self.logger.info(f"Clustering paragraphs with threshold {threshold}")
+        self.logger.info(f"Clustering paragraphs with {similarity_type} similarity threshold {threshold}")
         
         try:
             # Create a graph
@@ -227,7 +233,15 @@ class SimilarityAnalyzer:
             
             # Add nodes and edges for similarities above threshold
             for result in similarity_results:
-                if result.similarity_score >= threshold:
+                # Determine which similarity score to use based on the requested type
+                if similarity_type == 'text':
+                    similarity_score = result.text_similarity_score
+                    metric_name = "text similarity"
+                else:  # Default to content similarity
+                    similarity_score = result.content_similarity_score
+                    metric_name = "content similarity"
+                    
+                if similarity_score >= threshold:
                     # Add nodes with paragraph content as attribute
                     G.add_node(result.paragraph1_id, content=result.paragraph1_content)
                     G.add_node(result.paragraph2_id, content=result.paragraph2_content)
@@ -236,12 +250,12 @@ class SimilarityAnalyzer:
                     G.add_edge(
                         result.paragraph1_id, 
                         result.paragraph2_id, 
-                        weight=result.similarity_score
+                        weight=similarity_score
                     )
             
             # Skip if graph is empty
             if len(G.nodes) == 0:
-                self.logger.warning("No paragraphs to cluster")
+                self.logger.warning(f"No paragraphs to cluster using {metric_name}")
                 return []
                 
             # Find communities using Louvain method (optimizes modularity)
@@ -270,13 +284,14 @@ class SimilarityAnalyzer:
                     
                 clusters.append({
                     'name': cluster_name,
-                    'description': f"Auto-generated cluster with {len(community_list)} paragraphs",
+                    'description': f"Auto-generated cluster with {len(community_list)} paragraphs using {metric_name}",
                     'creation_date': datetime.now().isoformat(),
                     'similarity_threshold': threshold,
-                    'paragraph_ids': community_list
+                    'paragraph_ids': community_list,
+                    'similarity_type': similarity_type  # Store which similarity metric was used
                 })
             
-            self.logger.info(f"Created {len(clusters)} clusters")
+            self.logger.info(f"Created {len(clusters)} clusters using {metric_name}")
             return clusters
             
         except Exception as e:
@@ -345,16 +360,22 @@ class SimilarityAnalyzer:
                         self.logger.warning(f"Index out of range: {i}, {j} for shape {cosine_sim.shape}")
                         continue
                     
-                    # Get similarity value as float
-                    similarity = float(cosine_sim[i, j])
+                    # Get content similarity value as float (TF-IDF)
+                    content_similarity = float(cosine_sim[i, j])
+                    
+                    # Calculate text similarity using SequenceMatcher
+                    text_similarity = self._calculate_text_similarity(
+                        paragraphs[i]['content'],
+                        paragraphs[j]['content']
+                    )
                     
                     # Check if value is valid
-                    if np.isnan(similarity) or np.isinf(similarity):
-                        self.logger.warning(f"Invalid similarity value: {similarity}")
+                    if np.isnan(content_similarity) or np.isinf(content_similarity):
+                        self.logger.warning(f"Invalid similarity value: {content_similarity}")
                         continue
                     
-                    # Count pairs above threshold for debugging
-                    if similarity >= threshold:
+                    # Count pairs above threshold for debugging (using content similarity for threshold)
+                    if content_similarity >= threshold:
                         pairs_above_threshold += 1
                         
                         result = SimilarityResult(
@@ -364,7 +385,8 @@ class SimilarityAnalyzer:
                             paragraph2_content=paragraphs[j]['content'],
                             paragraph1_doc_id=paragraphs[i]['doc_id'],
                             paragraph2_doc_id=paragraphs[j]['doc_id'],
-                            similarity_score=similarity,
+                            content_similarity_score=content_similarity,
+                            text_similarity_score=text_similarity,
                             similarity_type='similar'
                         )
                         results.append(result)
@@ -386,13 +408,18 @@ class SimilarityAnalyzer:
                         if i >= cosine_sim.shape[0] or j >= cosine_sim.shape[1]:
                             continue
                             
-                        similarity = float(cosine_sim[i, j])
-                        if not np.isnan(similarity) and not np.isinf(similarity):
-                            top_pairs.append((i, j, similarity))
+                        content_similarity = float(cosine_sim[i, j])
+                        text_similarity = self._calculate_text_similarity(
+                            paragraphs[i]['content'],
+                            paragraphs[j]['content']
+                        )
+                        
+                        if not np.isnan(content_similarity) and not np.isinf(content_similarity):
+                            top_pairs.append((i, j, content_similarity, text_similarity))
                 
-                # Sort by similarity descending and take top 10
+                # Sort by content similarity descending and take top 10
                 top_pairs.sort(key=lambda x: x[2], reverse=True)
-                for i, j, similarity in top_pairs[:10]:
+                for i, j, content_similarity, text_similarity in top_pairs[:10]:
                     result = SimilarityResult(
                         paragraph1_id=paragraphs[i]['id'],
                         paragraph2_id=paragraphs[j]['id'],
@@ -400,7 +427,8 @@ class SimilarityAnalyzer:
                         paragraph2_content=paragraphs[j]['content'],
                         paragraph1_doc_id=paragraphs[i]['doc_id'],
                         paragraph2_doc_id=paragraphs[j]['doc_id'],
-                        similarity_score=similarity,
+                        content_similarity_score=content_similarity,
+                        text_similarity_score=text_similarity,
                         similarity_type='similar'
                     )
                     results.append(result)
@@ -443,7 +471,7 @@ class SimilarityAnalyzer:
                     if i >= len(word_sets) or j >= len(word_sets):
                         continue
                         
-                    # Calculate Jaccard similarity
+                    # Calculate Jaccard similarity (content-based)
                     set_i = word_sets[i]
                     set_j = word_sets[j]
                     
@@ -454,11 +482,17 @@ class SimilarityAnalyzer:
                     union = len(set_i.union(set_j))
                     
                     if union == 0:
-                        similarity = 0
+                        content_similarity = 0
                     else:
-                        similarity = intersection / union
+                        content_similarity = intersection / union
                     
-                    if similarity >= threshold:
+                    # Calculate text similarity (character-based)
+                    text_similarity = self._calculate_text_similarity(
+                        paragraphs[i]['content'],
+                        paragraphs[j]['content']
+                    )
+                    
+                    if content_similarity >= threshold:
                         pairs_above_threshold += 1
                         
                         result = SimilarityResult(
@@ -468,28 +502,30 @@ class SimilarityAnalyzer:
                             paragraph2_content=paragraphs[j]['content'],
                             paragraph1_doc_id=paragraphs[i]['doc_id'],
                             paragraph2_doc_id=paragraphs[j]['doc_id'],
-                            similarity_score=similarity,
+                            content_similarity_score=content_similarity,
+                            text_similarity_score=text_similarity,
                             similarity_type='similar'
                         )
                         results.append(result)
             
             self.logger.debug(f"Jaccard: Found {pairs_above_threshold} pairs above threshold out of {total_pairs} total pairs")
             
-            # Special case similar to TF-IDF method
+            # Similar special case as in TF-IDF for very low thresholds
             if threshold < 0.3 and len(results) == 0 and total_pairs > 0:
                 self.logger.info("Low threshold but no Jaccard results, getting top 10 instead")
-                # Find highest similarity scores
                 top_pairs = []
+                
                 for i in range(len(paragraphs)):
                     for j in range(i+1, len(paragraphs)):
                         # Skip same document
                         if paragraphs[i]['doc_id'] == paragraphs[j]['doc_id']:
                             continue
                             
-                        # Skip invalid indices
+                        # Skip if either word set is empty or out of range
                         if i >= len(word_sets) or j >= len(word_sets):
                             continue
                             
+                        # Calculate Jaccard similarity
                         set_i = word_sets[i]
                         set_j = word_sets[j]
                         
@@ -500,15 +536,21 @@ class SimilarityAnalyzer:
                         union = len(set_i.union(set_j))
                         
                         if union == 0:
-                            similarity = 0
+                            content_similarity = 0
                         else:
-                            similarity = intersection / union
-                            
-                        top_pairs.append((i, j, similarity))
+                            content_similarity = intersection / union
+                        
+                        # Calculate text similarity
+                        text_similarity = self._calculate_text_similarity(
+                            paragraphs[i]['content'],
+                            paragraphs[j]['content']
+                        )
+                        
+                        top_pairs.append((i, j, content_similarity, text_similarity))
                 
-                # Sort by similarity descending and take top 10
+                # Sort by content similarity descending and take top 10
                 top_pairs.sort(key=lambda x: x[2], reverse=True)
-                for i, j, similarity in top_pairs[:10]:
+                for i, j, content_similarity, text_similarity in top_pairs[:10]:
                     result = SimilarityResult(
                         paragraph1_id=paragraphs[i]['id'],
                         paragraph2_id=paragraphs[j]['id'],
@@ -516,7 +558,8 @@ class SimilarityAnalyzer:
                         paragraph2_content=paragraphs[j]['content'],
                         paragraph1_doc_id=paragraphs[i]['doc_id'],
                         paragraph2_doc_id=paragraphs[j]['doc_id'],
-                        similarity_score=similarity,
+                        content_similarity_score=content_similarity,
+                        text_similarity_score=text_similarity,
                         similarity_type='similar'
                     )
                     results.append(result)
@@ -526,6 +569,30 @@ class SimilarityAnalyzer:
         
         return results
     
+    def _calculate_text_similarity(self, text1: str, text2: str) -> float:
+        """Calculate character-based similarity between two texts."""
+        try:
+            # Handle edge cases
+            if text1 is None:
+                text1 = ""
+            if text2 is None:
+                text2 = ""
+                
+            # Simple case: both empty means identical
+            if not text1 and not text2:
+                return 1.0
+            # One empty means completely different
+            elif not text1 or not text2:
+                return 0.0
+                
+            # Calculate similarity ratio using SequenceMatcher
+            # This gives a character-by-character comparison
+            return SequenceMatcher(None, text1, text2).ratio()
+            
+        except Exception as e:
+            self.logger.error(f"Error calculating text similarity: {str(e)}", exc_info=True)
+            return 0.0  # Return 0 similarity on error
+    
     def _merge_similarity_results(self, results1: List[SimilarityResult], results2: List[SimilarityResult]) -> List[SimilarityResult]:
         """Merge similarity results, keeping the highest score for each pair."""
         # Create a dictionary to track highest similarity for each paragraph pair
@@ -534,13 +601,13 @@ class SimilarityAnalyzer:
         # Process first result set
         for result in results1:
             key = self._make_pair_key(result.paragraph1_id, result.paragraph2_id)
-            if key not in pair_dict or result.similarity_score > pair_dict[key].similarity_score:
+            if key not in pair_dict or result.content_similarity_score > pair_dict[key].content_similarity_score:
                 pair_dict[key] = result
         
         # Process second result set
         for result in results2:
             key = self._make_pair_key(result.paragraph1_id, result.paragraph2_id)
-            if key not in pair_dict or result.similarity_score > pair_dict[key].similarity_score:
+            if key not in pair_dict or result.content_similarity_score > pair_dict[key].content_similarity_score:
                 pair_dict[key] = result
         
         # Return merged results

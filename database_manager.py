@@ -4,7 +4,7 @@ import pandas as pd
 from datetime import datetime
 from typing import List, Dict, Tuple, Optional, Any
 
-from sqlalchemy import create_engine, Column, Integer, String, Float, ForeignKey, Text, Table, and_, func
+from sqlalchemy import create_engine, Column, Integer, String, Float, ForeignKey, Text, Table, and_, func, Index
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker, Session
 from document_parser import Paragraph as ParserParagraph
@@ -19,6 +19,14 @@ paragraph_tags = Table(
     Base.metadata,
     Column('paragraph_id', Integer, ForeignKey('paragraphs.id', ondelete='CASCADE'), primary_key=True),
     Column('tag_id', Integer, ForeignKey('tags.id', ondelete='CASCADE'), primary_key=True)
+)
+
+# Define the cluster_paragraphs association table
+cluster_paragraphs = Table(
+    'cluster_paragraphs',
+    Base.metadata,
+    Column('cluster_id', Integer, ForeignKey('clusters.id', ondelete='CASCADE'), primary_key=True),
+    Column('paragraph_id', Integer, ForeignKey('paragraphs.id', ondelete='CASCADE'), primary_key=True)
 )
 
 class Document(Base):
@@ -48,6 +56,7 @@ class Paragraph(Base):
     # Relationships
     document = relationship("Document", back_populates="paragraphs")
     tags = relationship("Tag", secondary=paragraph_tags, back_populates="paragraphs")
+    clusters = relationship("Cluster", secondary=cluster_paragraphs, back_populates="paragraphs")
     
     # Similarity relationships
     similarity_as_para1 = relationship(
@@ -82,13 +91,35 @@ class SimilarityResult(Base):
     id = Column(Integer, primary_key=True)
     paragraph1_id = Column(Integer, ForeignKey('paragraphs.id', ondelete='CASCADE'), nullable=False)
     paragraph2_id = Column(Integer, ForeignKey('paragraphs.id', ondelete='CASCADE'), nullable=False)
-    similarity_score = Column(Float, nullable=False)
+    content_similarity_score = Column(Float, nullable=False)  # Renamed from similarity_score
+    text_similarity_score = Column(Float, nullable=True)      # New field for character-based similarity
     similarity_type = Column(String, nullable=False)
     
     # Relationships
     paragraph1 = relationship("Paragraph", foreign_keys=[paragraph1_id], back_populates="similarity_as_para1")
     paragraph2 = relationship("Paragraph", foreign_keys=[paragraph2_id], back_populates="similarity_as_para2")
+    
+    # Add indices for performance
+    __table_args__ = (
+        Index('idx_similarity_paragraph1', 'paragraph1_id'),
+        Index('idx_similarity_paragraph2', 'paragraph2_id'),
+        Index('idx_content_similarity', 'content_similarity_score'),
+        Index('idx_text_similarity', 'text_similarity_score'),
+    )
 
+class Cluster(Base):
+    """Model for storing paragraph clusters."""
+    __tablename__ = 'clusters'
+    
+    id = Column(Integer, primary_key=True)
+    name = Column(String, nullable=False)
+    description = Column(Text, nullable=True)
+    creation_date = Column(String, nullable=False)
+    similarity_threshold = Column(Float, nullable=False)
+    similarity_type = Column(String, nullable=True)  # 'content' or 'text'
+    
+    # Relationships
+    paragraphs = relationship("Paragraph", secondary=cluster_paragraphs, back_populates="clusters")
 
 class DatabaseManager:
     """
@@ -227,11 +258,12 @@ class DatabaseManager:
         session = self.Session()
         try:
             for result in results:
-                # Create new similarity result record
+                # Create new similarity result record with both similarity scores
                 db_result = SimilarityResult(
                     paragraph1_id=result.paragraph1_id,
                     paragraph2_id=result.paragraph2_id,
-                    similarity_score=result.similarity_score,
+                    content_similarity_score=result.content_similarity_score,  # Renamed field
+                    text_similarity_score=result.text_similarity_score,        # New field
                     similarity_type=result.similarity_type
                 )
                 
@@ -428,10 +460,10 @@ class DatabaseManager:
                 Paragraph.document_id == Document.id
             )
             
-            # Apply threshold filter if provided
+            # Apply threshold filter if provided - using content_similarity_score (primary metric)
             if threshold is not None:
                 self.logger.info(f"Filtering by threshold: {threshold}")
-                query = query.filter(SimilarityResult.similarity_score >= threshold)
+                query = query.filter(SimilarityResult.content_similarity_score >= threshold)
             
             # Execute query to get base results
             results = query.all()
@@ -458,12 +490,13 @@ class DatabaseManager:
                 if para2_result:
                     para2_content, para2_doc_id, para2_filename = para2_result
                     
-                    # Build the complete similarity dictionary
+                    # Build the complete similarity dictionary with both similarity scores
                     similarity_dict = {
                         'id': sim_result.id,
                         'paragraph1_id': sim_result.paragraph1_id,
                         'paragraph2_id': sim_result.paragraph2_id,
-                        'similarity_score': sim_result.similarity_score,
+                        'content_similarity_score': sim_result.content_similarity_score,  # Renamed field
+                        'text_similarity_score': sim_result.text_similarity_score,        # New field
                         'similarity_type': sim_result.similarity_type,
                         'para1_content': para1_content,
                         'para1_doc_id': para1_doc_id,
@@ -623,8 +656,173 @@ class DatabaseManager:
         finally:
             session.close()
     
+    def create_cluster(self, name: str, description: str, similarity_threshold: float, 
+                      similarity_type: str = 'content') -> int:
+        """Create a new cluster and return its ID."""
+        self.logger.info(f"Creating new cluster: {name}")
+        
+        session = self.Session()
+        try:
+            # Create new cluster
+            cluster = Cluster(
+                name=name,
+                description=description,
+                creation_date=datetime.now().isoformat(),
+                similarity_threshold=similarity_threshold,
+                similarity_type=similarity_type
+            )
+            session.add(cluster)
+            session.commit()
+            
+            cluster_id = cluster.id
+            self.logger.info(f"Created cluster with ID: {cluster_id}")
+            return cluster_id
+            
+        except Exception as e:
+            session.rollback()
+            self.logger.error(f"Error creating cluster: {str(e)}", exc_info=True)
+            return -1
+        finally:
+            session.close()
+    
+    def add_paragraphs_to_cluster(self, cluster_id: int, paragraph_ids: List[int]) -> bool:
+        """Add paragraphs to a cluster."""
+        self.logger.info(f"Adding {len(paragraph_ids)} paragraphs to cluster {cluster_id}")
+        
+        session = self.Session()
+        try:
+            # Get cluster
+            cluster = session.query(Cluster).get(cluster_id)
+            
+            if not cluster:
+                self.logger.warning(f"Cluster with ID {cluster_id} not found")
+                return False
+            
+            # Get paragraphs
+            paragraphs = session.query(Paragraph).filter(Paragraph.id.in_(paragraph_ids)).all()
+            
+            # Add paragraphs to cluster
+            for paragraph in paragraphs:
+                if paragraph not in cluster.paragraphs:
+                    cluster.paragraphs.append(paragraph)
+            
+            session.commit()
+            
+            self.logger.info(f"Added {len(paragraphs)} paragraphs to cluster {cluster_id}")
+            return True
+            
+        except Exception as e:
+            session.rollback()
+            self.logger.error(f"Error adding paragraphs to cluster: {str(e)}", exc_info=True)
+            return False
+        finally:
+            session.close()
+    
+    def get_clusters(self) -> List[Dict]:
+        """Get all clusters."""
+        self.logger.info("Retrieving all clusters")
+        
+        session = self.Session()
+        try:
+            # Query all clusters
+            clusters = session.query(Cluster).all()
+            
+            # Convert ORM objects to dictionaries
+            cluster_dicts = []
+            for cluster in clusters:
+                cluster_dicts.append({
+                    'id': cluster.id,
+                    'name': cluster.name,
+                    'description': cluster.description,
+                    'creation_date': cluster.creation_date,
+                    'similarity_threshold': cluster.similarity_threshold,
+                    'similarity_type': cluster.similarity_type,
+                    'paragraph_count': len(cluster.paragraphs)
+                })
+            
+            self.logger.info(f"Retrieved {len(cluster_dicts)} clusters")
+            return cluster_dicts
+            
+        except Exception as e:
+            self.logger.error(f"Error retrieving clusters: {str(e)}", exc_info=True)
+            return []
+        finally:
+            session.close()
+    
+    def get_cluster_paragraphs(self, cluster_id: int) -> List[Dict]:
+        """Get paragraphs in a specific cluster."""
+        self.logger.info(f"Retrieving paragraphs for cluster {cluster_id}")
+        
+        session = self.Session()
+        try:
+            # Get cluster
+            cluster = session.query(Cluster).get(cluster_id)
+            
+            if not cluster:
+                self.logger.warning(f"Cluster with ID {cluster_id} not found")
+                return []
+            
+            # Get paragraphs in cluster with document info
+            paragraphs = []
+            for paragraph in cluster.paragraphs:
+                document = session.query(Document).get(paragraph.document_id)
+                
+                # Get tags for this paragraph
+                tags = [{
+                    'id': tag.id,
+                    'name': tag.name,
+                    'color': tag.color
+                } for tag in paragraph.tags]
+                
+                paragraphs.append({
+                    'id': paragraph.id,
+                    'content': paragraph.content,
+                    'document_id': paragraph.document_id,
+                    'paragraph_type': paragraph.paragraph_type,
+                    'position': paragraph.position,
+                    'header_content': paragraph.header_content,
+                    'filename': document.filename,
+                    'tags': tags
+                })
+            
+            self.logger.info(f"Retrieved {len(paragraphs)} paragraphs for cluster {cluster_id}")
+            return paragraphs
+            
+        except Exception as e:
+            self.logger.error(f"Error retrieving cluster paragraphs: {str(e)}", exc_info=True)
+            return []
+        finally:
+            session.close()
+    
+    def delete_cluster(self, cluster_id: int) -> bool:
+        """Delete a cluster."""
+        self.logger.info(f"Deleting cluster with ID: {cluster_id}")
+        
+        session = self.Session()
+        try:
+            # Get the cluster
+            cluster = session.query(Cluster).get(cluster_id)
+            
+            if not cluster:
+                self.logger.warning(f"Cluster with ID {cluster_id} not found")
+                return False
+            
+            # Delete the cluster (cascade will handle associations)
+            session.delete(cluster)
+            session.commit()
+            
+            self.logger.info(f"Deleted cluster with ID: {cluster_id}")
+            return True
+            
+        except Exception as e:
+            session.rollback()
+            self.logger.error(f"Error deleting cluster: {str(e)}", exc_info=True)
+            return False
+        finally:
+            session.close()
+    
     def export_to_excel(self, output_path: str) -> bool:
-        """Export database contents to Excel."""
+        """Export database contents to Excel with updated similarity fields."""
         self.logger.info(f"Exporting data to Excel: {output_path}")
         
         try:
@@ -663,7 +861,7 @@ class DatabaseManager:
             # Convert to DataFrame
             paragraphs_df = pd.DataFrame(paragraphs_data)
             
-            # Get similarity data
+            # Get similarity data with both similarity scores
             similarity_data = []
             
             # Query similarity results with paragraph content and document names
@@ -678,7 +876,7 @@ class DatabaseManager:
                 Document,
                 Paragraph.document_id == Document.id
             ).filter(
-                SimilarityResult.similarity_score >= 0.8
+                SimilarityResult.content_similarity_score >= 0.8
             ).all()
             
             # Get paragraph2 and document2 data
@@ -687,7 +885,8 @@ class DatabaseManager:
                 doc2 = session.query(Document).get(para2.document_id)
                 
                 similarity_data.append({
-                    'similarity_score': sim.similarity_score,
+                    'content_similarity_score': sim.content_similarity_score,  # Renamed field
+                    'text_similarity_score': sim.text_similarity_score,        # New field
                     'similarity_type': sim.similarity_type,
                     'paragraph1_content': para1_content,
                     'document1': doc1_filename,
@@ -705,7 +904,7 @@ class DatabaseManager:
                 # Paragraphs sheet
                 paragraphs_df.to_excel(writer, sheet_name='Paragraphs', index=False)
                 
-                # Similarities sheet
+                # Similarities sheet - now with both similarity metrics
                 if not similarity_df.empty:
                     similarity_df.to_excel(writer, sheet_name='Similarities', index=False)
                 
@@ -721,10 +920,11 @@ class DatabaseManager:
                 # Format for the Similarities sheet if it exists
                 if not similarity_df.empty:
                     sheet2 = writer.sheets['Similarities']
-                    sheet2.set_column('A:A', 15)  # Score column
-                    sheet2.set_column('B:B', 15)  # Type column
-                    sheet2.set_column('C:D', 80)  # Content columns
-                    sheet2.set_column('E:F', 30)  # Document columns
+                    sheet2.set_column('A:A', 15)  # Content Similarity column
+                    sheet2.set_column('B:B', 15)  # Text Similarity column
+                    sheet2.set_column('C:C', 15)  # Type column
+                    sheet2.set_column('D:E', 80)  # Content columns
+                    sheet2.set_column('F:G', 30)  # Document columns
             
             self.logger.info(f"Data exported successfully to {output_path}")
             return True
@@ -786,6 +986,12 @@ class DatabaseManager:
             
             # Clear paragraph_tags table
             session.execute(paragraph_tags.delete())
+            
+            # Clear cluster_paragraphs table
+            session.execute(cluster_paragraphs.delete())
+            
+            # Delete clusters
+            session.query(Cluster).delete()
             
             # Delete paragraphs
             session.query(Paragraph).delete()

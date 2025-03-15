@@ -299,3 +299,166 @@ pre.table-content {
     border-right: 1px solid #dee2e6;
     border-bottom: 1px solid #dee2e6;
 }
+
+/* Dual similarity metrics styling */
+
+/* Similarity container styling */
+.similarity-container {
+    margin-bottom: 30px;
+    transition: all 0.2s ease-in-out;
+}
+
+.similarity-container:hover {
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+
+/* Dual similarity score badges styling */
+.similarity-score-badges {
+    display: flex;
+    align-items: center;
+}
+
+.similarity-score-badges .badge {
+    font-size: 0.9rem;
+    padding: 0.4rem 0.6rem;
+    transition: transform 0.2s ease;
+    cursor: help;
+}
+
+.similarity-score-badges .badge:hover {
+    transform: scale(1.05);
+}
+
+/* Similarity legend */
+.similarity-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+    margin-bottom: 1rem;
+    padding: 0.5rem 1rem;
+    background-color: #f8f9fa;
+    border-radius: 0.25rem;
+}
+
+.similarity-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.similarity-legend-item .badge {
+    padding: 0.5rem 0.8rem;
+}
+
+/* Tooltip styling for badges */
+[title] {
+    position: relative;
+    cursor: help;
+}
+
+/* Enhanced diff visualization */
+.diff-stats {
+    background-color: #f8f9fa;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.diff-stats .card {
+    transition: transform 0.2s ease;
+}
+
+.diff-stats .card:hover {
+    transform: translateY(-3px);
+}
+
+.diff-details {
+    border: 1px solid #dee2e6;
+    border-radius: 0.5rem;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+}
+
+.diff-content {
+    line-height: 1.6;
+    max-height: 300px;
+    overflow-y: auto;
+    padding: 0.5rem;
+}
+
+/* Diff highlighting */
+.diff-added {
+    background-color: rgba(40, 167, 69, 0.2);
+    padding: 2px 0;
+    border-radius: 2px;
+}
+
+.diff-removed {
+    background-color: rgba(220, 53, 69, 0.2);
+    text-decoration: line-through;
+    padding: 2px 0;
+    border-radius: 2px;
+}
+
+.diff-unchanged {
+    color: #495057;
+}
+
+/* Filter controls animation */
+.form-select {
+    transition: border-color 0.2s ease;
+}
+
+.form-select:focus {
+    border-color: #80bdff;
+    box-shadow: 0 0 0 0.25rem rgba(0, 123, 255, 0.25);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .similarity-legend {
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+    
+    .similarity-score-badges {
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 0.5rem;
+    }
+    
+    .diff-stats .row {
+        margin-bottom: 1rem;
+    }
+}
+
+/* Progress bar animations */
+.progress {
+    height: 1.5rem;
+    font-size: 0.875rem;
+    border-radius: 0.25rem;
+    overflow: hidden;
+}
+
+.progress-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: width 0.6s ease;
+}
+
+/* Color overlay for the exact matches */
+.similarity-container[data-type="exact"] .content-body {
+    position: relative;
+}
+
+.similarity-container[data-type="exact"] .content-body::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(40, 167, 69, 0.05);
+    pointer-events: none;
+    border-radius: 0.25rem;
+}

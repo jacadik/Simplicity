@@ -1,0 +1,18 @@
+2025-03-15 20:40:59,741 [INFO] Starting migration on database: postgresql://paragraph_user:pass@localhost/paragraph_analyzer
+2025-03-15 20:41:00,088 [INFO] Current columns: id, paragraph1_id, paragraph2_id, similarity_score, similarity_type
+2025-03-15 20:41:00,089 [INFO] Adding text_similarity_score column...
+2025-03-15 20:41:00,100 [INFO] Added and initialized text_similarity_score column
+2025-03-15 20:41:00,100 [INFO] Renaming similarity_score to content_similarity_score...
+2025-03-15 20:41:00,102 [INFO] Renamed similarity_score to content_similarity_score
+2025-03-15 20:41:00,124 [INFO] Current indices: None
+2025-03-15 20:41:00,124 [INFO] Creating index on content_similarity_score...
+2025-03-15 20:41:00,138 [INFO] Creating index on text_similarity_score...
+2025-03-15 20:41:00,142 [INFO] Migration completed successfully
+2025-03-15 20:41:00,150 [INFO] Final columns: id, paragraph1_id, paragraph2_id, content_similarity_score, similarity_type, text_similarity_score
+2025-03-15 20:41:00,150 [INFO] Validating migration on database: postgresql://paragraph_user:pass@localhost/paragraph_analyzer
+2025-03-15 20:41:00,393 [INFO] Found 49 records in similarity_results table
+2025-03-15 20:41:00,393 [INFO] Sample data after migration:
+2025-03-15 20:41:00,394 [INFO]   (489, 2346, 2351, 0.16552186695635718, 0.16552186695635718, 'similar')
+2025-03-15 20:41:00,395 [INFO]   (490, 2346, 2356, 0.21214924659560924, 0.21214924659560924, 'similar')
+2025-03-15 20:41:00,395 [INFO]   (491, 2347, 2351, 0.2925244408707908, 0.2925244408707908, 'similar')
+2025-03-15 20:41:00,396 [INFO] Migration validation completed successfully

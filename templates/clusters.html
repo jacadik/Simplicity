@@ -22,7 +22,8 @@
                                 <th>ID</th>
                                 <th>Name</th>
                                 <th>Creation Date</th>
-                                <th>Similarity Threshold</th>
+                                <th>Similarity Type</th>
+                                <th>Threshold</th>
                                 <th>Paragraphs</th>
                                 <th>Actions</th>
                             </tr>
@@ -33,6 +34,13 @@
                                     <td>{{ cluster.id }}</td>
                                     <td>{{ cluster.name }}</td>
                                     <td>{{ cluster.creation_date.split('T')[0] }}</td>
+                                    <td>
+                                        {% if cluster.similarity_type == 'text' %}
+                                            <span class="badge bg-success">Text</span>
+                                        {% else %}
+                                            <span class="badge bg-primary">Content</span>
+                                        {% endif %}
+                                    </td>
                                     <td>{{ cluster.similarity_threshold }}</td>
                                     <td>{{ cluster.paragraph_count }}</td>
                                     <td>
@@ -67,6 +75,20 @@
                 <form action="/create-clusters" method="post">
                     <div class="modal-body">
                         <div class="mb-3">
+                            <label for="similarityTypeSelect" class="form-label">Similarity Metric</label>
+                            <select class="form-select" id="similarityTypeSelect" name="similarity_type">
+                                <option value="content">Content Similarity (Semantic)</option>
+                                <option value="text">Text Similarity (Character-based)</option>
+                            </select>
+                            <div class="form-text">
+                                <ul>
+                                    <li><strong>Content Similarity</strong>: Based on word patterns and meaning</li>
+                                    <li><strong>Text Similarity</strong>: Character-by-character comparison</li>
+                                </ul>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
                             <label for="thresholdValue" class="form-label">Similarity Threshold</label>
                             <input type="range" class="form-range" id="thresholdSlider" name="threshold" min="0.1" max="1.0" step="0.05" value="0.8" oninput="updateThresholdValue(this.value)">
                             <div class="text-center">
@@ -89,9 +111,61 @@
 {% endblock %}
 
 {% block scripts %}
+<style>
+    /* Styling for similarity type badges */
+    .badge.bg-primary, .badge.bg-success {
+        font-size: 0.85rem;
+        padding: 0.4rem 0.6rem;
+    }
+    
+    /* Improve form range styling */
+    .form-range {
+        height: 1.5rem;
+    }
+    
+    /* Modal styling improvements */
+    .modal-body .form-text ul {
+        padding-left: 1.25rem;
+        margin-top: 0.5rem;
+        margin-bottom: 0;
+    }
+    
+    /* Add hover effect to table rows */
+    .table tbody tr {
+        transition: background-color 0.2s ease;
+    }
+    
+    .table tbody tr:hover {
+        background-color: rgba(0, 123, 255, 0.05);
+    }
+</style>
+
 <script>
     function updateThresholdValue(value) {
         document.getElementById('thresholdValue').textContent = value;
     }
+    
+    // Add explanation tooltips
+    document.addEventListener('DOMContentLoaded', function() {
+        const similarityTypeSelect = document.getElementById('similarityTypeSelect');
+        
+        if (similarityTypeSelect) {
+            similarityTypeSelect.addEventListener('change', function() {
+                const selectedValue = this.value;
+                const thresholdSlider = document.getElementById('thresholdSlider');
+                
+                if (selectedValue === 'content') {
+                    // Content similarity typically has lower thresholds
+                    thresholdSlider.value = 0.8;
+                } else {
+                    // Text similarity may need higher thresholds
+                    thresholdSlider.value = 0.85;
+                }
+                
+                // Update the displayed value
+                updateThresholdValue(thresholdSlider.value);
+            });
+        }
+    });
 </script>
 {% endblock %}

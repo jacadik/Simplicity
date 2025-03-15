@@ -18,6 +18,23 @@
         </div>
     </div>
 
+    <!-- Similarity Metrics Legend -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <h5 class="mb-3">Similarity Metrics Explained</h5>
+            <div class="similarity-legend">
+                <div class="similarity-legend-item">
+                    <span class="badge bg-primary">Content Similarity</span>
+                    <span class="text-muted">Semantic comparison based on word patterns and meaning</span>
+                </div>
+                <div class="similarity-legend-item">
+                    <span class="badge bg-success">Text Similarity</span>
+                    <span class="text-muted">Character-by-character comparison of the text</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Similarity Analysis Controls -->
     <div class="card mb-4">
         <div class="card-body">
@@ -86,7 +103,7 @@
                             <h6 class="mb-0">Avg. Similarity</h6>
                             <h3 class="mb-0">
                                 {% if similarities %}
-                                    {{ (similarities|sum(attribute='similarity_score') / similarities|length * 100)|round(1) }}%
+                                    {{ (similarities|sum(attribute='content_similarity_score') / similarities|length * 100)|round(1) }}%
                                 {% else %}
                                     0%
                                 {% endif %}
@@ -127,8 +144,10 @@
                     <div class="mb-0">
                         <label for="sortOrder" class="form-label">Sort By</label>
                         <select class="form-select" id="sortOrder">
-                            <option value="score_desc">Similarity Score (High to Low)</option>
-                            <option value="score_asc">Similarity Score (Low to High)</option>
+                            <option value="content_score_desc">Content Similarity (High to Low)</option>
+                            <option value="content_score_asc">Content Similarity (Low to High)</option>
+                            <option value="text_score_desc">Text Similarity (High to Low)</option>
+                            <option value="text_score_asc">Text Similarity (Low to High)</option>
                             <option value="doc_name">Document Name</option>
                         </select>
                     </div>
@@ -149,7 +168,8 @@
                         
                         <div class="similarity-container" 
                              data-type="{{ sim.similarity_type }}"
-                             data-score="{{ sim.similarity_score }}"
+                             data-content-score="{{ sim.content_similarity_score }}"
+                             data-text-score="{{ sim.text_similarity_score }}"
                              data-doc1="{{ sim.para1_filename }}"
                              data-doc2="{{ sim.para2_filename }}">
                             
@@ -161,8 +181,13 @@
                                         </span>
                                         <span class="ms-2 text-muted">ID: {{ sim.id }}</span>
                                     </div>
-                                    <div class="similarity-score-badge">
-                                        <span class="fw-bold">{{ "%.2f"|format(sim.similarity_score * 100) }}%</span>
+                                    <div class="similarity-score-badges">
+                                        <span class="badge bg-primary me-2" title="Semantic similarity based on content meaning">
+                                            Content: {{ "%.2f"|format(sim.content_similarity_score * 100) }}%
+                                        </span>
+                                        <span class="badge bg-success" title="Character-based similarity of the text">
+                                            Text: {{ "%.2f"|format(sim.text_similarity_score * 100) }}%
+                                        </span>
                                     </div>
                                 </div>
                                 
@@ -277,6 +302,31 @@
 
 {% block scripts %}
 <style>
+    /* Dual similarity score badges styling */
+    .similarity-score-badges {
+        display: flex;
+        align-items: center;
+    }
+
+    .similarity-score-badges .badge {
+        font-size: 0.9rem;
+        padding: 0.4rem 0.6rem;
+    }
+
+    /* Similarity legend */
+    .similarity-legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1.5rem;
+    }
+
+    .similarity-legend-item {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    /* Existing styles */
     .diff-added {
         background-color: rgba(40, 167, 69, 0.2);
         padding: 2px 0;
@@ -335,10 +385,14 @@
         const containers = Array.from(document.querySelectorAll('.similarity-container'));
         
         containers.sort((a, b) => {
-            if (sortOrder === 'score_desc') {
-                return parseFloat(b.dataset.score) - parseFloat(a.dataset.score);
-            } else if (sortOrder === 'score_asc') {
-                return parseFloat(a.dataset.score) - parseFloat(b.dataset.score);
+            if (sortOrder === 'content_score_desc') {
+                return parseFloat(b.dataset.contentScore) - parseFloat(a.dataset.contentScore);
+            } else if (sortOrder === 'content_score_asc') {
+                return parseFloat(a.dataset.contentScore) - parseFloat(b.dataset.contentScore);
+            } else if (sortOrder === 'text_score_desc') {
+                return parseFloat(b.dataset.textScore) - parseFloat(a.dataset.textScore);
+            } else if (sortOrder === 'text_score_asc') {
+                return parseFloat(a.dataset.textScore) - parseFloat(b.dataset.textScore);
             } else if (sortOrder === 'doc_name') {
                 return a.dataset.doc1.localeCompare(b.dataset.doc1);
             }
