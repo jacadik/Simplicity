@@ -94,7 +94,9 @@
                         </div>
                         <div>
                             <h6 class="mb-0">Documents Compared</h6>
-                            <h3 class="mb-0">{{ similarities|map(attribute='para1_filename')|list|unique|list|length }}</h3>
+                            <h3 class="mb-0">
+                                {{ (similarities|map(attribute='para1_filename')|list + similarities|map(attribute='para2_filename')|list)|unique|list|length }}
+                            </h3>
                         </div>
                     </div>
                 </div>
