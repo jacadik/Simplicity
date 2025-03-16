@@ -570,17 +570,40 @@ def export_data():
         with tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False) as temp:
             temp_path = temp.name
         
-        # Export data to the temporary file
-        if db_manager.export_to_excel(temp_path):
-            return send_file(
-                temp_path,
-                as_attachment=True,
-                download_name=f'paragraph_analysis_{datetime.now().strftime("%Y%m%d%H%M%S")}.xlsx',
-                max_age=0
-            )
-        else:
-            flash('Failed to export data', 'danger')
-            return redirect(url_for('index'))
+        # Generate a meaningful filename for the download
+        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+        download_filename = f'paragraph_analysis_{timestamp}.xlsx'
+        
+        # Use the standalone excel_exporter if available
+        try:
+            from excel_exporter import export_to_excel as standalone_export
+            
+            # Call the standalone exporter with our database URL
+            if standalone_export(DB_URL, temp_path, logger):
+                return send_file(
+                    temp_path,
+                    as_attachment=True,
+                    download_name=download_filename,
+                    max_age=0
+                )
+            else:
+                flash('Failed to export data', 'danger')
+                return redirect(url_for('index'))
+                
+        except ImportError:
+            # Fall back to the database manager's export method
+            logger.info("Standalone exporter not available, using database manager's export method")
+            if db_manager.export_to_excel(temp_path):
+                return send_file(
+                    temp_path,
+                    as_attachment=True,
+                    download_name=download_filename,
+                    max_age=0
+                )
+            else:
+                flash('Failed to export data', 'danger')
+                return redirect(url_for('index'))
+                
     except Exception as e:
         logger.error(f"Error exporting data: {str(e)}", exc_info=True)
         flash('An error occurred during export', 'danger')

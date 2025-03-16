@@ -567,3 +567,56 @@
 2025-03-16 14:56:32,507 INFO: Finding similar paragraphs... [in C:\simplicity\app.py:378]
 2025-03-16 14:56:32,560 INFO: Found 25 similar paragraphs [in C:\simplicity\app.py:380]
 2025-03-16 14:56:32,561 INFO: Saving 28 similarity results to database [in C:\simplicity\app.py:387]
+2025-03-16 15:10:54,619 INFO: Paragraph Analyzer startup [in C:\simplicity\app.py:82]
+2025-03-16 15:10:58,139 INFO: Paragraph Analyzer startup [in C:\simplicity\app.py:82]
+2025-03-16 19:02:58,347 INFO: Paragraph Analyzer startup [in C:\simplicity\app.py:82]
+2025-03-16 19:03:12,212 INFO: Exporting data to Excel: C:\Users\jcadi\AppData\Local\Temp\tmppsjr2xjf.xlsx [in C:\simplicity\excel_exporter.py:76]
+2025-03-16 19:03:12,212 INFO: Collecting paragraphs data [in C:\simplicity\excel_exporter.py:85]
+2025-03-16 19:03:12,426 INFO: Collecting similarity data [in C:\simplicity\excel_exporter.py:132]
+2025-03-16 19:03:12,459 INFO: Collecting document statistics [in C:\simplicity\excel_exporter.py:182]
+2025-03-16 19:03:12,474 INFO: Collecting tag statistics [in C:\simplicity\excel_exporter.py:235]
+2025-03-16 19:03:12,491 INFO: Collecting cluster statistics [in C:\simplicity\excel_exporter.py:254]
+2025-03-16 19:03:12,491 INFO: Collecting summary statistics [in C:\simplicity\excel_exporter.py:290]
+2025-03-16 19:03:12,507 INFO: Writing Excel file [in C:\simplicity\excel_exporter.py:334]
+2025-03-16 19:03:12,949 ERROR: Error exporting to Excel: 'collections.defaultdict' object has no attribute 'columns' [in C:\simplicity\excel_exporter.py:445]
+Traceback (most recent call last):
+  File "C:\simplicity\excel_exporter.py", line 438, in export_to_excel
+    for col_num, value in enumerate(sheet.table.columns):
+                                    ^^^^^^^^^^^^^^^^^^^
+AttributeError: 'collections.defaultdict' object has no attribute 'columns'
+2025-03-16 19:08:09,946 INFO: Paragraph Analyzer startup [in C:\simplicity\app.py:82]
+2025-03-16 19:08:10,396 ERROR: Error exporting data: expected 'except' or 'finally' block (excel_exporter.py, line 428) [in C:\simplicity\app.py:608]
+Traceback (most recent call last):
+  File "C:\simplicity\app.py", line 579, in export_data
+    from excel_exporter import export_to_excel as standalone_export
+  File "C:\simplicity\excel_exporter.py", line 428
+    logger.info("Writing Excel file")
+SyntaxError: expected 'except' or 'finally' block
+2025-03-16 19:13:36,861 INFO: Paragraph Analyzer startup [in C:\simplicity\app.py:82]
+2025-03-16 19:13:37,311 INFO: Exporting data to Excel: C:\Users\jcadi\AppData\Local\Temp\tmpyu87lo0z.xlsx [in C:\simplicity\excel_exporter.py:76]
+2025-03-16 19:13:37,313 INFO: Collecting paragraphs data [in C:\simplicity\excel_exporter.py:85]
+2025-03-16 19:13:37,499 INFO: Collecting similarity data [in C:\simplicity\excel_exporter.py:132]
+2025-03-16 19:13:37,512 INFO: Collecting document statistics [in C:\simplicity\excel_exporter.py:182]
+2025-03-16 19:13:37,535 INFO: Collecting tag statistics [in C:\simplicity\excel_exporter.py:235]
+2025-03-16 19:13:37,544 INFO: Collecting cluster statistics [in C:\simplicity\excel_exporter.py:254]
+2025-03-16 19:13:37,552 INFO: Collecting summary statistics [in C:\simplicity\excel_exporter.py:290]
+2025-03-16 19:13:37,560 INFO: Writing Excel file [in C:\simplicity\excel_exporter.py:334]
+2025-03-16 19:13:37,668 INFO: Enhanced data export completed to C:\Users\jcadi\AppData\Local\Temp\tmpyu87lo0z.xlsx [in C:\simplicity\excel_exporter.py:436]
+2025-03-16 19:16:38,810 INFO: Processed 1 paragraphs from Green_elephant_jumped.docx [in C:\simplicity\app.py:150]
+2025-03-16 19:16:38,832 INFO: Processed 1 paragraphs from Green_elephant.docx [in C:\simplicity\app.py:150]
+2025-03-16 19:16:46,871 INFO: Retrieved 2 paragraphs for similarity analysis [in C:\simplicity\app.py:351]
+2025-03-16 19:16:46,871 INFO: Paragraph distribution by document: {311: 1, 312: 1} [in C:\simplicity\app.py:361]
+2025-03-16 19:16:46,871 INFO: Finding exact matches... [in C:\simplicity\app.py:373]
+2025-03-16 19:16:46,889 INFO: Found 1 exact matches [in C:\simplicity\app.py:375]
+2025-03-16 19:16:46,889 INFO: Finding similar paragraphs... [in C:\simplicity\app.py:378]
+2025-03-16 19:16:46,906 INFO: Found 1 similar paragraphs [in C:\simplicity\app.py:380]
+2025-03-16 19:16:46,906 INFO: Saving 2 similarity results to database [in C:\simplicity\app.py:387]
+2025-03-16 19:16:57,680 INFO: Exporting data to Excel: C:\Users\jcadi\AppData\Local\Temp\tmpf007ajud.xlsx [in C:\simplicity\excel_exporter.py:76]
+2025-03-16 19:16:57,688 INFO: Collecting paragraphs data [in C:\simplicity\excel_exporter.py:85]
+2025-03-16 19:16:57,862 INFO: Collecting similarity data [in C:\simplicity\excel_exporter.py:132]
+2025-03-16 19:16:57,881 INFO: Collecting document statistics [in C:\simplicity\excel_exporter.py:182]
+2025-03-16 19:16:57,897 INFO: Collecting tag statistics [in C:\simplicity\excel_exporter.py:235]
+2025-03-16 19:16:57,897 INFO: Collecting cluster statistics [in C:\simplicity\excel_exporter.py:254]
+2025-03-16 19:16:57,914 INFO: Collecting summary statistics [in C:\simplicity\excel_exporter.py:290]
+2025-03-16 19:16:57,931 INFO: Writing Excel file [in C:\simplicity\excel_exporter.py:334]
+2025-03-16 19:16:57,981 INFO: Enhanced data export completed to C:\Users\jcadi\AppData\Local\Temp\tmpf007ajud.xlsx [in C:\simplicity\excel_exporter.py:436]
