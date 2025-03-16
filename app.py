@@ -8,7 +8,7 @@ from flask import Flask, render_template, request, redirect, url_for, flash, jso
 from werkzeug.utils import secure_filename
 
 from document_parser import DocumentParser
-from similarity_analyzer import SimilarityAnalyzer, SimilarityResult
+from similarity_analyzer import SimilarityAnalyzer, SimilarityResult as AnalyzerSimilarityResult
 from database_manager import DatabaseManager, Document, Paragraph, Tag, SimilarityResult
 
 # Configuration
@@ -515,18 +515,18 @@ def create_clusters():
         flash('No similarities found for clustering', 'warning')
         return redirect(url_for('view_similarity'))
     
-    # Convert database results to SimilarityResult objects for the algorithm
+    # Convert database results to AnalyzerSimilarityResult objects for the algorithm
     similarity_results = []
     for sim in similarities:
-        result = SimilarityResult(
+        result = AnalyzerSimilarityResult(
             paragraph1_id=sim['paragraph1_id'],
             paragraph2_id=sim['paragraph2_id'],
             paragraph1_content=sim['para1_content'],
             paragraph2_content=sim['para2_content'],
             paragraph1_doc_id=sim['para1_doc_id'],
             paragraph2_doc_id=sim['para2_doc_id'],
-            content_similarity_score=sim['content_similarity_score'],  # Updated field name
-            text_similarity_score=sim['text_similarity_score'],        # Added field
+            content_similarity_score=sim['content_similarity_score'],
+            text_similarity_score=sim['text_similarity_score'],
             similarity_type=sim['similarity_type']
         )
         similarity_results.append(result)
