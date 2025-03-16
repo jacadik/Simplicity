@@ -8,8 +8,8 @@ from flask import Flask, render_template, request, redirect, url_for, flash, jso
 from werkzeug.utils import secure_filename
 
 from document_parser import DocumentParser
-from similarity_analyzer import SimilarityAnalyzer, SimilarityResult
-from database_manager import DatabaseManager, Document, Paragraph, Tag, SimilarityResult as DbSimilarityResult, Cluster
+from similarity_analyzer import SimilarityAnalyzer
+from database_manager import DatabaseManager, Document, Paragraph, Tag, SimilarityResult
 
 # Configuration
 UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads')
@@ -239,6 +239,10 @@ def view_paragraphs():
     
     paragraphs = db_manager.get_paragraphs(document_id, collapse_duplicates=collapse_duplicates)
     documents = db_manager.get_documents()
+    
+    # Create a dictionary to map filenames to document IDs for easy lookup
+    filename_to_doc_id = {doc['filename']: doc['id'] for doc in documents}
+    
     tags = db_manager.get_tags()
     
     return render_template(
@@ -247,7 +251,8 @@ def view_paragraphs():
         documents=documents, 
         tags=tags, 
         selected_document=document_id,
-        show_all_duplicates=show_all_duplicates
+        show_all_duplicates=show_all_duplicates,
+        filename_to_doc_id=filename_to_doc_id  # Add this dictionary to template context
     )
 
 @app.route('/document/<int:document_id>')
@@ -300,7 +305,7 @@ def view_similarity():
 
 @app.route('/analyze-similarity', methods=['POST'])
 def analyze_similarity():
-    """Run similarity analysis on paragraphs with dual metrics."""
+    """Run similarity analysis on paragraphs."""
     threshold = float(request.form.get('threshold', 0.8))
     
     # Get all paragraphs
@@ -331,14 +336,7 @@ def analyze_similarity():
     if all_results:
         # Save results to database
         db_manager.add_similarity_results(all_results)
-        
-        # Calculate average scores for both metrics
-        avg_content_similarity = sum(r.content_similarity_score for r in all_results) / len(all_results)
-        avg_text_similarity = sum(r.text_similarity_score for r in all_results) / len(all_results)
-        
-        flash(f'Found {len(exact_matches)} exact matches and {len(similar_paragraphs)} similar paragraphs. '
-              f'Avg content similarity: {avg_content_similarity:.1%}, '
-              f'Avg text similarity: {avg_text_similarity:.1%}', 'success')
+        flash(f'Found {len(exact_matches)} exact matches and {len(similar_paragraphs)} similar paragraphs', 'success')
     else:
         flash('No similarities found', 'info')
     
@@ -430,6 +428,8 @@ def get_tags_json():
     tags = db_manager.get_tags()
     return jsonify(tags)
 
+# Add these routes to app.py
+
 @app.route('/clusters')
 def view_clusters():
     """View all paragraph clusters."""
@@ -439,9 +439,7 @@ def view_clusters():
 @app.route('/clusters/<int:cluster_id>')
 def view_cluster(cluster_id):
     """View paragraphs in a specific cluster."""
-    clusters = db_manager.get_clusters()
-    cluster = next((c for c in clusters if c['id'] == cluster_id), None)
-    
+    cluster = next((c for c in db_manager.get_clusters() if c['id'] == cluster_id), None)
     if not cluster:
         flash('Cluster not found', 'danger')
         return redirect(url_for('view_clusters'))
@@ -453,7 +451,6 @@ def view_cluster(cluster_id):
 def create_clusters():
     """Create paragraph clusters based on similarity analysis."""
     threshold = float(request.form.get('threshold', 0.8))
-    similarity_type = request.form.get('similarity_type', 'content')  # New parameter to choose which metric to use
     
     # Get all similarity results
     similarities = db_manager.get_similar_paragraphs(threshold)
@@ -472,18 +469,13 @@ def create_clusters():
             paragraph2_content=sim['para2_content'],
             paragraph1_doc_id=sim['para1_doc_id'],
             paragraph2_doc_id=sim['para2_doc_id'],
-            content_similarity_score=sim['content_similarity_score'],  # Renamed field
-            text_similarity_score=sim['text_similarity_score'],        # New field
+            similarity_score=sim['similarity_score'],
             similarity_type=sim['similarity_type']
         )
         similarity_results.append(result)
     
-    # Cluster the paragraphs using the specified similarity type
-    clusters = similarity_analyzer.cluster_paragraphs(
-        similarity_results, 
-        threshold, 
-        similarity_type
-    )
+    # Cluster the paragraphs
+    clusters = similarity_analyzer.cluster_paragraphs(similarity_results, threshold)
     
     if not clusters:
         flash('No clusters found', 'warning')
@@ -495,8 +487,7 @@ def create_clusters():
         cluster_id = db_manager.create_cluster(
             name=cluster['name'],
             description=cluster['description'],
-            similarity_threshold=cluster['similarity_threshold'],
-            similarity_type=cluster['similarity_type']
+            similarity_threshold=cluster['similarity_threshold']
         )
         
         if cluster_id > 0:
@@ -504,7 +495,7 @@ def create_clusters():
                 cluster_count += 1
     
     if cluster_count > 0:
-        flash(f'Successfully created {cluster_count} clusters using {similarity_type} similarity', 'success')
+        flash(f'Successfully created {cluster_count} clusters', 'success')
     else:
         flash('Failed to create clusters', 'danger')
     

@@ -6,13 +6,18 @@
     <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
         <h1 class="h2">Dashboard</h1>
         <div class="btn-toolbar mb-2 mb-md-0">
+            {% if documents %}
+                <a href="/clear" class="btn btn-sm btn-danger me-2" onclick="return confirm('Are you sure you want to clear all data? This action cannot be undone.');">
+                    <i class="bi bi-trash"></i> Clear All Data
+                </a>
+            {% endif %}
             <button type="button" class="btn btn-sm btn-outline-primary me-2" data-bs-toggle="modal" data-bs-target="#uploadModal">
                 <i class="bi bi-upload"></i> Upload Documents
             </button>
             <button type="button" class="btn btn-sm btn-outline-secondary me-2" data-bs-toggle="modal" data-bs-target="#folderModal">
                 <i class="bi bi-folder"></i> Import from Folder
             </button>
-            <a href="/export" class="btn btn-sm btn-outline-success">
+            <a href="/export" class="btn btn-sm btn-outline-success me-2">
                 <i class="bi bi-file-excel"></i> Export to Excel
             </a>
         </div>
@@ -38,7 +43,7 @@
                             <td>{{ doc.filename }}</td>
                             <td>{{ doc.file_type.upper() }}</td>
                             <td>{{ doc.upload_date.split('T')[0].split('-')[2] }}-{{ doc.upload_date.split('T')[0].split('-')[1] }}-{{ doc.upload_date.split('T')[0].split('-')[0] }} {{ doc.upload_date.split('T')[1].split('.')[0][:5] }}</td>
-							<<td>
+							<td>
 								<a href="/delete/{{ doc.id }}" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure you want to delete this document?');">
 									<i class="bi bi-trash"></i> Delete
 								</a>
@@ -59,14 +64,6 @@
             </tbody>
         </table>
     </div>
-
-    {% if documents %}
-        <div class="mt-3">
-            <a href="/clear" class="btn btn-danger" onclick="return confirm('Are you sure you want to clear all data? This action cannot be undone.');">
-                <i class="bi bi-trash"></i> Clear All Data
-            </a>
-        </div>
-    {% endif %}
 
     <!-- Upload Modal -->
     <div class="modal fade" id="uploadModal" tabindex="-1" aria-labelledby="uploadModalLabel" aria-hidden="true">
@@ -121,59 +118,58 @@
 
 {% block scripts %}
 <script>
-// Prevent double form submission for the upload modal
-document.addEventListener('DOMContentLoaded', function() {
-    // Get the forms
-    const uploadForm = document.getElementById('uploadForm');
-    const folderForm = document.getElementById('folderForm');
-    
-    // Function to handle form submission and prevent double-submission
-    function handleFormSubmit(form) {
-        // Flag to track if the form has been submitted
-        let formSubmitted = false;
+    document.addEventListener('DOMContentLoaded', function() {
+        // Get the forms
+        const uploadForm = document.getElementById('uploadForm');
+        const folderForm = document.getElementById('folderForm');
         
-        // Add event listener to the form
-        form.addEventListener('submit', function(event) {
-            // If the form was already submitted, prevent the second submission
-            if (formSubmitted) {
-                event.preventDefault();
-                return false;
-            }
+        // Function to handle form submission and prevent double-submission
+        function handleFormSubmit(form) {
+            // Flag to track if the form has been submitted
+            let formSubmitted = false;
             
-            // Mark the form as submitted
-            formSubmitted = true;
-            
-            // Disable submit button to prevent double submission
-            const submitButton = form.querySelector('button[type="submit"]');
-            if (submitButton) {
-                submitButton.disabled = true;
-                submitButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Processing...';
-            }
-            
-            // Allow the form submission to proceed
-            return true;
-        });
-        
-        // Reset the submitted flag when the modal is hidden
-        const modalId = form.closest('.modal').id;
-        const modal = document.getElementById(modalId);
-        if (modal) {
-            modal.addEventListener('hidden.bs.modal', function() {
-                formSubmitted = false;
+            // Add event listener to the form
+            form.addEventListener('submit', function(event) {
+                // If the form was already submitted, prevent the second submission
+                if (formSubmitted) {
+                    event.preventDefault();
+                    return false;
+                }
                 
-                // Re-enable the submit button
+                // Mark the form as submitted
+                formSubmitted = true;
+                
+                // Disable submit button to prevent double submission
                 const submitButton = form.querySelector('button[type="submit"]');
                 if (submitButton) {
-                    submitButton.disabled = false;
-                    submitButton.innerHTML = modalId === 'uploadModal' ? 'Upload' : 'Import';
+                    submitButton.disabled = true;
+                    submitButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Processing...';
                 }
+                
+                // Allow the form submission to proceed
+                return true;
             });
+            
+            // Reset the submitted flag when the modal is hidden
+            const modalId = form.closest('.modal').id;
+            const modal = document.getElementById(modalId);
+            if (modal) {
+                modal.addEventListener('hidden.bs.modal', function() {
+                    formSubmitted = false;
+                    
+                    // Re-enable the submit button
+                    const submitButton = form.querySelector('button[type="submit"]');
+                    if (submitButton) {
+                        submitButton.disabled = false;
+                        submitButton.innerHTML = modalId === 'uploadModal' ? 'Upload' : 'Import';
+                    }
+                });
+            }
         }
-    }
-    
-    // Apply handlers to both forms
-    if (uploadForm) handleFormSubmit(uploadForm);
-    if (folderForm) handleFormSubmit(folderForm);
-});
+        
+        // Apply handlers to both forms
+        if (uploadForm) handleFormSubmit(uploadForm);
+        if (folderForm) handleFormSubmit(folderForm);
+    });
 </script>
 {% endblock %}
