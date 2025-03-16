@@ -408,7 +408,7 @@ class SimilarityAnalyzer:
                         self.logger.warning(f"Invalid similarity value: {content_similarity}")
                         continue
                     
-                    # Count pairs above threshold for debugging (using content similarity for threshold)
+                    # Only include pairs above threshold
                     if content_similarity >= threshold:
                         pairs_above_threshold += 1
                         
@@ -427,47 +427,7 @@ class SimilarityAnalyzer:
             
             self.logger.debug(f"Found {pairs_above_threshold} pairs above threshold out of {total_pairs} total pairs")
             
-            # Special case: if threshold is very low but no results, maybe try the highest pairs
-            if threshold < 0.3 and len(results) == 0 and total_pairs > 0:
-                self.logger.info("Low threshold but no results, getting top 10 similarity pairs instead")
-                # Find highest similarity scores
-                top_pairs = []
-                for i in range(len(paragraphs)):
-                    for j in range(i+1, len(paragraphs)):
-                        # Skip same document
-                        if paragraphs[i]['doc_id'] == paragraphs[j]['doc_id']:
-                            continue
-                            
-                        # Skip invalid indices
-                        if i >= cosine_sim.shape[0] or j >= cosine_sim.shape[1]:
-                            continue
-                            
-                        content_similarity = float(cosine_sim[i, j])
-                        text_similarity = self._calculate_text_similarity(
-                            paragraphs[i]['content'],
-                            paragraphs[j]['content']
-                        )
-                        
-                        if not np.isnan(content_similarity) and not np.isinf(content_similarity):
-                            top_pairs.append((i, j, content_similarity, text_similarity))
-                
-                # Sort by content similarity descending and take top 10
-                top_pairs.sort(key=lambda x: x[2], reverse=True)
-                for i, j, content_similarity, text_similarity in top_pairs[:10]:
-                    result = SimilarityResult(
-                        paragraph1_id=paragraphs[i]['id'],
-                        paragraph2_id=paragraphs[j]['id'],
-                        paragraph1_content=paragraphs[i]['content'],
-                        paragraph2_content=paragraphs[j]['content'],
-                        paragraph1_doc_id=paragraphs[i]['doc_id'],
-                        paragraph2_doc_id=paragraphs[j]['doc_id'],
-                        content_similarity_score=content_similarity,
-                        text_similarity_score=text_similarity,
-                        similarity_type='similar'
-                    )
-                    results.append(result)
-                
-                self.logger.info(f"Added {len(results)} top similarity pairs")
+            # NOTE: Removed the special case for low thresholds that was causing inconsistent results
         
         except Exception as e:
             self.logger.error(f"Error calculating TF-IDF similarity: {str(e)}", exc_info=True)

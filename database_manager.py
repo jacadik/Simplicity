@@ -248,6 +248,26 @@ class DatabaseManager:
         finally:
             session.close()
     
+    def clear_similarity_results(self) -> bool:
+        """Clear all similarity results from the database."""
+        self.logger.info("Clearing all similarity results")
+        
+        session = self.Session()
+        try:
+            # Delete all similarity results
+            count = session.query(SimilarityResult).delete()
+            session.commit()
+            
+            self.logger.info(f"Deleted {count} similarity results")
+            return True
+            
+        except Exception as e:
+            session.rollback()
+            self.logger.error(f"Error clearing similarity results: {str(e)}", exc_info=True)
+            return False
+        finally:
+            session.close()
+    
     def add_similarity_results(self, results: List[AnalyzerSimilarityResult]) -> bool:
         """Add similarity results to the database."""
         if not results:
@@ -255,6 +275,10 @@ class DatabaseManager:
             return True
             
         self.logger.info(f"Adding {len(results)} similarity results to database")
+        
+        # First, clear existing similarity results
+        if not self.clear_similarity_results():
+            self.logger.warning("Failed to clear existing similarity results, proceeding with update")
         
         session = self.Session()
         try:
@@ -264,42 +288,20 @@ class DatabaseManager:
                                 f"type={result.similarity_type}, content_score={result.content_similarity_score}, "
                                 f"text_score={result.text_similarity_score}")
                 
-                # Check if this pair already exists in any order
-                existing = session.query(SimilarityResult).filter(
-                    or_(
-                        and_(
-                            SimilarityResult.paragraph1_id == result.paragraph1_id,
-                            SimilarityResult.paragraph2_id == result.paragraph2_id
-                        ),
-                        and_(
-                            SimilarityResult.paragraph1_id == result.paragraph2_id,
-                            SimilarityResult.paragraph2_id == result.paragraph1_id
-                        )
-                    )
-                ).first()
-                
-                if existing:
-                    self.logger.debug(f"Similarity result already exists for paragraphs {result.paragraph1_id} and {result.paragraph2_id}, updating")
-                    # Update existing record
-                    existing.content_similarity_score = result.content_similarity_score
-                    existing.text_similarity_score = result.text_similarity_score
-                    existing.similarity_type = result.similarity_type
-                else:
-                    # Create new similarity result record with both similarity scores
-                    self.logger.debug(f"Adding new similarity result for paragraphs {result.paragraph1_id} and {result.paragraph2_id}")
-                    db_result = SimilarityResult(
-                        paragraph1_id=result.paragraph1_id,
-                        paragraph2_id=result.paragraph2_id,
-                        content_similarity_score=result.content_similarity_score,
-                        text_similarity_score=result.text_similarity_score,
-                        similarity_type=result.similarity_type
-                    )
-                    session.add(db_result)
+                # Create new similarity result record with both similarity scores
+                db_result = SimilarityResult(
+                    paragraph1_id=result.paragraph1_id,
+                    paragraph2_id=result.paragraph2_id,
+                    content_similarity_score=result.content_similarity_score,
+                    text_similarity_score=result.text_similarity_score,
+                    similarity_type=result.similarity_type
+                )
+                session.add(db_result)
             
             # Commit all similarity results in one transaction
             session.commit()
             
-            self.logger.info(f"Successfully added/updated {len(results)} similarity results")
+            self.logger.info(f"Successfully added {len(results)} similarity results")
             return True
             
         except Exception as e:
@@ -471,7 +473,7 @@ class DatabaseManager:
         try:
             session = self.Session()
             
-            self.logger.info("Starting similarity query")
+            self.logger.info(f"Starting similarity query with threshold: {threshold}")
             
             # First, get all similarity results with paragraph1 data
             query = session.query(

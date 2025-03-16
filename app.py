@@ -335,11 +335,14 @@ def view_similarity():
     # Pass the percentage threshold to the template
     return render_template('similarity.html', similarities=similarities, threshold=threshold_pct)
 
-# Update the route for running similarity analysis to use percentage
 @app.route('/analyze-similarity', methods=['POST'])
 def analyze_similarity():
     """Run similarity analysis on paragraphs."""
-    threshold = float(request.form.get('threshold', 0.8))
+    # Get threshold as percentage (0-100)
+    threshold_pct = float(request.form.get('threshold', 80.0))
+    
+    # Convert percentage to decimal (0-1) for similarity analyzer
+    threshold = threshold_pct / 100.0
     
     # Get all paragraphs - use collapse_duplicates=False to get ALL paragraphs
     paragraphs = db_manager.get_paragraphs(collapse_duplicates=False)
@@ -369,12 +372,15 @@ def analyze_similarity():
             'doc_id': para['document_id']
         })
     
+    # Clear existing similarity results before finding new ones
+    db_manager.clear_similarity_results()
+    
     # Find exact matches first
     app.logger.info("Finding exact matches...")
     exact_matches = similarity_analyzer.find_exact_matches(para_data)
     app.logger.info(f"Found {len(exact_matches)} exact matches")
     
-    # Find similar paragraphs
+    # Find similar paragraphs with the converted threshold
     app.logger.info("Finding similar paragraphs...")
     similar_paragraphs = similarity_analyzer.find_similar_paragraphs(para_data, threshold)
     app.logger.info(f"Found {len(similar_paragraphs)} similar paragraphs")
@@ -390,7 +396,8 @@ def analyze_similarity():
     else:
         flash('No similarities found', 'info')
     
-    return redirect(url_for('view_similarity', threshold=threshold))
+    # Redirect to similarity view with the same threshold percentage
+    return redirect(url_for('view_similarity', threshold=threshold_pct))
 
 @app.route('/tags')
 def manage_tags():
