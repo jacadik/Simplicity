@@ -58,6 +58,92 @@ class SimilarityAnalyzer:
         
         return logger
     
+    def _normalize_text(self, text: str) -> str:
+        """Normalize text for comparison by removing extra whitespace, lowercasing, etc."""
+        if not text:
+            return ""
+        
+        try:
+            # Convert to lowercase
+            text = text.lower()
+            
+            # Replace multiple whitespace with single space
+            text = re.sub(r'\s+', ' ', text)
+            
+            # Remove punctuation (keeping spaces)
+            text = re.sub(r'[^\w\s]', '', text)
+            
+            # Trim whitespace
+            text = text.strip()
+            
+            return text
+        except Exception as e:
+            self.logger.error(f"Error normalizing text: {str(e)}", exc_info=True)
+            return ""
+    
+    def _preprocess_text(self, text: str) -> str:
+        """Preprocess text for TF-IDF analysis."""
+        # For TF-IDF, we want to preserve more structure than pure normalization
+        if not text:
+            return ""
+        
+        try:
+            # Convert to lowercase
+            text = text.lower()
+            
+            # Replace multiple whitespace with single space
+            text = re.sub(r'\s+', ' ', text)
+            
+            # Trim whitespace
+            text = text.strip()
+            
+            return text
+        except Exception as e:
+            self.logger.error(f"Error preprocessing text: {str(e)}", exc_info=True)
+            return ""
+    
+    def _calculate_text_similarity(self, text1: str, text2: str) -> float:
+        """Calculate character-by-character similarity using SequenceMatcher."""
+        if not text1 or not text2:
+            return 0.0
+        
+        try:
+            # Normalize texts for character-by-character comparison
+            norm_text1 = self._normalize_text(text1)
+            norm_text2 = self._normalize_text(text2)
+            
+            if not norm_text1 or not norm_text2:
+                return 0.0
+            
+            # Use SequenceMatcher for character-by-character comparison
+            matcher = SequenceMatcher(None, norm_text1, norm_text2)
+            return matcher.ratio()
+        except Exception as e:
+            self.logger.error(f"Error calculating text similarity: {str(e)}", exc_info=True)
+            return 0.0
+    
+    def _make_pair_key(self, id1: int, id2: int) -> str:
+        """Create a unique key for a pair of paragraph IDs."""
+        # Ensure consistency by always putting smaller ID first
+        sorted_ids = sorted([id1, id2])
+        return f"{sorted_ids[0]}_{sorted_ids[1]}"
+    
+    def _merge_similarity_results(self, results1: List[SimilarityResult], 
+                                 results2: List[SimilarityResult]) -> List[SimilarityResult]:
+        """Merge two lists of similarity results, avoiding duplicates."""
+        # Create a set of existing pair keys
+        existing_pairs = {self._make_pair_key(r.paragraph1_id, r.paragraph2_id) for r in results1}
+        
+        # Add results from results2 that don't exist in results1
+        merged = results1.copy()
+        for result in results2:
+            pair_key = self._make_pair_key(result.paragraph1_id, result.paragraph2_id)
+            if pair_key not in existing_pairs:
+                merged.append(result)
+                existing_pairs.add(pair_key)
+        
+        return merged
+    
     def find_exact_matches(self, paragraphs: List[Dict]) -> List[SimilarityResult]:
         """Find paragraphs that are exact matches."""
         self.logger.info(f"Finding exact matches among {len(paragraphs)} paragraphs")
@@ -235,93 +321,6 @@ class SimilarityAnalyzer:
         
         return results
     
-    def cluster_paragraphs(self, similarity_results: List[SimilarityResult], threshold: float = None, 
-                          similarity_type: str = 'content') -> List[Dict]:
-        """
-        Cluster paragraphs using graph-based community detection.
-        
-        Args:
-            similarity_results: List of similarity results
-            threshold: Minimum similarity score to consider paragraphs related
-            similarity_type: Which similarity metric to use ('content' or 'text')
-                
-        Returns:
-            List of clusters, where each cluster is a dict with name and paragraph IDs
-        """
-        threshold = float(threshold) if threshold is not None else self.threshold
-        self.logger.info(f"Clustering paragraphs with {similarity_type} similarity threshold {threshold}")
-        
-        try:
-            # Create a graph
-            G = nx.Graph()
-            
-            # Add nodes and edges for similarities above threshold
-            for result in similarity_results:
-                # Determine which similarity score to use based on the requested type
-                if similarity_type == 'text':
-                    similarity_score = result.text_similarity_score
-                    metric_name = "text similarity"
-                else:  # Default to content similarity
-                    similarity_score = result.content_similarity_score
-                    metric_name = "content similarity"
-                    
-                if similarity_score >= threshold:
-                    # Add nodes with paragraph content as attribute
-                    G.add_node(result.paragraph1_id, content=result.paragraph1_content)
-                    G.add_node(result.paragraph2_id, content=result.paragraph2_content)
-                    
-                    # Add edge with similarity score as weight
-                    G.add_edge(
-                        result.paragraph1_id, 
-                        result.paragraph2_id, 
-                        weight=similarity_score
-                    )
-            
-            # Skip if graph is empty
-            if len(G.nodes) == 0:
-                self.logger.warning(f"No paragraphs to cluster using {metric_name}")
-                return []
-                
-            # Find communities using Louvain method (optimizes modularity)
-            try:
-                communities = nx.community.louvain_communities(G)
-            except Exception as e:
-                self.logger.error(f"Louvain community detection failed: {str(e)}", exc_info=True)
-                # Fallback to simpler community detection
-                communities = list(nx.connected_components(G))
-                self.logger.info(f"Using connected components as fallback, found {len(communities)} communities")
-            
-            # Convert to list of dicts
-            clusters = []
-            for i, community in enumerate(communities):
-                # Convert community to list
-                community_list = list(community)
-                
-                # Get a representative paragraph for naming the cluster
-                if community_list:
-                    representative_id = community_list[0]
-                    rep_content = G.nodes[representative_id].get('content', '')
-                    # Use the first 50 chars of the representative paragraph for the name
-                    cluster_name = f"Cluster {i+1}: {rep_content[:50]}..."
-                else:
-                    cluster_name = f"Cluster {i+1}"
-                    
-                clusters.append({
-                    'name': cluster_name,
-                    'description': f"Auto-generated cluster with {len(community_list)} paragraphs using {metric_name}",
-                    'creation_date': datetime.now().isoformat(),
-                    'similarity_threshold': threshold,
-                    'paragraph_ids': community_list,
-                    'similarity_type': similarity_type  # Store which similarity metric was used
-                })
-            
-            self.logger.info(f"Created {len(clusters)} clusters using {metric_name}")
-            return clusters
-            
-        except Exception as e:
-            self.logger.error(f"Error clustering paragraphs: {str(e)}", exc_info=True)
-            return []
-    
     def _calculate_tfidf_similarity(self, corpus: List[str], paragraphs: List[Dict], threshold: float) -> List[SimilarityResult]:
         """Calculate similarity using TF-IDF and cosine similarity."""
         results = []
@@ -463,3 +462,147 @@ class SimilarityAnalyzer:
             self.logger.error(f"Error calculating TF-IDF similarity: {str(e)}", exc_info=True)
         
         return results
+    
+    def _calculate_jaccard_similarity(self, corpus: List[str], paragraphs: List[Dict], threshold: float) -> List[SimilarityResult]:
+        """Calculate similarity using Jaccard index as a backup method."""
+        results = []
+        
+        try:
+            # Handle edge cases
+            if len(corpus) <= 1 or len(paragraphs) <= 1:
+                return []
+            
+            # Calculate Jaccard similarity for each pair
+            for i in range(len(paragraphs)):
+                for j in range(i+1, len(paragraphs)):
+                    # Skip if both paragraphs are from the same document
+                    if paragraphs[i]['doc_id'] == paragraphs[j]['doc_id']:
+                        continue
+                    
+                    # Skip if either corpus entry is empty
+                    if not corpus[i].strip() or not corpus[j].strip():
+                        continue
+                    
+                    # Calculate Jaccard similarity (set of words)
+                    set1 = set(corpus[i].split())
+                    set2 = set(corpus[j].split())
+                    
+                    intersection = len(set1.intersection(set2))
+                    union = len(set1.union(set2))
+                    
+                    if union == 0:  # Avoid division by zero
+                        continue
+                        
+                    content_similarity = intersection / union
+                    
+                    # Calculate text similarity using SequenceMatcher
+                    text_similarity = self._calculate_text_similarity(
+                        paragraphs[i]['content'], 
+                        paragraphs[j]['content']
+                    )
+                    
+                    if content_similarity >= threshold:
+                        result = SimilarityResult(
+                            paragraph1_id=paragraphs[i]['id'],
+                            paragraph2_id=paragraphs[j]['id'],
+                            paragraph1_content=paragraphs[i]['content'],
+                            paragraph2_content=paragraphs[j]['content'],
+                            paragraph1_doc_id=paragraphs[i]['doc_id'],
+                            paragraph2_doc_id=paragraphs[j]['doc_id'],
+                            content_similarity_score=content_similarity,
+                            text_similarity_score=text_similarity,
+                            similarity_type='similar'
+                        )
+                        results.append(result)
+            
+        except Exception as e:
+            self.logger.error(f"Error calculating Jaccard similarity: {str(e)}", exc_info=True)
+        
+        return results
+    
+    def cluster_paragraphs(self, similarity_results: List[SimilarityResult], threshold: float = None, 
+                          similarity_type: str = 'content') -> List[Dict]:
+        """
+        Cluster paragraphs using graph-based community detection.
+        
+        Args:
+            similarity_results: List of similarity results
+            threshold: Minimum similarity score to consider paragraphs related
+            similarity_type: Which similarity metric to use ('content' or 'text')
+                
+        Returns:
+            List of clusters, where each cluster is a dict with name and paragraph IDs
+        """
+        threshold = float(threshold) if threshold is not None else self.threshold
+        self.logger.info(f"Clustering paragraphs with {similarity_type} similarity threshold {threshold}")
+        
+        try:
+            # Create a graph
+            G = nx.Graph()
+            
+            # Add nodes and edges for similarities above threshold
+            for result in similarity_results:
+                # Determine which similarity score to use based on the requested type
+                if similarity_type == 'text':
+                    similarity_score = result.text_similarity_score
+                    metric_name = "text similarity"
+                else:  # Default to content similarity
+                    similarity_score = result.content_similarity_score
+                    metric_name = "content similarity"
+                    
+                if similarity_score >= threshold:
+                    # Add nodes with paragraph content as attribute
+                    G.add_node(result.paragraph1_id, content=result.paragraph1_content)
+                    G.add_node(result.paragraph2_id, content=result.paragraph2_content)
+                    
+                    # Add edge with similarity score as weight
+                    G.add_edge(
+                        result.paragraph1_id, 
+                        result.paragraph2_id, 
+                        weight=similarity_score
+                    )
+            
+            # Skip if graph is empty
+            if len(G.nodes) == 0:
+                self.logger.warning(f"No paragraphs to cluster using {metric_name}")
+                return []
+                
+            # Find communities using Louvain method (optimizes modularity)
+            try:
+                communities = nx.community.louvain_communities(G)
+            except Exception as e:
+                self.logger.error(f"Louvain community detection failed: {str(e)}", exc_info=True)
+                # Fallback to simpler community detection
+                communities = list(nx.connected_components(G))
+                self.logger.info(f"Using connected components as fallback, found {len(communities)} communities")
+            
+            # Convert to list of dicts
+            clusters = []
+            for i, community in enumerate(communities):
+                # Convert community to list
+                community_list = list(community)
+                
+                # Get a representative paragraph for naming the cluster
+                if community_list:
+                    representative_id = community_list[0]
+                    rep_content = G.nodes[representative_id].get('content', '')
+                    # Use the first 50 chars of the representative paragraph for the name
+                    cluster_name = f"Cluster {i+1}: {rep_content[:50]}..."
+                else:
+                    cluster_name = f"Cluster {i+1}"
+                    
+                clusters.append({
+                    'name': cluster_name,
+                    'description': f"Auto-generated cluster with {len(community_list)} paragraphs using {metric_name}",
+                    'creation_date': datetime.now().isoformat(),
+                    'similarity_threshold': threshold,
+                    'paragraph_ids': community_list,
+                    'similarity_type': similarity_type  # Store which similarity metric was used
+                })
+            
+            self.logger.info(f"Created {len(clusters)} clusters using {metric_name}")
+            return clusters
+            
+        except Exception as e:
+            self.logger.error(f"Error clustering paragraphs: {str(e)}", exc_info=True)
+            return []

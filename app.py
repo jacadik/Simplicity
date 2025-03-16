@@ -8,7 +8,7 @@ from flask import Flask, render_template, request, redirect, url_for, flash, jso
 from werkzeug.utils import secure_filename
 
 from document_parser import DocumentParser
-from similarity_analyzer import SimilarityAnalyzer
+from similarity_analyzer import SimilarityAnalyzer, SimilarityResult
 from database_manager import DatabaseManager, Document, Paragraph, Tag, SimilarityResult
 
 # Configuration
@@ -428,8 +428,6 @@ def get_tags_json():
     tags = db_manager.get_tags()
     return jsonify(tags)
 
-# Add these routes to app.py
-
 @app.route('/clusters')
 def view_clusters():
     """View all paragraph clusters."""
@@ -451,6 +449,7 @@ def view_cluster(cluster_id):
 def create_clusters():
     """Create paragraph clusters based on similarity analysis."""
     threshold = float(request.form.get('threshold', 0.8))
+    similarity_type = request.form.get('similarity_type', 'content')  # Default to content similarity
     
     # Get all similarity results
     similarities = db_manager.get_similar_paragraphs(threshold)
@@ -469,13 +468,14 @@ def create_clusters():
             paragraph2_content=sim['para2_content'],
             paragraph1_doc_id=sim['para1_doc_id'],
             paragraph2_doc_id=sim['para2_doc_id'],
-            similarity_score=sim['similarity_score'],
+            content_similarity_score=sim['content_similarity_score'],  # Updated field name
+            text_similarity_score=sim['text_similarity_score'],        # Added field
             similarity_type=sim['similarity_type']
         )
         similarity_results.append(result)
     
-    # Cluster the paragraphs
-    clusters = similarity_analyzer.cluster_paragraphs(similarity_results, threshold)
+    # Cluster the paragraphs using the specified similarity type
+    clusters = similarity_analyzer.cluster_paragraphs(similarity_results, threshold, similarity_type)
     
     if not clusters:
         flash('No clusters found', 'warning')
@@ -487,7 +487,8 @@ def create_clusters():
         cluster_id = db_manager.create_cluster(
             name=cluster['name'],
             description=cluster['description'],
-            similarity_threshold=cluster['similarity_threshold']
+            similarity_threshold=cluster['similarity_threshold'],
+            similarity_type=cluster['similarity_type']  # Store which similarity type was used
         )
         
         if cluster_id > 0:
@@ -495,7 +496,7 @@ def create_clusters():
                 cluster_count += 1
     
     if cluster_count > 0:
-        flash(f'Successfully created {cluster_count} clusters', 'success')
+        flash(f'Successfully created {cluster_count} clusters using {similarity_type} similarity', 'success')
     else:
         flash('Failed to create clusters', 'danger')
     
