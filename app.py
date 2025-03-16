@@ -31,6 +31,30 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16 MB max upload size
 app.secret_key = 'paragraph_analyzer_secret_key'  # For flash messages
 
+def _setup_logger(self, level: str) -> logging.Logger:
+    """Set up a logger instance."""
+    logger = logging.getLogger(f'{__name__}.DatabaseManager')
+    
+    if level.upper() == 'DEBUG':
+        logger.setLevel(logging.DEBUG)
+    elif level.upper() == 'INFO':
+        logger.setLevel(logging.INFO)
+    elif level.upper() == 'WARNING':
+        logger.setLevel(logging.WARNING)
+    elif level.upper() == 'ERROR':
+        logger.setLevel(logging.ERROR)
+    else:
+        logger.setLevel(logging.INFO)
+    
+    # Add console handler if not already added
+    if not logger.handlers:
+        console_handler = logging.StreamHandler()
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        console_handler.setFormatter(formatter)
+        logger.addHandler(console_handler)
+    
+    return logger
+	
 # Add before_request function to detect AJAX requests
 @app.before_request
 def before_request():
@@ -295,25 +319,46 @@ def serve_document(document_id):
         download_name=document.filename
     )
 	
+# Update the route for viewing similarity analysis to use percentage
 @app.route('/similarity')
 def view_similarity():
     """View similarity analysis with threshold adjustment."""
-    threshold = request.args.get('threshold', type=float, default=0.8)
+    # Get threshold as percentage (0-100), default to 80%
+    threshold_pct = request.args.get('threshold', type=float, default=80.0)
+    
+    # Convert percentage to decimal (0-1) for database query
+    threshold = threshold_pct / 100.0
+    
+    # Get similarities using the decimal threshold
     similarities = db_manager.get_similar_paragraphs(threshold)
     
-    return render_template('similarity.html', similarities=similarities, threshold=threshold)
+    # Pass the percentage threshold to the template
+    return render_template('similarity.html', similarities=similarities, threshold=threshold_pct)
 
+# Update the route for running similarity analysis to use percentage
 @app.route('/analyze-similarity', methods=['POST'])
 def analyze_similarity():
     """Run similarity analysis on paragraphs."""
     threshold = float(request.form.get('threshold', 0.8))
     
-    # Get all paragraphs
-    paragraphs = db_manager.get_paragraphs()
+    # Get all paragraphs - use collapse_duplicates=False to get ALL paragraphs
+    paragraphs = db_manager.get_paragraphs(collapse_duplicates=False)
     
     if not paragraphs:
         flash('No paragraphs available for analysis', 'warning')
         return redirect(url_for('view_similarity'))
+    
+    app.logger.info(f"Retrieved {len(paragraphs)} paragraphs for similarity analysis")
+    
+    # Log document distribution for debugging
+    doc_counts = {}
+    for para in paragraphs:
+        doc_id = para['document_id']
+        if doc_id not in doc_counts:
+            doc_counts[doc_id] = 0
+        doc_counts[doc_id] += 1
+    
+    app.logger.info(f"Paragraph distribution by document: {doc_counts}")
     
     # Prepare data for similarity analysis
     para_data = []
@@ -325,16 +370,21 @@ def analyze_similarity():
         })
     
     # Find exact matches first
+    app.logger.info("Finding exact matches...")
     exact_matches = similarity_analyzer.find_exact_matches(para_data)
+    app.logger.info(f"Found {len(exact_matches)} exact matches")
     
     # Find similar paragraphs
+    app.logger.info("Finding similar paragraphs...")
     similar_paragraphs = similarity_analyzer.find_similar_paragraphs(para_data, threshold)
+    app.logger.info(f"Found {len(similar_paragraphs)} similar paragraphs")
     
     # Combine results
     all_results = exact_matches + similar_paragraphs
     
     if all_results:
         # Save results to database
+        app.logger.info(f"Saving {len(all_results)} similarity results to database")
         db_manager.add_similarity_results(all_results)
         flash(f'Found {len(exact_matches)} exact matches and {len(similar_paragraphs)} similar paragraphs', 'success')
     else:

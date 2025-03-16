@@ -59,90 +59,51 @@ class SimilarityAnalyzer:
         return logger
     
     def _normalize_text(self, text: str) -> str:
-        """Normalize text for comparison by removing extra whitespace, lowercasing, etc."""
-        if not text:
+        """
+        Normalize text for comparison to find exact matches.
+        This improved version preserves the essential content while ignoring formatting differences.
+        """
+        if text is None or not isinstance(text, str):
             return ""
         
-        try:
-            # Convert to lowercase
-            text = text.lower()
-            
-            # Replace multiple whitespace with single space
-            text = re.sub(r'\s+', ' ', text)
-            
-            # Remove punctuation (keeping spaces)
-            text = re.sub(r'[^\w\s]', '', text)
-            
-            # Trim whitespace
-            text = text.strip()
-            
-            return text
-        except Exception as e:
-            self.logger.error(f"Error normalizing text: {str(e)}", exc_info=True)
-            return ""
+        # Convert to lowercase
+        text = text.lower()
+        
+        # Remove all whitespace and replace with a single space
+        text = ' '.join(text.split())
+        
+        # Remove common punctuation that doesn't affect meaning
+        text = re.sub(r'[,.;:!?"\'\(\)\[\]]', '', text)
+        
+        # Log normalized text for debugging
+        if len(text) > 50:
+            self.logger.debug(f"Normalized text: {text[:50]}...")
+        
+        return text.strip()
     
     def _preprocess_text(self, text: str) -> str:
         """Preprocess text for TF-IDF analysis."""
-        # For TF-IDF, we want to preserve more structure than pure normalization
-        if not text:
+        if text is None or not isinstance(text, str):
             return ""
         
-        try:
-            # Convert to lowercase
-            text = text.lower()
-            
-            # Replace multiple whitespace with single space
-            text = re.sub(r'\s+', ' ', text)
-            
-            # Trim whitespace
-            text = text.strip()
-            
-            return text
-        except Exception as e:
-            self.logger.error(f"Error preprocessing text: {str(e)}", exc_info=True)
-            return ""
+        # Convert to lowercase
+        text = text.lower()
+        
+        # Remove extra whitespace
+        text = ' '.join(text.split())
+        
+        return text.strip()
     
     def _calculate_text_similarity(self, text1: str, text2: str) -> float:
-        """Calculate character-by-character similarity using SequenceMatcher."""
+        """Calculate character-based similarity between two texts using SequenceMatcher."""
         if not text1 or not text2:
             return 0.0
         
-        try:
-            # Normalize texts for character-by-character comparison
-            norm_text1 = self._normalize_text(text1)
-            norm_text2 = self._normalize_text(text2)
-            
-            if not norm_text1 or not norm_text2:
-                return 0.0
-            
-            # Use SequenceMatcher for character-by-character comparison
-            matcher = SequenceMatcher(None, norm_text1, norm_text2)
-            return matcher.ratio()
-        except Exception as e:
-            self.logger.error(f"Error calculating text similarity: {str(e)}", exc_info=True)
-            return 0.0
-    
-    def _make_pair_key(self, id1: int, id2: int) -> str:
-        """Create a unique key for a pair of paragraph IDs."""
-        # Ensure consistency by always putting smaller ID first
-        sorted_ids = sorted([id1, id2])
-        return f"{sorted_ids[0]}_{sorted_ids[1]}"
-    
-    def _merge_similarity_results(self, results1: List[SimilarityResult], 
-                                 results2: List[SimilarityResult]) -> List[SimilarityResult]:
-        """Merge two lists of similarity results, avoiding duplicates."""
-        # Create a set of existing pair keys
-        existing_pairs = {self._make_pair_key(r.paragraph1_id, r.paragraph2_id) for r in results1}
+        # Use Python's difflib SequenceMatcher for character-based comparison
+        matcher = SequenceMatcher(None, text1, text2)
+        similarity = matcher.ratio()
         
-        # Add results from results2 that don't exist in results1
-        merged = results1.copy()
-        for result in results2:
-            pair_key = self._make_pair_key(result.paragraph1_id, result.paragraph2_id)
-            if pair_key not in existing_pairs:
-                merged.append(result)
-                existing_pairs.add(pair_key)
-        
-        return merged
+        return similarity
     
     def find_exact_matches(self, paragraphs: List[Dict]) -> List[SimilarityResult]:
         """Find paragraphs that are exact matches."""
@@ -157,13 +118,16 @@ class SimilarityAnalyzer:
                 # Extract the content safely
                 content = para.get('content', '')
                 if not content:
+                    self.logger.warning(f"Skipping paragraph with empty content, ID: {para.get('id')}")
                     continue
                 
                 # Normalize the content for comparison
                 normalized = self._normalize_text(content)
                 if not normalized:
+                    self.logger.warning(f"Normalization resulted in empty string for paragraph ID: {para.get('id')}")
                     continue
                 
+                # Store with normalized content as key
                 if normalized not in content_dict:
                     content_dict[normalized] = []
                 content_dict[normalized].append(para)
@@ -171,30 +135,36 @@ class SimilarityAnalyzer:
             # Find groups with more than one paragraph
             for normalized, para_group in content_dict.items():
                 if len(para_group) > 1:
-                    self.logger.debug(f"Found group with {len(para_group)} matching paragraphs")
+                    self.logger.info(f"Found group with {len(para_group)} matching paragraphs with normalized content: {normalized[:50]}...")
+                    
                     # Create similarity results for all pairs in group
                     for i in range(len(para_group)):
                         for j in range(i+1, len(para_group)):
-                            # Skip if both paragraphs are from the same document
-                            if para_group[i].get('doc_id') == para_group[j].get('doc_id'):
+                            # Get document IDs safely
+                            doc_id1 = para_group[i].get('doc_id')
+                            doc_id2 = para_group[j].get('doc_id')
+                            
+                            # Ensure document IDs are valid and different
+                            if doc_id1 is None or doc_id2 is None:
+                                self.logger.warning(f"Missing document ID in paragraphs: {doc_id1}, {doc_id2}")
                                 continue
                             
-                            # Ensure all required fields are present
-                            if not all(k in para_group[i] for k in ['id', 'content', 'doc_id']):
-                                self.logger.warning(f"Missing required fields in paragraph: {para_group[i]}")
+                            # Skip if both paragraphs are from the same document
+                            if doc_id1 == doc_id2:
+                                self.logger.debug(f"Skipping comparison of paragraphs from same document ID: {doc_id1}")
                                 continue
-                                
-                            if not all(k in para_group[j] for k in ['id', 'content', 'doc_id']):
-                                self.logger.warning(f"Missing required fields in paragraph: {para_group[j]}")
-                                continue
-                                
+                            
+                            # Log the match for debugging
+                            self.logger.info(f"Found exact match between paragraphs {para_group[i]['id']} and {para_group[j]['id']}")
+                            
+                            # Create similarity result
                             result = SimilarityResult(
                                 paragraph1_id=para_group[i]['id'],
                                 paragraph2_id=para_group[j]['id'],
                                 paragraph1_content=para_group[i]['content'],
                                 paragraph2_content=para_group[j]['content'],
-                                paragraph1_doc_id=para_group[i]['doc_id'],
-                                paragraph2_doc_id=para_group[j]['doc_id'],
+                                paragraph1_doc_id=doc_id1,
+                                paragraph2_doc_id=doc_id2,
                                 content_similarity_score=1.0,  # Perfect content match
                                 text_similarity_score=1.0,     # Perfect text match
                                 similarity_type='exact'
@@ -239,37 +209,19 @@ class SimilarityAnalyzer:
             # Debug log
             self.logger.debug(f"Processing {len(valid_paragraphs)} valid paragraphs")
             
-            # First check for exact matches - more efficient and reliable
-            exact_matches = []
-            content_dict = {}
+            # Check for exact matches first (this is more efficient)
+            exact_matches = self.find_exact_matches(valid_paragraphs)
+            self.logger.debug(f"Found {len(exact_matches)} exact matches from internal method")
             
-            for i, para in enumerate(valid_paragraphs):
-                # Normalize the content
-                normalized = self._normalize_text(para['content'])
-                if normalized in content_dict:
-                    for prev_idx in content_dict[normalized]:
-                        # Skip if same document
-                        if valid_paragraphs[prev_idx]['doc_id'] == para['doc_id']:
-                            continue
-                            
-                        exact_matches.append(SimilarityResult(
-                            paragraph1_id=valid_paragraphs[prev_idx]['id'],
-                            paragraph2_id=para['id'],
-                            paragraph1_content=valid_paragraphs[prev_idx]['content'],
-                            paragraph2_content=para['content'],
-                            paragraph1_doc_id=valid_paragraphs[prev_idx]['doc_id'],
-                            paragraph2_doc_id=para['doc_id'],
-                            content_similarity_score=1.0,   # Perfect content match
-                            text_similarity_score=1.0,      # Perfect text match
-                            similarity_type='exact'
-                        ))
-                    content_dict[normalized].append(i)
-                else:
-                    content_dict[normalized] = [i]
+            # Extract exact match pairs to avoid duplicates
+            exact_match_pairs = set()
+            for result in exact_matches:
+                # Use a consistent order for the pair to avoid duplicates
+                pair = tuple(sorted([result.paragraph1_id, result.paragraph2_id]))
+                exact_match_pairs.add(pair)
             
             # Add exact matches to results
             results.extend(exact_matches)
-            self.logger.debug(f"Found {len(exact_matches)} exact matches")
                 
             # Prepare corpus for TF-IDF
             corpus = []
@@ -306,14 +258,14 @@ class SimilarityAnalyzer:
                 self.logger.error(f"Jaccard similarity failed: {str(e)}", exc_info=True)
             
             # Filter out exact matches we've already found
-            exact_match_pairs = {self._make_pair_key(r.paragraph1_id, r.paragraph2_id) for r in exact_matches}
-            
+            filtered_similar_results = []
             for result in similar_results:
-                pair_key = self._make_pair_key(result.paragraph1_id, result.paragraph2_id)
-                if pair_key not in exact_match_pairs:
+                pair = tuple(sorted([result.paragraph1_id, result.paragraph2_id]))
+                if pair not in exact_match_pairs:
                     result.similarity_type = 'similar'  # Ensure type is set to 'similar'
-                    results.append(result)
+                    filtered_similar_results.append(result)
             
+            results.extend(filtered_similar_results)
             self.logger.info(f"Found total of {len(results)} similarity results")
             
         except Exception as e:
@@ -464,61 +416,94 @@ class SimilarityAnalyzer:
         return results
     
     def _calculate_jaccard_similarity(self, corpus: List[str], paragraphs: List[Dict], threshold: float) -> List[SimilarityResult]:
-        """Calculate similarity using Jaccard index as a backup method."""
+        """Calculate similarity using Jaccard similarity (word-based)."""
         results = []
         
         try:
-            # Handle edge cases
-            if len(corpus) <= 1 or len(paragraphs) <= 1:
-                return []
-            
-            # Calculate Jaccard similarity for each pair
+            # Process pairs
             for i in range(len(paragraphs)):
                 for j in range(i+1, len(paragraphs)):
                     # Skip if both paragraphs are from the same document
                     if paragraphs[i]['doc_id'] == paragraphs[j]['doc_id']:
                         continue
                     
-                    # Skip if either corpus entry is empty
-                    if not corpus[i].strip() or not corpus[j].strip():
-                        continue
-                    
-                    # Calculate Jaccard similarity (set of words)
-                    set1 = set(corpus[i].split())
-                    set2 = set(corpus[j].split())
-                    
-                    intersection = len(set1.intersection(set2))
-                    union = len(set1.union(set2))
-                    
-                    if union == 0:  # Avoid division by zero
-                        continue
+                    # Calculate Jaccard similarity
+                    try:
+                        text1 = corpus[i].lower()
+                        text2 = corpus[j].lower()
                         
-                    content_similarity = intersection / union
-                    
-                    # Calculate text similarity using SequenceMatcher
-                    text_similarity = self._calculate_text_similarity(
-                        paragraphs[i]['content'], 
-                        paragraphs[j]['content']
-                    )
-                    
-                    if content_similarity >= threshold:
-                        result = SimilarityResult(
-                            paragraph1_id=paragraphs[i]['id'],
-                            paragraph2_id=paragraphs[j]['id'],
-                            paragraph1_content=paragraphs[i]['content'],
-                            paragraph2_content=paragraphs[j]['content'],
-                            paragraph1_doc_id=paragraphs[i]['doc_id'],
-                            paragraph2_doc_id=paragraphs[j]['doc_id'],
-                            content_similarity_score=content_similarity,
-                            text_similarity_score=text_similarity,
-                            similarity_type='similar'
+                        # Skip empty texts
+                        if not text1 or not text2:
+                            continue
+                        
+                        # Tokenize into words
+                        words1 = set(text1.split())
+                        words2 = set(text2.split())
+                        
+                        # Calculate Jaccard similarity
+                        intersection = words1.intersection(words2)
+                        union = words1.union(words2)
+                        
+                        # Avoid division by zero
+                        if not union:
+                            continue
+                        
+                        jaccard_similarity = len(intersection) / len(union)
+                        
+                        # Calculate text similarity using SequenceMatcher
+                        text_similarity = self._calculate_text_similarity(
+                            paragraphs[i]['content'],
+                            paragraphs[j]['content']
                         )
-                        results.append(result)
-            
+                        
+                        # Check if similarity is above threshold
+                        if jaccard_similarity >= threshold:
+                            result = SimilarityResult(
+                                paragraph1_id=paragraphs[i]['id'],
+                                paragraph2_id=paragraphs[j]['id'],
+                                paragraph1_content=paragraphs[i]['content'],
+                                paragraph2_content=paragraphs[j]['content'],
+                                paragraph1_doc_id=paragraphs[i]['doc_id'],
+                                paragraph2_doc_id=paragraphs[j]['doc_id'],
+                                content_similarity_score=jaccard_similarity,
+                                text_similarity_score=text_similarity,
+                                similarity_type='similar'
+                            )
+                            results.append(result)
+                    except Exception as e:
+                        self.logger.error(f"Error calculating Jaccard similarity for pair {i}, {j}: {str(e)}")
+        
         except Exception as e:
             self.logger.error(f"Error calculating Jaccard similarity: {str(e)}", exc_info=True)
         
         return results
+    
+    def _merge_similarity_results(self, results1: List[SimilarityResult], results2: List[SimilarityResult]) -> List[SimilarityResult]:
+        """Merge similarity results, keeping the highest score for each pair."""
+        # Create a dictionary to track pairs
+        pair_map = {}
+        
+        # Process first result set
+        for result in results1:
+            key = self._make_pair_key(result.paragraph1_id, result.paragraph2_id)
+            pair_map[key] = result
+        
+        # Process second result set, keeping highest score
+        for result in results2:
+            key = self._make_pair_key(result.paragraph1_id, result.paragraph2_id)
+            if key in pair_map:
+                existing = pair_map[key]
+                if result.content_similarity_score > existing.content_similarity_score:
+                    pair_map[key] = result
+            else:
+                pair_map[key] = result
+        
+        # Convert back to list
+        return list(pair_map.values())
+    
+    def _make_pair_key(self, id1: int, id2: int) -> Tuple[int, int]:
+        """Make a consistent key for a pair of IDs."""
+        return tuple(sorted([id1, id2]))
     
     def cluster_paragraphs(self, similarity_results: List[SimilarityResult], threshold: float = None, 
                           similarity_type: str = 'content') -> List[Dict]:

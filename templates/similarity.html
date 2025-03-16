@@ -41,8 +41,12 @@
             <form action="/analyze-similarity" method="post">
                 <div class="row align-items-end">
                     <div class="col-md-6">
-                        <label for="thresholdSlider" class="form-label">Similarity Threshold: <span id="thresholdValue">{{ threshold }}</span></label>
-                        <input type="range" class="form-range similarity-slider" id="thresholdSlider" name="threshold" min="0.1" max="1.0" step="0.05" value="{{ threshold }}">
+                        <label for="thresholdSlider" class="form-label">Similarity Threshold: <span id="thresholdValue">{{ threshold }}%</span></label>
+                        <input type="range" class="form-range similarity-slider" id="thresholdSlider" name="threshold" min="0" max="100" step="5" value="{{ threshold }}">
+                        <div class="d-flex justify-content-between mt-1">
+                            <span class="text-muted small">0% (Show All)</span>
+                            <span class="text-muted small">100% (Exact Matches Only)</span>
+                        </div>
                     </div>
                     <div class="col-md-6">
                         <button type="submit" class="btn btn-primary">
@@ -355,7 +359,7 @@
     const thresholdValue = document.getElementById('thresholdValue');
     
     thresholdSlider.addEventListener('input', function() {
-        thresholdValue.textContent = this.value;
+        thresholdValue.textContent = this.value + '%';
     });
     
     // Filtering functionality

@@ -4,7 +4,7 @@ import pandas as pd
 from datetime import datetime
 from typing import List, Dict, Tuple, Optional, Any
 
-from sqlalchemy import create_engine, Column, Integer, String, Float, ForeignKey, Text, Table, and_, func, Index
+from sqlalchemy import create_engine, Column, Integer, String, Float, ForeignKey, Text, Table, and_, func, Index, or_
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker, Session
 from document_parser import Paragraph as ParserParagraph
@@ -251,6 +251,7 @@ class DatabaseManager:
     def add_similarity_results(self, results: List[AnalyzerSimilarityResult]) -> bool:
         """Add similarity results to the database."""
         if not results:
+            self.logger.warning("No similarity results to add")
             return True
             
         self.logger.info(f"Adding {len(results)} similarity results to database")
@@ -258,21 +259,47 @@ class DatabaseManager:
         session = self.Session()
         try:
             for result in results:
-                # Create new similarity result record with both similarity scores
-                db_result = SimilarityResult(
-                    paragraph1_id=result.paragraph1_id,
-                    paragraph2_id=result.paragraph2_id,
-                    content_similarity_score=result.content_similarity_score,  # Renamed field
-                    text_similarity_score=result.text_similarity_score,        # New field
-                    similarity_type=result.similarity_type
-                )
+                # Log details for debugging
+                self.logger.debug(f"Processing similarity result: para1={result.paragraph1_id}, para2={result.paragraph2_id}, "
+                                f"type={result.similarity_type}, content_score={result.content_similarity_score}, "
+                                f"text_score={result.text_similarity_score}")
                 
-                session.add(db_result)
+                # Check if this pair already exists in any order
+                existing = session.query(SimilarityResult).filter(
+                    or_(
+                        and_(
+                            SimilarityResult.paragraph1_id == result.paragraph1_id,
+                            SimilarityResult.paragraph2_id == result.paragraph2_id
+                        ),
+                        and_(
+                            SimilarityResult.paragraph1_id == result.paragraph2_id,
+                            SimilarityResult.paragraph2_id == result.paragraph1_id
+                        )
+                    )
+                ).first()
+                
+                if existing:
+                    self.logger.debug(f"Similarity result already exists for paragraphs {result.paragraph1_id} and {result.paragraph2_id}, updating")
+                    # Update existing record
+                    existing.content_similarity_score = result.content_similarity_score
+                    existing.text_similarity_score = result.text_similarity_score
+                    existing.similarity_type = result.similarity_type
+                else:
+                    # Create new similarity result record with both similarity scores
+                    self.logger.debug(f"Adding new similarity result for paragraphs {result.paragraph1_id} and {result.paragraph2_id}")
+                    db_result = SimilarityResult(
+                        paragraph1_id=result.paragraph1_id,
+                        paragraph2_id=result.paragraph2_id,
+                        content_similarity_score=result.content_similarity_score,
+                        text_similarity_score=result.text_similarity_score,
+                        similarity_type=result.similarity_type
+                    )
+                    session.add(db_result)
             
             # Commit all similarity results in one transaction
             session.commit()
             
-            self.logger.info(f"Added {len(results)} similarity results")
+            self.logger.info(f"Successfully added/updated {len(results)} similarity results")
             return True
             
         except Exception as e:
