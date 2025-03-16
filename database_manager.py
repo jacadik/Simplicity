@@ -849,6 +849,29 @@ class DatabaseManager:
             return False
         finally:
             session.close()
+
+    def clear_all_clusters(self) -> bool:
+        """Delete all clusters in the database."""
+        self.logger.info("Clearing all clusters")
+        
+        session = self.Session()
+        try:
+            # Clear cluster_paragraphs associations
+            session.execute(cluster_paragraphs.delete())
+            
+            # Delete all clusters
+            count = session.query(Cluster).delete()
+            session.commit()
+            
+            self.logger.info(f"Deleted {count} clusters")
+            return True
+            
+        except Exception as e:
+            session.rollback()
+            self.logger.error(f"Error clearing clusters: {str(e)}", exc_info=True)
+            return False
+        finally:
+            session.close()
     
     def export_to_excel(self, output_path: str) -> bool:
         """Export database contents to Excel with updated similarity fields."""

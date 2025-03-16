@@ -9,7 +9,7 @@ from werkzeug.utils import secure_filename
 
 from document_parser import DocumentParser
 from similarity_analyzer import SimilarityAnalyzer, SimilarityResult as AnalyzerSimilarityResult
-from database_manager import DatabaseManager, Document, Paragraph, Tag, SimilarityResult
+from database_manager import DatabaseManager, Document, Paragraph, Tag, SimilarityResult, Cluster, cluster_paragraphs
 
 # Configuration
 UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads')
@@ -54,7 +54,7 @@ def _setup_logger(self, level: str) -> logging.Logger:
         logger.addHandler(console_handler)
     
     return logger
-	
+    
 # Add before_request function to detect AJAX requests
 @app.before_request
 def before_request():
@@ -318,7 +318,7 @@ def serve_document(document_id):
         as_attachment=False,
         download_name=document.filename
     )
-	
+    
 # Update the route for viewing similarity analysis to use percentage
 @app.route('/similarity')
 def view_similarity():
@@ -508,6 +508,10 @@ def create_clusters():
     threshold = float(request.form.get('threshold', 0.8))
     similarity_type = request.form.get('similarity_type', 'content')  # Default to content similarity
     
+    # Clear all existing clusters before creating new ones
+    if not db_manager.clear_all_clusters():
+        flash('Failed to clear existing clusters', 'warning')
+    
     # Get all similarity results
     similarities = db_manager.get_similar_paragraphs(threshold)
     
@@ -568,7 +572,7 @@ def delete_cluster(cluster_id):
         flash('Failed to delete cluster', 'danger')
     
     return redirect(url_for('view_clusters'))
-	
+    
 @app.route('/export')
 def export_data():
     """Export data to Excel."""
