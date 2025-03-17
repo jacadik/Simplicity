@@ -216,21 +216,72 @@ class SimilarityAnalyzer:
     
     def _calculate_text_similarity(self, text1: str, text2: str) -> float:
         """
-        Calculate character-based similarity between two texts using SequenceMatcher.
-        This version directly uses the ratio() method for more reliable comparison.
+        Calculate character-based similarity between two texts.
+        Specifically designed to handle cases where one text is a subset of another.
         """
         if not text1 or not text2:
             return 0.0
             
         try:
-            # Use SequenceMatcher for direct ratio calculation
-            matcher = SequenceMatcher(None, text1, text2)
+            # Normalize texts for better comparison
+            clean_text1 = text1.strip().lower()
+            clean_text2 = text2.strip().lower()
+            
+            # Check if one text is fully contained in the other
+            if clean_text1 in clean_text2:
+                # Text1 is contained in text2
+                similarity = len(clean_text1) / len(clean_text2)
+                self.logger.debug(f"Text1 is contained in Text2. Similarity: {similarity:.6f}")
+                return min(1.0, similarity)  # Cap at 1.0
+            
+            if clean_text2 in clean_text1:
+                # Text2 is contained in text1
+                similarity = len(clean_text2) / len(clean_text1)
+                self.logger.debug(f"Text2 is contained in Text1. Similarity: {similarity:.6f}")
+                return min(1.0, similarity)  # Cap at 1.0
+            
+            # Check if there's a large overlap by searching for significant chunks of text
+            # Split into chunks and look for matches
+            chunk_size = min(len(clean_text1), len(clean_text2)) // 2
+            if chunk_size > 100:  # Only bother with this approach for substantial texts
+                # Try with shorter text as the source of chunks
+                if len(clean_text1) <= len(clean_text2):
+                    source, target = clean_text1, clean_text2
+                else:
+                    source, target = clean_text2, clean_text1
+                
+                # Try chunks of different sizes
+                for size in [chunk_size, chunk_size // 2, 100]:
+                    if size < 20:  # Don't bother with tiny chunks
+                        break
+                    
+                    # Check for matches of chunks
+                    matched_chars = 0
+                    for i in range(0, len(source) - size + 1, size // 2):
+                        chunk = source[i:i+size]
+                        if chunk in target:
+                            matched_chars += len(chunk)
+                    
+                    if matched_chars > 0:
+                        # Calculate similarity based on matched characters
+                        chunk_similarity = min(1.0, matched_chars / max(len(clean_text1), len(clean_text2)))
+                        if chunk_similarity > 0.3:  # If significant overlap found
+                            self.logger.debug(f"Found chunk matches. Similarity: {chunk_similarity:.6f}")
+                            return chunk_similarity
+            
+            # Fall back to standard SequenceMatcher for other cases
+            matcher = SequenceMatcher(None, clean_text1, clean_text2)
             similarity = matcher.ratio()
             
-            self.logger.debug(f"Text similarity: {similarity:.6f}")
+            # Check for significantly long matching blocks
+            longest_block = matcher.find_longest_match(0, len(clean_text1), 0, len(clean_text2))
+            if longest_block.size > 100:  # If there's a substantial matching block
+                block_similarity = longest_block.size / min(len(clean_text1), len(clean_text2))
+                similarity = min(1.0, max(similarity, block_similarity))
             
+            self.logger.debug(f"Standard similarity: {similarity:.6f}")
             return similarity
-            
+                
         except Exception as e:
             self.logger.error(f"Error calculating text similarity: {str(e)}", exc_info=True)
             return 0.0
