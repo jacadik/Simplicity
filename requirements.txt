@@ -8,8 +8,12 @@ itsdangerous==2.1.2
 # Document parsing
 python-docx==0.8.11
 pdfplumber==0.10.3
+PyMuPDF==1.22.5  # Added: For better PDF analysis (font detection)
 python-magic==0.4.27
-pdfplumber>=0.7.0
+
+# OCR capabilities 
+pytesseract==0.3.10  # Added: For OCR integration
+Pillow==10.1.0  # Already included but needed for OCR
 
 # Data processing
 pandas==2.1.3
@@ -21,14 +25,12 @@ XlsxWriter==3.1.9
 SQLAlchemy==2.0.25
 psycopg2-binary==2.9.9
 
-# Data visualization and export
-Pillow==10.1.0
+# Enhanced NLP capabilities
+langdetect==1.0.9  # Added: For language detection
+unicodedata2==15.0.0  # Added: For better Unicode handling
 
 # Graph algorithms for clustering
 networkx==3.2.1
-
-# LSH implementation
-datasketch==1.6.4
 
 # Utilities
 python-dateutil==2.8.2
