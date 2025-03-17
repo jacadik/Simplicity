@@ -52,6 +52,7 @@ class Paragraph(Base):
     paragraph_type = Column(String, nullable=False)
     position = Column(Integer, nullable=False)
     header_content = Column(Text, nullable=True)
+    column = Column(Integer, nullable=True)  # New column to track column position
     
     # Relationships
     document = relationship("Document", back_populates="paragraphs")
@@ -72,6 +73,51 @@ class Paragraph(Base):
         cascade="all, delete-orphan", 
         back_populates="paragraph2"
     )
+
+# Database migration script to add the column field
+# You can add this to a new file or to an existing migration script
+
+def migrate_paragraphs_table():
+    """Add column field to paragraphs table if it doesn't exist."""
+    import sqlite3
+    import os
+    from sqlalchemy import create_engine, inspect, text
+    
+    # Use the DB_URL from your app.py
+    # For SQLite:
+    # DB_URL = f"sqlite:///{os.path.join(os.path.dirname(os.path.abspath(__file__)), 'paragraph_analyzer.db')}"
+    # For PostgreSQL:
+    DB_URL = "postgresql://paragraph_user:pass@localhost/paragraph_analyzer"
+    
+    try:
+        # Create engine
+        engine = create_engine(DB_URL)
+        inspector = inspect(engine)
+        
+        # Check if column exists
+        columns = [col['name'] for col in inspector.get_columns('paragraphs')]
+        
+        if 'column' not in columns:
+            # Add column
+            with engine.connect() as conn:
+                # For SQLite
+                if 'sqlite' in DB_URL:
+                    conn.execute(text("ALTER TABLE paragraphs ADD COLUMN column INTEGER"))
+                # For PostgreSQL
+                else:
+                    conn.execute(text("ALTER TABLE paragraphs ADD COLUMN column INTEGER"))
+                    
+                conn.commit()
+                
+            print("Added 'column' field to paragraphs table")
+        else:
+            print("'column' field already exists in paragraphs table")
+            
+    except Exception as e:
+        print(f"Error migrating paragraphs table: {str(e)}")
+        return False
+        
+    return True
 
 class Tag(Base):
     """Tag model for categorizing paragraphs."""

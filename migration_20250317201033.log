@@ -1,0 +1,4 @@
+2025-03-17 20:10:36,869 - INFO - Starting migration on database: postgresql://paragraph_user:pass@localhost/paragraph_analyzer
+2025-03-17 20:10:37,768 - INFO - Current columns in paragraphs table: id, content, document_id, paragraph_type, position, header_content
+2025-03-17 20:10:37,769 - INFO - Added 'column' field to paragraphs table (PostgreSQL)
+2025-03-17 20:10:37,777 - INFO - Migration completed successfully
