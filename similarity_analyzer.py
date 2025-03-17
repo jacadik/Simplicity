@@ -1,6 +1,7 @@
 import logging
 import re
-from typing import List, Dict, Tuple, Set, Any, Optional
+import string
+from typing import List, Dict, Tuple, Set, Any, Optional, Generator
 from dataclasses import dataclass
 import numpy as np
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -8,6 +9,10 @@ from sklearn.metrics.pairwise import cosine_similarity
 import networkx as nx
 from datetime import datetime
 from difflib import SequenceMatcher
+from functools import lru_cache
+from datasketch import MinHash, MinHashLSH
+from concurrent.futures import ProcessPoolExecutor, as_completed
+import multiprocessing
 
 
 @dataclass
@@ -27,12 +32,39 @@ class SimilarityResult:
 class SimilarityAnalyzer:
     """
     Analyzes paragraphs to find exact matches and similar paragraphs
-    using multiple similarity metrics.
+    using multiple similarity metrics with LSH optimization.
     """
-    def __init__(self, threshold: float = 0.8, logging_level: str = 'INFO'):
-        """Initialize the similarity analyzer."""
+    def __init__(self, threshold: float = 0.8, logging_level: str = 'INFO',
+                 num_perm: int = 128, min_length: int = 10):
+        """
+        Initialize the similarity analyzer.
+        
+        Args:
+            threshold: Similarity threshold for considering paragraphs similar
+            logging_level: Logging level
+            num_perm: Number of permutations for MinHash (higher = more accurate)
+            min_length: Minimum paragraph length for comparison
+        """
         self.threshold = float(threshold)  # Ensure threshold is a float
         self.logger = self._setup_logger(logging_level)
+        self.num_perm = num_perm  # Number of permutations for MinHash
+        self.min_length = min_length  # Minimum paragraph length to consider
+        self.stopwords = self._get_stopwords()
+        
+    def _get_stopwords(self) -> Set[str]:
+        """Get common English stopwords."""
+        common_stopwords = {
+            'a', 'an', 'the', 'and', 'or', 'but', 'if', 'then', 'else', 'when',
+            'at', 'by', 'for', 'with', 'about', 'against', 'between', 'into',
+            'to', 'from', 'in', 'out', 'on', 'off', 'over', 'under', 'again',
+            'further', 'then', 'once', 'here', 'there', 'all', 'any', 'both',
+            'each', 'few', 'more', 'most', 'other', 'some', 'such', 'no', 'nor',
+            'not', 'only', 'own', 'same', 'so', 'than', 'too', 'very', 'can',
+            'will', 'just', 'should', 'now', 'is', 'are', 'was', 'were', 'be',
+            'been', 'being', 'have', 'has', 'had', 'having', 'do', 'does', 'did',
+            'doing', 'this', 'that', 'these', 'those', 'of', 'up', 'down'
+        }
+        return common_stopwords
     
     def _setup_logger(self, level: str) -> logging.Logger:
         """Set up a logger instance."""
@@ -93,70 +125,109 @@ class SimilarityAnalyzer:
         text = ' '.join(text.split())
         
         return text.strip()
+
+    def _get_paragraph_shingles(self, text: str, k: int = 3) -> List[str]:
+        """
+        Extract k-shingles (character n-grams) from text for MinHash.
+        Using character-level shingles works better for short paragraphs.
+        
+        Args:
+            text: The text to extract shingles from
+            k: The size of each shingle (n-gram)
+            
+        Returns:
+            List of shingles
+        """
+        # Remove punctuation and normalize whitespace
+        text = text.lower()
+        text = re.sub(r'[^\w\s]', '', text)
+        text = re.sub(r'\s+', ' ', text).strip()
+        
+        # For very short texts, use shorter shingles
+        if len(text) < 30 and k > 2:
+            k = 2
+            
+        # Generate character shingles
+        shingles = []
+        for i in range(len(text) - k + 1):
+            shingle = text[i:i+k]
+            shingles.append(shingle)
+            
+        return shingles
+    
+    def _get_paragraph_tokens(self, text: str) -> List[str]:
+        """
+        Extract word tokens from text, removing stopwords.
+        
+        Args:
+            text: The text to tokenize
+            
+        Returns:
+            List of tokens
+        """
+        # Normalize text
+        text = text.lower()
+        text = re.sub(r'[^\w\s]', '', text)
+        text = re.sub(r'\s+', ' ', text).strip()
+        
+        # Split into tokens and remove stopwords
+        tokens = [word for word in text.split() if word not in self.stopwords]
+        
+        return tokens
+
+    def _create_minhash(self, text: str) -> MinHash:
+        """
+        Create a MinHash signature for a paragraph.
+        
+        Args:
+            text: The paragraph text
+            
+        Returns:
+            MinHash signature
+        """
+        # For longer paragraphs, use word tokens to capture semantic similarity
+        if len(text) > 100:
+            tokens = self._get_paragraph_tokens(text)
+            shingles = [' '.join(tokens[i:i+2]) for i in range(len(tokens)-1)]
+        else:
+            # For shorter paragraphs, use character shingles
+            shingles = self._get_paragraph_shingles(text)
+        
+        # Create MinHash signature
+        minhash = MinHash(num_perm=self.num_perm)
+        for shingle in shingles:
+            minhash.update(shingle.encode('utf-8'))
+            
+        return minhash
+
+    def _batch_paragraphs(self, paragraphs: List[Dict], batch_size: int = 1000) -> Generator[List[Dict], None, None]:
+        """
+        Split paragraphs into batches for processing.
+        
+        Args:
+            paragraphs: List of paragraph dictionaries
+            batch_size: Size of each batch
+            
+        Yields:
+            Batches of paragraphs
+        """
+        for i in range(0, len(paragraphs), batch_size):
+            yield paragraphs[i:i+batch_size]
     
     def _calculate_text_similarity(self, text1: str, text2: str) -> float:
         """
-        Calculate character-based similarity between two texts.
-        This implementation matches the JavaScript implementation that shows ~0% when texts differ completely.
+        Calculate character-based similarity between two texts using SequenceMatcher.
+        This version directly uses the ratio() method for more reliable comparison.
         """
         if not text1 or not text2:
             return 0.0
             
         try:
-            # Split texts into words for a stricter comparison
-            words1 = text1.split()
-            words2 = text2.split()
-            
-            # Calculate exact matches of whole words in same positions
-            # This is a much stricter approach that will result in lower similarity scores
-            exact_matches = 0
-            total_words = max(len(words1), len(words2))
-            
-            for i in range(min(len(words1), len(words2))):
-                if words1[i] == words2[i]:
-                    exact_matches += 1
-            
-            # Calculate character counts for the enhanced comparison view
-            from difflib import SequenceMatcher
+            # Use SequenceMatcher for direct ratio calculation
             matcher = SequenceMatcher(None, text1, text2)
-            opcodes = matcher.get_opcodes()
+            similarity = matcher.ratio()
             
-            unchanged = 0
-            added = 0
-            removed = 0
-            
-            for tag, i1, i2, j1, j2 in opcodes:
-                if tag == 'equal':
-                    # Only count characters as unchanged if they form complete words
-                    # or are part of matching word boundaries
-                    segment = text1[i1:i2]
-                    if segment.strip() and (segment.strip() in words1 and segment.strip() in words2):
-                        unchanged += (i2 - i1)
-                    else:
-                        # If they're just random matching characters, count as both added and removed
-                        removed += (i2 - i1)
-                        added += (j2 - j1)
-                elif tag == 'delete':
-                    removed += (i2 - i1)
-                elif tag == 'insert':
-                    added += (j2 - j1)
-                elif tag == 'replace':
-                    removed += (i2 - i1)
-                    added += (j2 - j1)
-            
-            # If there are no exact matches, the similarity should be extremely low
-            if exact_matches == 0:
-                similarity = 0.0
-            else:
-                # Calculate similarity based on total operations
-                total = unchanged + added + removed
-                if total == 0:
-                    similarity = 0.0
-                else:
-                    # Use a very stringent measure for similarity that produces lower percentages
-                    similarity = unchanged / (total * 3)  # Applying a stricter penalty
-            
-            self.logger.debug(f"Text similarity: {similarity:.6f}, unchanged: {unchanged}, added: {added}, removed: {removed}")
+            self.logger.debug(f"Text similarity: {similarity:.6f}")
             
             return similarity
             
@@ -237,8 +308,107 @@ class SimilarityAnalyzer:
         
         return results
     
+    def fast_similarity_search(self, paragraphs: List[Dict], 
+                              threshold: float) -> List[Tuple[int, int, float]]:
+        """
+        Find similar paragraphs using MinHash LSH.
+        
+        Args:
+            paragraphs: List of paragraph dictionaries
+            threshold: Similarity threshold
+            
+        Returns:
+            List of tuples (paragraph1_id, paragraph2_id, estimated_similarity)
+        """
+        self.logger.info(f"Running fast similarity search on {len(paragraphs)} paragraphs")
+        
+        # Use a threshold slightly lower for LSH to catch more candidates
+        lsh_threshold = max(0.1, threshold - 0.1)
+        
+        # Initialize LSH index
+        lsh = MinHashLSH(threshold=lsh_threshold, num_perm=self.num_perm)
+        
+        # Store paragraph info
+        para_info = {}
+        
+        # Prefilter paragraphs by length
+        valid_paragraphs = []
+        for para in paragraphs:
+            content = para.get('content', '')
+            if len(content) >= self.min_length:
+                valid_paragraphs.append(para)
+            else:
+                self.logger.debug(f"Skipping paragraph {para.get('id')} (too short: {len(content)} chars)")
+                
+        self.logger.info(f"Processing {len(valid_paragraphs)} paragraphs after length filtering")
+        
+        # Create MinHash signatures for all paragraphs
+        try:
+            for para in valid_paragraphs:
+                para_id = para['id']
+                content = para['content']
+                doc_id = para['doc_id']
+                
+                # Create MinHash signature
+                minhash = self._create_minhash(content)
+                
+                # Store paragraph info
+                para_info[para_id] = {
+                    'content': content,
+                    'doc_id': doc_id,
+                    'minhash': minhash
+                }
+                
+                # Add to LSH index
+                lsh.insert(f"{para_id}", minhash)
+                
+            # Find similar pairs
+            similar_pairs = []
+            para_ids = list(para_info.keys())
+            
+            # For each paragraph, query the LSH index
+            for para_id in para_ids:
+                # Query the LSH index for similar paragraphs
+                minhash = para_info[para_id]['minhash']
+                doc_id = para_info[para_id]['doc_id']
+                
+                # Get candidates from LSH
+                candidates = lsh.query(minhash)
+                
+                # Process candidates
+                for candidate in candidates:
+                    candidate_id = int(candidate)
+                    
+                    # Skip self-comparisons
+                    if candidate_id == para_id:
+                        continue
+                        
+                    # Skip comparisons from the same document
+                    candidate_doc_id = para_info[candidate_id]['doc_id']
+                    if candidate_doc_id == doc_id:
+                        continue
+                        
+                    # Ensure sorted order to avoid duplicates
+                    if para_id > candidate_id:
+                        continue
+                        
+                    # Calculate estimated similarity
+                    candidate_minhash = para_info[candidate_id]['minhash']
+                    estimated_similarity = minhash.jaccard(candidate_minhash)
+                    
+                    # Add pair if above threshold
+                    if estimated_similarity >= threshold:
+                        similar_pairs.append((para_id, candidate_id, estimated_similarity))
+            
+            self.logger.info(f"Found {len(similar_pairs)} similar paragraph pairs using LSH")
+            return similar_pairs
+            
+        except Exception as e:
+            self.logger.error(f"Error in fast similarity search: {str(e)}", exc_info=True)
+            return []
+
     def find_similar_paragraphs(self, paragraphs: List[Dict], threshold: float = None) -> List[SimilarityResult]:
-        """Find paragraphs that are similar based on the given threshold."""
+        """Find paragraphs that are similar based on the given threshold using LSH."""
         # Convert threshold to float and use default if None
         threshold = float(threshold) if threshold is not None else self.threshold
         self.logger.info(f"Finding similar paragraphs with threshold {threshold}")
@@ -253,11 +423,9 @@ class SimilarityAnalyzer:
             
             # Filter out paragraphs without content
             valid_paragraphs = []
-            valid_contents = []
             for para in paragraphs:
                 if 'content' in para and para['content'] and 'id' in para and 'doc_id' in para:
                     valid_paragraphs.append(para)
-                    valid_contents.append(para['content'])
                 else:
                     self.logger.warning(f"Skipping invalid paragraph: {para}")
             
@@ -282,49 +450,58 @@ class SimilarityAnalyzer:
             # Add exact matches to results
             results.extend(exact_matches)
                 
-            # Prepare corpus for TF-IDF
-            corpus = []
-            for content in valid_contents:
-                try:
-                    preprocessed = self._preprocess_text(content)
-                    corpus.append(preprocessed)
-                except Exception as e:
-                    self.logger.error(f"Error preprocessing text: {str(e)}", exc_info=True)
-                    corpus.append("")  # Add empty string as fallback
+            # Find similar pairs using LSH
+            similar_pairs = self.fast_similarity_search(valid_paragraphs, threshold)
             
-            # Skip if all preprocessed texts are empty
-            if not any(corpus):
-                self.logger.warning("All preprocessed texts are empty")
-                return results  # Just return exact matches
-            
-            # Calculate similar (non-exact) paragraphs
-            similar_results = []
-            
-            # Try TF-IDF first
-            try:
-                tfidf_results = self._calculate_tfidf_similarity(corpus, valid_paragraphs, threshold)
-                similar_results.extend(tfidf_results)
-                self.logger.debug(f"Found {len(tfidf_results)} TF-IDF similar results")
-            except Exception as e:
-                self.logger.error(f"TF-IDF similarity failed: {str(e)}", exc_info=True)
-            
-            # Try Jaccard as backup
-            try:
-                jaccard_results = self._calculate_jaccard_similarity(corpus, valid_paragraphs, threshold)
-                self.logger.debug(f"Found {len(jaccard_results)} Jaccard similar results")
-                similar_results = self._merge_similarity_results(similar_results, jaccard_results)
-            except Exception as e:
-                self.logger.error(f"Jaccard similarity failed: {str(e)}", exc_info=True)
-            
-            # Filter out exact matches we've already found
-            filtered_similar_results = []
-            for result in similar_results:
-                pair = tuple(sorted([result.paragraph1_id, result.paragraph2_id]))
+            # Filter out pairs that are already exact matches
+            filtered_pairs = []
+            for para1_id, para2_id, est_similarity in similar_pairs:
+                pair = tuple(sorted([para1_id, para2_id]))
                 if pair not in exact_match_pairs:
-                    result.similarity_type = 'similar'  # Ensure type is set to 'similar'
-                    filtered_similar_results.append(result)
+                    filtered_pairs.append((para1_id, para2_id, est_similarity))
             
-            results.extend(filtered_similar_results)
+            # Create a lookup for paragraphs by ID
+            para_lookup = {para['id']: para for para in valid_paragraphs}
+            
+            # Process candidate pairs with more accurate similarity measures
+            for para1_id, para2_id, est_similarity in filtered_pairs:
+                para1 = para_lookup.get(para1_id)
+                para2 = para_lookup.get(para2_id)
+                
+                if not para1 or not para2:
+                    continue
+                
+                # Calculate more accurate content similarity
+                content_similarity = self._calculate_jaccard_similarity(
+                    para1['content'],
+                    para2['content']
+                )
+                
+                # Calculate text similarity using SequenceMatcher ratio directly
+                text_similarity = self._calculate_text_similarity(
+                    para1['content'],
+                    para2['content']
+                )
+                
+                # Ensure text similarity is not zero
+                if text_similarity < 0.01:
+                    text_similarity = 0.01  # Set a minimum value to avoid zero
+                
+                # Only include if actual similarity is above threshold
+                if content_similarity >= threshold:
+                    result = SimilarityResult(
+                        paragraph1_id=para1_id,
+                        paragraph2_id=para2_id,
+                        paragraph1_content=para1['content'],
+                        paragraph2_content=para2['content'],
+                        paragraph1_doc_id=para1['doc_id'],
+                        paragraph2_doc_id=para2['doc_id'],
+                        content_similarity_score=content_similarity,
+                        text_similarity_score=text_similarity,
+                        similarity_type='similar'
+                    )
+                    results.append(result)
+            
             self.logger.info(f"Found total of {len(results)} similarity results")
             
         except Exception as e:
@@ -332,170 +509,41 @@ class SimilarityAnalyzer:
         
         return results
     
-    def _calculate_tfidf_similarity(self, corpus: List[str], paragraphs: List[Dict], threshold: float) -> List[SimilarityResult]:
-        """Calculate similarity using TF-IDF and cosine similarity."""
-        results = []
-        
+    def _calculate_jaccard_similarity(self, text1: str, text2: str) -> float:
+        """Calculate Jaccard similarity between two texts."""
+        if not text1 or not text2:
+            return 0.0
+            
         try:
-            # Handle edge cases
-            if len(corpus) <= 1 or len(paragraphs) <= 1:
-                return []
+            # Normalize texts
+            text1 = text1.lower()
+            text2 = text2.lower()
+            
+            # Remove punctuation
+            text1 = re.sub(r'[^\w\s]', '', text1)
+            text2 = re.sub(r'[^\w\s]', '', text2)
+            
+            # Split into words
+            words1 = set(text1.split())
+            words2 = set(text2.split())
+            
+            # Remove stopwords
+            words1 = words1.difference(self.stopwords)
+            words2 = words2.difference(self.stopwords)
+            
+            # Calculate Jaccard similarity
+            intersection = words1.intersection(words2)
+            union = words1.union(words2)
+            
+            # Avoid division by zero
+            if not union:
+                return 0.0
                 
-            # Check for empty corpus
-            if all(not text for text in corpus):
-                return []
-                
-            # Create TF-IDF vectors - using more robust settings
-            vectorizer = TfidfVectorizer(
-                min_df=1,  # Include terms that appear in just one document
-                strip_accents='unicode',
-                use_idf=True,
-                smooth_idf=True
-            )
+            return len(intersection) / len(union)
             
-            try:
-                tfidf_matrix = vectorizer.fit_transform(corpus)
-                self.logger.debug(f"Created TF-IDF matrix of shape {tfidf_matrix.shape}")
-                
-                # Check for zero-length documents
-                zero_docs = []
-                for i, doc in enumerate(corpus):
-                    if not doc.strip() or len(vectorizer.get_feature_names_out()) == 0:
-                        zero_docs.append(i)
-                        
-                if zero_docs:
-                    self.logger.warning(f"Found {len(zero_docs)} empty documents after vectorization")
-            except ValueError as e:
-                self.logger.error(f"TF-IDF vectorization error: {str(e)}")
-                return []
-            
-            # Calculate cosine similarity
-            try:
-                cosine_sim = cosine_similarity(tfidf_matrix)
-                self.logger.debug(f"Cosine similarity matrix shape: {cosine_sim.shape}")
-            except Exception as e:
-                self.logger.error(f"Error calculating cosine similarity: {str(e)}")
-                return []
-            
-            # Identify pairs above threshold
-            pairs_above_threshold = 0
-            total_pairs = 0
-            
-            for i in range(len(paragraphs)):
-                for j in range(i+1, len(paragraphs)):
-                    total_pairs += 1
-                    
-                    # Skip if both paragraphs are from the same document
-                    if paragraphs[i]['doc_id'] == paragraphs[j]['doc_id']:
-                        continue
-                    
-                    # Ensure index is valid
-                    if i >= cosine_sim.shape[0] or j >= cosine_sim.shape[1]:
-                        self.logger.warning(f"Index out of range: {i}, {j} for shape {cosine_sim.shape}")
-                        continue
-                    
-                    # Get content similarity value as float (TF-IDF)
-                    content_similarity = float(cosine_sim[i, j])
-                    
-                    # Calculate text similarity using our improved method
-                    text_similarity = self._calculate_text_similarity(
-                        paragraphs[i]['content'],
-                        paragraphs[j]['content']
-                    )
-                    
-                    # Check if value is valid
-                    if np.isnan(content_similarity) or np.isinf(content_similarity):
-                        self.logger.warning(f"Invalid similarity value: {content_similarity}")
-                        continue
-                    
-                    # Only include pairs above threshold
-                    if content_similarity >= threshold:
-                        pairs_above_threshold += 1
-                        
-                        result = SimilarityResult(
-                            paragraph1_id=paragraphs[i]['id'],
-                            paragraph2_id=paragraphs[j]['id'],
-                            paragraph1_content=paragraphs[i]['content'],
-                            paragraph2_content=paragraphs[j]['content'],
-                            paragraph1_doc_id=paragraphs[i]['doc_id'],
-                            paragraph2_doc_id=paragraphs[j]['doc_id'],
-                            content_similarity_score=content_similarity,
-                            text_similarity_score=text_similarity,
-                            similarity_type='similar'
-                        )
-                        results.append(result)
-            
-            self.logger.debug(f"Found {pairs_above_threshold} pairs above threshold out of {total_pairs} total pairs")
-            
-            # NOTE: Removed the special case for low thresholds that was causing inconsistent results
-        
         except Exception as e:
-            self.logger.error(f"Error calculating TF-IDF similarity: {str(e)}", exc_info=True)
-        
-        return results
-    
-    def _calculate_jaccard_similarity(self, corpus: List[str], paragraphs: List[Dict], threshold: float) -> List[SimilarityResult]:
-        """Calculate similarity using Jaccard similarity (word-based)."""
-        results = []
-        
-        try:
-            # Process pairs
-            for i in range(len(paragraphs)):
-                for j in range(i+1, len(paragraphs)):
-                    # Skip if both paragraphs are from the same document
-                    if paragraphs[i]['doc_id'] == paragraphs[j]['doc_id']:
-                        continue
-                    
-                    # Calculate Jaccard similarity
-                    try:
-                        text1 = corpus[i].lower()
-                        text2 = corpus[j].lower()
-                        
-                        # Skip empty texts
-                        if not text1 or not text2:
-                            continue
-                        
-                        # Tokenize into words
-                        words1 = set(text1.split())
-                        words2 = set(text2.split())
-                        
-                        # Calculate Jaccard similarity
-                        intersection = words1.intersection(words2)
-                        union = words1.union(words2)
-                        
-                        # Avoid division by zero
-                        if not union:
-                            continue
-                        
-                        jaccard_similarity = len(intersection) / len(union)
-                        
-                        # Calculate text similarity using our improved method
-                        text_similarity = self._calculate_text_similarity(
-                            paragraphs[i]['content'],
-                            paragraphs[j]['content']
-                        )
-                        
-                        # Check if similarity is above threshold
-                        if jaccard_similarity >= threshold:
-                            result = SimilarityResult(
-                                paragraph1_id=paragraphs[i]['id'],
-                                paragraph2_id=paragraphs[j]['id'],
-                                paragraph1_content=paragraphs[i]['content'],
-                                paragraph2_content=paragraphs[j]['content'],
-                                paragraph1_doc_id=paragraphs[i]['doc_id'],
-                                paragraph2_doc_id=paragraphs[j]['doc_id'],
-                                content_similarity_score=jaccard_similarity,
-                                text_similarity_score=text_similarity,
-                                similarity_type='similar'
-                            )
-                            results.append(result)
-                    except Exception as e:
-                        self.logger.error(f"Error calculating Jaccard similarity for pair {i}, {j}: {str(e)}")
-        
-        except Exception as e:
-            self.logger.error(f"Error calculating Jaccard similarity: {str(e)}", exc_info=True)
-        
-        return results
+            self.logger.error(f"Error calculating Jaccard similarity: {str(e)}")
+            return 0.0
     
     def _merge_similarity_results(self, results1: List[SimilarityResult], results2: List[SimilarityResult]) -> List[SimilarityResult]:
         """Merge similarity results, keeping the highest score for each pair."""
