@@ -9,8 +9,8 @@ from typing import Dict, Any, Optional
 from sqlalchemy import create_engine, Column, Integer, String, Float, ForeignKey, Text, Table, and_, func, Index, or_, inspect, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker, Session
-from document_parser import Paragraph as ParserParagraph
-from similarity_analyzer import SimilarityResult as AnalyzerSimilarityResult
+from utils.document_parser import Paragraph as ParserParagraph
+from utils.similarity_analyzer import SimilarityResult as AnalyzerSimilarityResult
 
 # Initialize SQLAlchemy Base
 Base = declarative_base()

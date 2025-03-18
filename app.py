@@ -7,10 +7,11 @@ from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, send_file, g
 from werkzeug.utils import secure_filename
 
-from document_parser import DocumentParser
-from similarity_analyzer import SimilarityAnalyzer, SimilarityResult as AnalyzerSimilarityResult
-from database_manager import DatabaseManager, Document, Paragraph, Tag, SimilarityResult, Cluster, cluster_paragraphs
-from document_metadata_extractor import DocumentMetadataExtractor
+from utils.document_parser import DocumentParser
+from utils.similarity_analyzer import SimilarityAnalyzer, SimilarityResult as AnalyzerSimilarityResult
+from utils.database_manager import DatabaseManager, Document, Paragraph, Tag, SimilarityResult, Cluster, cluster_paragraphs
+from utils.document_metadata_extractor import DocumentMetadataExtractor
+from utils.excel_exporter import export_to_excel
 
 # Configuration
 UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads')
@@ -617,7 +618,7 @@ def export_data():
         
         # Use the standalone excel_exporter if available
         try:
-            from excel_exporter import export_to_excel as standalone_export
+            from utils.excel_exporter import export_to_excel as standalone_export
             
             # Call the standalone exporter with our database URL
             if standalone_export(DB_URL, temp_path, logger):
@@ -954,7 +955,7 @@ def export_data():
         
         # Use the standalone excel_exporter if available
         try:
-            from excel_exporter import export_to_excel as standalone_export
+            from utils.excel_exporter import export_to_excel as standalone_export
             
             # Call the standalone exporter with our database URL
             if standalone_export(DB_URL, temp_path, logger):

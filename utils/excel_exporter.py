@@ -17,7 +17,7 @@ from sqlalchemy import create_engine, or_, func
 from sqlalchemy.orm import sessionmaker
 
 # Import database models
-from database_manager import (
+from utils.database_manager import (
     Document, Paragraph, Tag, SimilarityResult, Cluster,
     paragraph_tags, cluster_paragraphs
 )
