@@ -472,39 +472,46 @@
             </div>
         `;
         
-        $.ajax({
-            url: '/tag-paragraph',
+        // Debug log
+        console.log(`Tagging paragraph ${paragraphId} with tag ${tagId}, tagging all duplicates`);
+        
+        // Create FormData for more reliable parameter passing
+        const formData = new FormData();
+        formData.append('paragraph_id', paragraphId);
+        formData.append('tag_id', tagId);
+        formData.append('tag_all_duplicates', 'true');
+        
+        fetch('/tag-paragraph', {
             method: 'POST',
-            data: {
-                paragraph_id: paragraphId,
-                tag_id: tagId,
-                tag_all_duplicates: true  // This is the key parameter to tag all duplicates
-            },
-            success: function(response) {
-                if (response.success) {
-                    // Show success message
-                    const alertDiv = document.createElement('div');
-                    alertDiv.className = 'alert alert-success alert-dismissible fade show position-fixed bottom-0 end-0 m-3';
-                    alertDiv.innerHTML = `
-                        <div class="d-flex">
-                            <div class="me-2"><i class="bi bi-check-circle"></i></div>
-                            <div>Tag added to all instances successfully!</div>
-                        </div>
-                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                    `;
-                    document.body.appendChild(alertDiv);
-                    
-                    // Reload page
-                    setTimeout(() => {
-                        window.location.reload();
-                    }, 1000);
-                } else {
-                    alert('Failed to add tag: ' + response.message);
-                }
-            },
-            error: function() {
-                alert('An error occurred while adding the tag');
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            console.log('Tag response:', data);
+            if (data.success) {
+                // Show success message
+                const alertDiv = document.createElement('div');
+                alertDiv.className = 'alert alert-success alert-dismissible fade show position-fixed bottom-0 end-0 m-3';
+                alertDiv.innerHTML = `
+                    <div class="d-flex">
+                        <div class="me-2"><i class="bi bi-check-circle"></i></div>
+                        <div>Tag added to all instances successfully!</div>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                `;
+                document.body.appendChild(alertDiv);
+                
+                // Reload page
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000);
+            } else {
+                alert('Failed to add tag: ' + (data.message || 'Unknown error'));
             }
+        })
+        .catch(error => {
+            console.error('Error adding tag:', error);
+            alert('An error occurred while adding the tag');
         });
     }
     
@@ -514,39 +521,46 @@
             return;
         }
         
-        $.ajax({
-            url: '/untag-paragraph',
+        // Debug log
+        console.log(`Removing tag ${tagId} from paragraph ${paragraphId} and all duplicates`);
+        
+        // Create FormData for more reliable parameter passing
+        const formData = new FormData();
+        formData.append('paragraph_id', paragraphId);
+        formData.append('tag_id', tagId);
+        formData.append('untag_all_duplicates', 'true');
+        
+        fetch('/untag-paragraph', {
             method: 'POST',
-            data: {
-                paragraph_id: paragraphId,
-                tag_id: tagId,
-                untag_all_duplicates: true  // This is the key parameter to untag all duplicates
-            },
-            success: function(response) {
-                if (response.success) {
-                    // Show success message
-                    const alertDiv = document.createElement('div');
-                    alertDiv.className = 'alert alert-success alert-dismissible fade show position-fixed bottom-0 end-0 m-3';
-                    alertDiv.innerHTML = `
-                        <div class="d-flex">
-                            <div class="me-2"><i class="bi bi-check-circle"></i></div>
-                            <div>Tag removed from all instances successfully!</div>
-                        </div>
-                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                    `;
-                    document.body.appendChild(alertDiv);
-                    
-                    // Reload page
-                    setTimeout(() => {
-                        window.location.reload();
-                    }, 1000);
-                } else {
-                    alert('Failed to remove tag: ' + response.message);
-                }
-            },
-            error: function() {
-                alert('An error occurred while removing the tag');
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            console.log('Untag response:', data);
+            if (data.success) {
+                // Show success message
+                const alertDiv = document.createElement('div');
+                alertDiv.className = 'alert alert-success alert-dismissible fade show position-fixed bottom-0 end-0 m-3';
+                alertDiv.innerHTML = `
+                    <div class="d-flex">
+                        <div class="me-2"><i class="bi bi-check-circle"></i></div>
+                        <div>Tag removed from all instances successfully!</div>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                `;
+                document.body.appendChild(alertDiv);
+                
+                // Reload page
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000);
+            } else {
+                alert('Failed to remove tag: ' + (data.message || 'Unknown error'));
             }
+        })
+        .catch(error => {
+            console.error('Error removing tag:', error);
+            alert('An error occurred while removing the tag');
         });
     }
     

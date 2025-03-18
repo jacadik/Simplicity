@@ -500,16 +500,22 @@
         
         // Add tag to paragraph and all its duplicates
         function addTagToParagraph(paragraphId, tagId) {
+            // Debug log
+            console.log(`Document view: Tagging paragraph ${paragraphId} with tag ${tagId}, tagging all duplicates`);
+            
+            // Create FormData for more reliable parameter passing
+            const formData = new FormData();
+            formData.append('paragraph_id', paragraphId);
+            formData.append('tag_id', tagId);
+            formData.append('tag_all_duplicates', 'true');
+            
             fetch('/tag-paragraph', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                    'X-Requested-With': 'XMLHttpRequest'
-                },
-                body: `paragraph_id=${paragraphId}&tag_id=${tagId}&tag_all_duplicates=true`
+                body: formData
             })
             .then(response => response.json())
             .then(data => {
+                console.log('Tag response:', data);
                 if (data.success) {
                     // Close the modal
                     tagModal.hide();
@@ -550,16 +556,22 @@
                     const paragraphId = this.dataset.paragraphId;
                     const tagId = this.dataset.tagId;
                     
+                    // Debug log
+                    console.log(`Document view: Removing tag ${tagId} from paragraph ${paragraphId} and all duplicates`);
+                    
+                    // Create FormData for more reliable parameter passing
+                    const formData = new FormData();
+                    formData.append('paragraph_id', paragraphId);
+                    formData.append('tag_id', tagId);
+                    formData.append('untag_all_duplicates', 'true');
+                    
                     fetch('/untag-paragraph', {
                         method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/x-www-form-urlencoded',
-                            'X-Requested-With': 'XMLHttpRequest'
-                        },
-                        body: `paragraph_id=${paragraphId}&tag_id=${tagId}&untag_all_duplicates=true`
+                        body: formData
                     })
                     .then(response => response.json())
                     .then(data => {
+                        console.log('Untag response:', data);
                         if (data.success) {
                             // Show success message
                             const alertDiv = document.createElement('div');
