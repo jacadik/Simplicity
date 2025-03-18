@@ -234,6 +234,10 @@
                 <div class="modal-body">
                     <input type="hidden" id="paragraphIdForTag">
                     <div class="mb-3">
+                        <p class="alert alert-info mb-3">
+                            <i class="bi bi-info-circle me-2"></i>
+                            This tag will be applied to all instances of this paragraph across documents.
+                        </p>
                         <label class="form-label">Select Tag</label>
                         <div class="d-flex flex-wrap gap-2 tag-selection">
                             {% for tag in tags %}
@@ -453,7 +457,7 @@
         new bootstrap.Modal(document.getElementById('tagModal')).show();
     }
     
-    // Add tag to paragraph
+    // Add tag to paragraph and all its duplicates
     function addTag(tagId) {
         const paragraphId = document.getElementById('paragraphIdForTag').value;
         
@@ -464,7 +468,7 @@
                 <div class="spinner-border text-primary" role="status">
                     <span class="visually-hidden">Loading...</span>
                 </div>
-                <p class="mt-2 mb-0">Adding tag...</p>
+                <p class="mt-2 mb-0">Adding tag to all instances of this paragraph...</p>
             </div>
         `;
         
@@ -473,7 +477,8 @@
             method: 'POST',
             data: {
                 paragraph_id: paragraphId,
-                tag_id: tagId
+                tag_id: tagId,
+                tag_all_duplicates: true  // This is the key parameter to tag all duplicates
             },
             success: function(response) {
                 if (response.success) {
@@ -483,7 +488,7 @@
                     alertDiv.innerHTML = `
                         <div class="d-flex">
                             <div class="me-2"><i class="bi bi-check-circle"></i></div>
-                            <div>Tag added successfully!</div>
+                            <div>Tag added to all instances successfully!</div>
                         </div>
                         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                     `;
@@ -503,9 +508,9 @@
         });
     }
     
-    // Remove tag from paragraph
+    // Remove tag from paragraph and all its duplicates
     function removeTag(paragraphId, tagId) {
-        if (!confirm('Are you sure you want to remove this tag?')) {
+        if (!confirm('Are you sure you want to remove this tag from all instances of this paragraph?')) {
             return;
         }
         
@@ -514,7 +519,8 @@
             method: 'POST',
             data: {
                 paragraph_id: paragraphId,
-                tag_id: tagId
+                tag_id: tagId,
+                untag_all_duplicates: true  // This is the key parameter to untag all duplicates
             },
             success: function(response) {
                 if (response.success) {
@@ -524,7 +530,7 @@
                     alertDiv.innerHTML = `
                         <div class="d-flex">
                             <div class="me-2"><i class="bi bi-check-circle"></i></div>
-                            <div>Tag removed successfully!</div>
+                            <div>Tag removed from all instances successfully!</div>
                         </div>
                         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                     `;

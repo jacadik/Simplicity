@@ -484,31 +484,65 @@ def delete_tag():
 
 @app.route('/tag-paragraph', methods=['POST'])
 def tag_paragraph():
-    """Tag a paragraph."""
-    paragraph_id = request.form.get('paragraph_id', type=int)
-    tag_id = request.form.get('tag_id', type=int)
-    
-    if not paragraph_id or not tag_id:
-        return jsonify({'success': False, 'message': 'Invalid parameters'})
-    
-    if db_manager.tag_paragraph(paragraph_id, tag_id):
-        return jsonify({'success': True})
-    else:
-        return jsonify({'success': False, 'message': 'Failed to tag paragraph'})
+    try:
+        paragraph_id = request.form.get('paragraph_id')
+        tag_id = request.form.get('tag_id')
+        
+        # Explicitly check for the tag_all_duplicates parameter
+        tag_all_duplicates = request.form.get('tag_all_duplicates', 'false').lower() == 'true'
+        
+        if not paragraph_id or not tag_id:
+            return jsonify({'success': False, 'message': 'Missing parameters'})
+        
+        # Convert to integers
+        paragraph_id = int(paragraph_id)
+        tag_id = int(tag_id)
+        
+        # Debug logging
+        app.logger.info(f"Tagging paragraph {paragraph_id} with tag {tag_id}, tag_all_duplicates: {tag_all_duplicates}")
+        
+        # Call database manager with the tag_all_duplicates parameter
+        success = db_manager.tag_paragraph(paragraph_id, tag_id, tag_all_duplicates)
+        
+        if success:
+            return jsonify({'success': True})
+        else:
+            return jsonify({'success': False, 'message': 'Failed to add tag'})
+    except Exception as e:
+        app.logger.error(f"Error in tag_paragraph: {str(e)}", exc_info=True)
+        return jsonify({'success': False, 'message': str(e)})
 
+# Route handler for untagging paragraphs
 @app.route('/untag-paragraph', methods=['POST'])
 def untag_paragraph():
-    """Remove a tag from a paragraph."""
-    paragraph_id = request.form.get('paragraph_id', type=int)
-    tag_id = request.form.get('tag_id', type=int)
-    
-    if not paragraph_id or not tag_id:
-        return jsonify({'success': False, 'message': 'Invalid parameters'})
-    
-    if db_manager.untag_paragraph(paragraph_id, tag_id):
-        return jsonify({'success': True})
-    else:
-        return jsonify({'success': False, 'message': 'Failed to untag paragraph'})
+    try:
+        paragraph_id = request.form.get('paragraph_id')
+        tag_id = request.form.get('tag_id')
+        
+        # Explicitly check for the untag_all_duplicates parameter
+        untag_all_duplicates = request.form.get('untag_all_duplicates', 'false').lower() == 'true'
+        
+        if not paragraph_id or not tag_id:
+            return jsonify({'success': False, 'message': 'Missing parameters'})
+        
+        # Convert to integers
+        paragraph_id = int(paragraph_id)
+        tag_id = int(tag_id)
+        
+        # Debug logging
+        app.logger.info(f"Untagging paragraph {paragraph_id} with tag {tag_id}, untag_all_duplicates: {untag_all_duplicates}")
+        
+        # Call database manager with the untag_all_duplicates parameter
+        success = db_manager.untag_paragraph(paragraph_id, tag_id, untag_all_duplicates)
+        
+        if success:
+            return jsonify({'success': True})
+        else:
+            return jsonify({'success': False, 'message': 'Failed to remove tag'})
+    except Exception as e:
+        app.logger.error(f"Error in untag_paragraph: {str(e)}", exc_info=True)
+        return jsonify({'success': False, 'message': str(e)})
+
 
 @app.route('/get-tags')
 def get_tags_json():

@@ -337,6 +337,10 @@
                 <div class="modal-body">
                     <input type="hidden" id="paragraphIdForTag">
                     <div class="mb-3">
+                        <p class="alert alert-info mb-3">
+                            <i class="bi bi-info-circle me-2"></i>
+                            This tag will be applied to all instances of this paragraph across documents.
+                        </p>
                         <label class="form-label">Select Tag</label>
                         <div class="d-flex flex-wrap gap-2 tag-selection">
                             <!-- Tags will be loaded via AJAX -->
@@ -494,7 +498,7 @@
             });
         });
         
-        // Add tag to paragraph
+        // Add tag to paragraph and all its duplicates
         function addTagToParagraph(paragraphId, tagId) {
             fetch('/tag-paragraph', {
                 method: 'POST',
@@ -502,7 +506,7 @@
                     'Content-Type': 'application/x-www-form-urlencoded',
                     'X-Requested-With': 'XMLHttpRequest'
                 },
-                body: `paragraph_id=${paragraphId}&tag_id=${tagId}`
+                body: `paragraph_id=${paragraphId}&tag_id=${tagId}&tag_all_duplicates=true`
             })
             .then(response => response.json())
             .then(data => {
@@ -516,7 +520,7 @@
                     alertDiv.innerHTML = `
                         <div class="d-flex">
                             <div class="me-2"><i class="bi bi-check-circle"></i></div>
-                            <div>Tag added successfully!</div>
+                            <div>Tag added to all matching paragraphs!</div>
                         </div>
                         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                     `;
@@ -536,13 +540,13 @@
             });
         }
         
-        // Remove tag from paragraph
+        // Remove tag from paragraph and all its duplicates
         const removeTagButtons = document.querySelectorAll('.remove-tag-btn');
         removeTagButtons.forEach(button => {
             button.addEventListener('click', function(e) {
                 e.stopPropagation(); // Prevent event bubbling
                 
-                if (confirm('Are you sure you want to remove this tag?')) {
+                if (confirm('Are you sure you want to remove this tag from all matching paragraphs?')) {
                     const paragraphId = this.dataset.paragraphId;
                     const tagId = this.dataset.tagId;
                     
@@ -552,7 +556,7 @@
                             'Content-Type': 'application/x-www-form-urlencoded',
                             'X-Requested-With': 'XMLHttpRequest'
                         },
-                        body: `paragraph_id=${paragraphId}&tag_id=${tagId}`
+                        body: `paragraph_id=${paragraphId}&tag_id=${tagId}&untag_all_duplicates=true`
                     })
                     .then(response => response.json())
                     .then(data => {
@@ -563,7 +567,7 @@
                             alertDiv.innerHTML = `
                                 <div class="d-flex">
                                     <div class="me-2"><i class="bi bi-check-circle"></i></div>
-                                    <div>Tag removed successfully!</div>
+                                    <div>Tag removed from all matching paragraphs!</div>
                                 </div>
                                 <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                             `;

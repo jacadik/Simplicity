@@ -808,8 +808,55 @@ class DatabaseManager:
         finally:
             session.close()
     
-    def tag_paragraph(self, paragraph_id: int, tag_id: int) -> bool:
-        """Associate a tag with a paragraph."""
+    def _find_duplicate_paragraphs(self, paragraph_id: int) -> List[int]:
+        """
+        Find all paragraph IDs with the same content as the given paragraph.
+        
+        Args:
+            paragraph_id: ID of the paragraph to find duplicates for
+            
+        Returns:
+            List of paragraph IDs with identical content
+        """
+        self.logger.info(f"Finding duplicate paragraphs for paragraph ID: {paragraph_id}")
+        
+        session = self.Session()
+        try:
+            # Get the content of the paragraph
+            paragraph = session.query(Paragraph).get(paragraph_id)
+            if not paragraph:
+                self.logger.warning(f"Paragraph with ID {paragraph_id} not found")
+                return []
+            
+            # Find paragraphs with the same content but different IDs
+            duplicates = session.query(Paragraph.id).filter(
+                Paragraph.content == paragraph.content,
+                Paragraph.id != paragraph_id
+            ).all()
+            
+            # Extract IDs
+            duplicate_ids = [id for (id,) in duplicates]
+            
+            self.logger.info(f"Found {len(duplicate_ids)} duplicate paragraphs for paragraph ID {paragraph_id}")
+            return duplicate_ids
+        except Exception as e:
+            self.logger.error(f"Error finding duplicate paragraphs: {str(e)}", exc_info=True)
+            return []
+        finally:
+            session.close()
+    
+    def tag_paragraph(self, paragraph_id: int, tag_id: int, tag_all_duplicates: bool = False) -> bool:
+        """
+        Associate a tag with a paragraph, and optionally tag all duplicate paragraphs.
+        
+        Args:
+            paragraph_id: ID of the paragraph to tag
+            tag_id: ID of the tag to apply
+            tag_all_duplicates: Whether to tag all paragraphs with identical content
+            
+        Returns:
+            Boolean indicating success
+        """
         self.logger.info(f"Tagging paragraph {paragraph_id} with tag {tag_id}")
         
         session = self.Session()
@@ -822,16 +869,32 @@ class DatabaseManager:
                 self.logger.warning(f"Paragraph {paragraph_id} or tag {tag_id} not found")
                 return False
             
-            # Check if already tagged
-            if tag in paragraph.tags:
-                self.logger.info(f"Paragraph {paragraph_id} already has tag {tag_id}")
-                return True
+            # List of paragraphs to tag
+            paragraphs_to_tag = [paragraph]
             
-            # Add tag to paragraph
-            paragraph.tags.append(tag)
+            # If tagging all duplicates, find paragraphs with the same content
+            if tag_all_duplicates:
+                duplicate_ids = self._find_duplicate_paragraphs(paragraph_id)
+                self.logger.info(f"Found {len(duplicate_ids)} duplicate paragraphs to tag")
+                
+                # Get the duplicate paragraphs
+                if duplicate_ids:
+                    duplicates = session.query(Paragraph).filter(Paragraph.id.in_(duplicate_ids)).all()
+                    paragraphs_to_tag.extend(duplicates)
+            
+            # Tag all paragraphs
+            for para in paragraphs_to_tag:
+                # Check if already tagged
+                if tag in para.tags:
+                    self.logger.info(f"Paragraph {para.id} already has tag {tag_id}")
+                    continue
+                
+                # Add tag to paragraph
+                para.tags.append(tag)
+            
             session.commit()
             
-            self.logger.info(f"Tagged paragraph {paragraph_id} with tag {tag_id}")
+            self.logger.info(f"Tagged {len(paragraphs_to_tag)} paragraphs with tag {tag_id}")
             return True
             
         except Exception as e:
@@ -841,8 +904,18 @@ class DatabaseManager:
         finally:
             session.close()
     
-    def untag_paragraph(self, paragraph_id: int, tag_id: int) -> bool:
-        """Remove a tag association from a paragraph."""
+    def untag_paragraph(self, paragraph_id: int, tag_id: int, untag_all_duplicates: bool = False) -> bool:
+        """
+        Remove a tag association from a paragraph, and optionally from all duplicate paragraphs.
+        
+        Args:
+            paragraph_id: ID of the paragraph to untag
+            tag_id: ID of the tag to remove
+            untag_all_duplicates: Whether to untag all paragraphs with identical content
+            
+        Returns:
+            Boolean indicating success
+        """
         self.logger.info(f"Removing tag {tag_id} from paragraph {paragraph_id}")
         
         session = self.Session()
@@ -855,12 +928,28 @@ class DatabaseManager:
                 self.logger.warning(f"Paragraph {paragraph_id} or tag {tag_id} not found")
                 return False
             
-            # Remove tag from paragraph
-            if tag in paragraph.tags:
-                paragraph.tags.remove(tag)
-                session.commit()
+            # List of paragraphs to untag
+            paragraphs_to_untag = [paragraph]
             
-            self.logger.info(f"Removed tag {tag_id} from paragraph {paragraph_id}")
+            # If untagging all duplicates, find paragraphs with the same content
+            if untag_all_duplicates:
+                duplicate_ids = self._find_duplicate_paragraphs(paragraph_id)
+                self.logger.info(f"Found {len(duplicate_ids)} duplicate paragraphs to untag")
+                
+                # Get the duplicate paragraphs
+                if duplicate_ids:
+                    duplicates = session.query(Paragraph).filter(Paragraph.id.in_(duplicate_ids)).all()
+                    paragraphs_to_untag.extend(duplicates)
+            
+            # Untag all paragraphs
+            for para in paragraphs_to_untag:
+                # Remove tag from paragraph if it exists
+                if tag in para.tags:
+                    para.tags.remove(tag)
+            
+            session.commit()
+            
+            self.logger.info(f"Removed tag {tag_id} from {len(paragraphs_to_untag)} paragraphs")
             return True
             
         except Exception as e:
