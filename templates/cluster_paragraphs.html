@@ -3,87 +3,159 @@
 {% block title %}Cluster: {{ cluster.name }}{% endblock %}
 
 {% block content %}
-    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-        <h1 class="h2">Cluster: {{ cluster.name }}</h1>
-        <div class="btn-toolbar mb-2 mb-md-0">
-            <a href="/clusters" class="btn btn-sm btn-outline-secondary">
-                <i class="bi bi-arrow-left"></i> Back to Clusters
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-4">
+        <div>
+            <h1 class="h3 mb-0">Cluster: {{ cluster.name }}</h1>
+            <p class="text-muted mb-0">{{ cluster.description }}</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="/clusters" class="btn btn-light">
+                <i class="bi bi-arrow-left me-1"></i> Back to Clusters
             </a>
         </div>
     </div>
 
-    <div class="card mb-4">
-        <div class="card-header bg-light">
-            <h5 class="mb-0">Cluster Information</h5>
-        </div>
-        <div class="card-body">
-            <div class="row">
-                <div class="col-md-6">
-                    <p><strong>Description:</strong> {{ cluster.description }}</p>
-                    <p><strong>Creation Date:</strong> {{ cluster.creation_date.split('T')[0] }}</p>
+    <!-- Cluster Information Card -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <i class="bi bi-diagram-3 text-primary mb-2" style="font-size: 2rem;"></i>
+                    <h2 class="mb-0">{{ cluster.id }}</h2>
+                    <p class="text-muted mb-0">Cluster ID</p>
                 </div>
-                <div class="col-md-6">
-                    <p><strong>Similarity Threshold:</strong> {{ cluster.similarity_threshold }}</p>
-                    <p><strong>Paragraphs:</strong> {{ paragraphs|length }}</p>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <i class="bi bi-calendar-date text-success mb-2" style="font-size: 2rem;"></i>
+                    <h2 class="mb-0">{{ cluster.creation_date.split('T')[0].split('-')[2] }}-{{ cluster.creation_date.split('T')[0].split('-')[1] }}</h2>
+                    <p class="text-muted mb-0">Created</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <i class="bi bi-percent text-info mb-2" style="font-size: 2rem;"></i>
+                    <h2 class="mb-0">{{ cluster.similarity_threshold }}</h2>
+                    <p class="text-muted mb-0">Threshold</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <i class="bi bi-paragraph text-warning mb-2" style="font-size: 2rem;"></i>
+                    <h2 class="mb-0">{{ paragraphs|length }}</h2>
+                    <p class="text-muted mb-0">Paragraphs</p>
                 </div>
             </div>
         </div>
     </div>
 
-    <h3>Paragraphs in Cluster</h3>
-    <div class="row">
-        <div class="col-md-12">
+    <!-- Paragraph Comparison Button -->
+    {% if paragraphs and paragraphs|length > 1 %}
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="d-flex align-items-center gap-3">
+                <button type="button" class="btn btn-primary" id="compareAllBtn">
+                    <i class="bi bi-arrows-angle-expand me-2"></i> Compare All Paragraphs
+                </button>
+                <div class="text-muted">Compare all {{ paragraphs|length }} paragraphs in this cluster to see patterns and differences</div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Comparison View (Hidden initially) -->
+    <div id="comparisonView" class="mb-4" style="display: none;">
+        <div class="card">
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-arrows-angle-expand me-2"></i>Cluster Comparison</h5>
+                <button type="button" class="btn btn-sm btn-light" id="closeCompareBtn">
+                    <i class="bi bi-x"></i>
+                </button>
+            </div>
+            <div class="card-body">
+                <div id="enhancedDiffContainer"></div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Paragraphs in Cluster -->
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0"><i class="bi bi-paragraph me-2"></i>Paragraphs in Cluster</h5>
+            <div>
+                <input type="text" class="form-control form-control-sm" id="paragraphSearch" placeholder="Search content..." style="min-width: 200px;">
+            </div>
+        </div>
+        <div class="card-body">
             {% if paragraphs %}
-                <div class="mb-3">
-                    <button type="button" class="btn btn-primary mb-3" id="compareAllBtn">
-                        <i class="bi bi-arrows-angle-expand"></i> Compare All Paragraphs
-                    </button>
-                </div>
-                
-                <div id="comparisonView" class="mb-4" style="display: none;">
-                    <div class="card">
-                        <div class="card-header bg-primary text-white">
-                            <h5 class="mb-0">Cluster Comparison</h5>
-                        </div>
-                        <div class="card-body">
-                            <div id="enhancedDiffContainer"></div>
-                        </div>
-                    </div>
-                </div>
-                
                 {% for para in paragraphs %}
                     <div class="card paragraph-card mb-3">
                         <div class="card-header d-flex justify-content-between align-items-center">
-                            <div>
-                                <span class="badge bg-secondary">{{ para.paragraph_type }}</span>
-                                <span class="text-muted ms-2">ID: {{ para.id }}</span>
+                            <div class="d-flex align-items-center gap-2">
+                                {% if para.paragraph_type == 'header' %}
+                                    <span class="badge bg-primary">{{ para.paragraph_type }}</span>
+                                {% elif para.paragraph_type == 'normal' %}
+                                    <span class="badge bg-secondary">{{ para.paragraph_type }}</span>
+                                {% elif para.paragraph_type == 'list' %}
+                                    <span class="badge bg-success">{{ para.paragraph_type }}</span>
+                                {% elif para.paragraph_type == 'table' %}
+                                    <span class="badge bg-danger">{{ para.paragraph_type }}</span>
+                                {% elif para.paragraph_type == 'boilerplate' %}
+                                    <span class="badge bg-warning">{{ para.paragraph_type }}</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">{{ para.paragraph_type }}</span>
+                                {% endif %}
+                                <span class="text-muted small">ID: {{ para.id }}</span>
                             </div>
                             <div>
-                                <span class="badge bg-info">{{ para.filename }}</span>
+                                <span class="badge bg-light text-dark border">
+                                    <i class="bi bi-file-earmark-text me-1"></i>{{ para.filename }}
+                                </span>
                             </div>
                         </div>
                         <div class="card-body">
                             {% if para.header_content %}
-                                <div class="mb-2">
-                                    <strong>Header:</strong> {{ para.header_content }}
+                                <div class="mb-3 p-2 rounded bg-light">
+                                    <strong><i class="bi bi-type-h1 me-1"></i>Header:</strong> {{ para.header_content }}
                                 </div>
                             {% endif %}
                             
-                            <p class="paragraph-content">{{ para.content }}</p>
+                            <div class="paragraph-content p-3 bg-light rounded mb-3">
+                                {{ para.content }}
+                            </div>
                             
-                            <div class="paragraph-tags mt-2">
+                            <div class="paragraph-tags d-flex flex-wrap gap-1 mt-2">
                                 {% for tag in para.tags %}
                                     <span class="badge" style="background-color: {{ tag.color }}">
                                         {{ tag.name }}
                                     </span>
                                 {% endfor %}
                             </div>
+                            
+                            <div class="text-end mt-3">
+                                <a href="/paragraphs?document_id={{ para.document_id }}" class="btn btn-sm btn-outline-primary">
+                                    <i class="bi bi-eye me-1"></i> View in Context
+                                </a>
+                            </div>
                         </div>
                     </div>
                 {% endfor %}
             {% else %}
-                <div class="alert alert-info">
-                    No paragraphs found in this cluster.
+                <div class="text-center py-5">
+                    <div class="empty-state">
+                        <i class="bi bi-file-earmark-x text-muted mb-3" style="font-size: 4rem;"></i>
+                        <h5>No paragraphs found</h5>
+                        <p class="text-muted">This cluster doesn't contain any paragraphs</p>
+                        <a href="/clusters" class="btn btn-primary mt-2">
+                            <i class="bi bi-arrow-left me-1"></i> Back to Clusters
+                        </a>
+                    </div>
                 </div>
             {% endif %}
         </div>
@@ -96,24 +168,80 @@
     document.addEventListener('DOMContentLoaded', function() {
         const compareAllBtn = document.getElementById('compareAllBtn');
         const comparisonView = document.getElementById('comparisonView');
+        const closeCompareBtn = document.getElementById('closeCompareBtn');
         const paragraphs = document.querySelectorAll('.paragraph-content');
         
-        compareAllBtn.addEventListener('click', function() {
-            if (paragraphs.length < 2) {
-                alert('Need at least 2 paragraphs to compare');
-                return;
-            }
-            
-            // Get all paragraph texts
-            const paraTexts = [];
-            paragraphs.forEach(p => paraTexts.push(p.textContent.trim()));
-            
-            // Show the comparison view
-            comparisonView.style.display = 'block';
-            
-            // Create enhanced diff visualization
-            enhancedDiffVisualization(paraTexts, 'enhancedDiffContainer');
+        // Enable search functionality for paragraphs
+        const searchInput = document.getElementById('paragraphSearch');
+        if (searchInput) {
+            searchInput.addEventListener('input', function() {
+                const searchTerm = this.value.toLowerCase();
+                const paragraphCards = document.querySelectorAll('.paragraph-card');
+                
+                paragraphCards.forEach(card => {
+                    const content = card.querySelector('.paragraph-content').textContent.toLowerCase();
+                    if (content.includes(searchTerm)) {
+                        card.style.display = 'block';
+                        if (searchTerm) {
+                            // Highlight matches
+                            highlightText(card.querySelector('.paragraph-content'), searchTerm);
+                        }
+                    } else {
+                        card.style.display = 'none';
+                    }
+                });
+            });
+        }
+        
+        // Function to highlight search matches
+        function highlightText(element, term) {
+            const originalText = element.innerHTML;
+            // Remove any existing highlights
+            const cleanText = originalText.replace(/<mark class="search-highlight">([^<]+)<\/mark>/g, '$1');
+            // Add new highlights
+            const regex = new RegExp(term, 'gi');
+            const highlightedText = cleanText.replace(regex, '<mark class="search-highlight">$&</mark>');
+            element.innerHTML = highlightedText;
+        }
+        
+        // Add hover effect to paragraph cards
+        const paragraphCards = document.querySelectorAll('.paragraph-card');
+        paragraphCards.forEach(card => {
+            card.addEventListener('mouseenter', function() {
+                this.classList.add('shadow');
+            });
+            card.addEventListener('mouseleave', function() {
+                this.classList.remove('shadow');
+            });
         });
+        
+        if (compareAllBtn) {
+            compareAllBtn.addEventListener('click', function() {
+                if (paragraphs.length < 2) {
+                    alert('Need at least 2 paragraphs to compare');
+                    return;
+                }
+                
+                // Get all paragraph texts
+                const paraTexts = [];
+                paragraphs.forEach(p => paraTexts.push(p.textContent.trim()));
+                
+                // Show the comparison view
+                comparisonView.style.display = 'block';
+                
+                // Scroll to the comparison view
+                comparisonView.scrollIntoView({ behavior: 'smooth' });
+                
+                // Create enhanced diff visualization
+                enhancedDiffVisualization(paraTexts, 'enhancedDiffContainer');
+            });
+        }
+        
+        if (closeCompareBtn) {
+            closeCompareBtn.addEventListener('click', function() {
+                comparisonView.style.display = 'none';
+            });
+        }
     });
     
     function enhancedDiffVisualization(paragraphs, containerId) {
@@ -156,39 +284,45 @@
         // Generate HTML visualization
         let html = `
             <div class="cluster-stats mb-4">
-                <h4>Cluster Analysis</h4>
-                <div class="row">
+                <h4 class="mb-3">Cluster Analysis</h4>
+                <div class="row g-3">
                     <div class="col-md-4">
-                        <div class="card bg-light">
+                        <div class="card border-0 shadow-sm">
                             <div class="card-body text-center">
-                                <h5 class="card-title">Total Paragraphs</h5>
-                                <p class="card-text h3">${paragraphs.length}</p>
+                                <i class="bi bi-files text-primary mb-2" style="font-size: 2rem;"></i>
+                                <h2 class="card-title">${paragraphs.length}</h2>
+                                <p class="card-text text-muted">Total Paragraphs</p>
                             </div>
                         </div>
                     </div>
                     <div class="col-md-4">
-                        <div class="card bg-light">
+                        <div class="card border-0 shadow-sm">
                             <div class="card-body text-center">
-                                <h5 class="card-title">Unique Words</h5>
-                                <p class="card-text h3">${uniqueWordCount}</p>
+                                <i class="bi bi-type text-success mb-2" style="font-size: 2rem;"></i>
+                                <h2 class="card-title">${uniqueWordCount}</h2>
+                                <p class="card-text text-muted">Unique Words</p>
                             </div>
                         </div>
                     </div>
                     <div class="col-md-4">
-                        <div class="card bg-light">
+                        <div class="card border-0 shadow-sm">
                             <div class="card-body text-center">
-                                <h5 class="card-title">Content Consistency</h5>
-                                <p class="card-text h3">${consistencyPercentage}%</p>
+                                <i class="bi bi-percent text-info mb-2" style="font-size: 2rem;"></i>
+                                <h2 class="card-title">${consistencyPercentage}%</h2>
+                                <p class="card-text text-muted">Content Consistency</p>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
             
-            <div class="mb-4">
-                <h4>Word Variation Heatmap</h4>
-                <p class="text-muted">This heatmap shows how consistently each word appears across paragraphs:</p>
-                <div class="word-heatmap p-3 bg-light rounded">`;
+            <div class="card mb-4 border-0 shadow-sm">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-palette me-2"></i>Word Variation Heatmap</h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">This heatmap shows how consistently each word appears across paragraphs in this cluster:</p>
+                    <div class="word-heatmap p-3 bg-light rounded">`;
         
         // Sort words by frequency for better visualization
         const sortedWords = Array.from(allWords).sort((a, b) => wordFrequency[b] - wordFrequency[a]);
@@ -200,8 +334,8 @@
             // Calculate color based on consistency (green for high, red for low)
             const hue = consistency * 120; // 0 = red, 120 = green
             
-            html += `<span class="word-heat d-inline-block m-1 p-1 rounded" 
-                         style="background-color: hsl(${hue}, 80%, 80%);" 
+            html += `<span class="word-heat d-inline-block m-1 p-2 rounded" 
+                         style="background-color: hsl(${hue}, 80%, 80%); font-size: 0.9rem; transition: transform 0.2s ease;" 
                          title="${(consistency * 100).toFixed(0)}% consistent">
                         ${word}
                     </span>`;
@@ -209,10 +343,11 @@
         
         html += `</div>
             </div>
+            </div>
             
             <div class="mb-4">
-                <h4>Paragraph Comparison</h4>
-                <p class="text-muted">Compare each paragraph against the first paragraph in the cluster:</p>
+                <h5 class="mb-3"><i class="bi bi-arrow-left-right me-2"></i>Paragraph Comparison</h5>
+                <p class="text-muted mb-4">Each paragraph below is compared against the first paragraph in the cluster:</p>
             </div>`;
         
         // Compare all paragraphs against the reference
@@ -229,15 +364,30 @@
             }
             
             const similarity = (unchanged / (unchanged + added + removed) * 100).toFixed(1);
+            const similarityClass = similarity > 80 ? 'success' : similarity > 50 ? 'warning' : 'danger';
             
             // Create comparison card
             html += `
-                <div class="card mb-3">
-                    <div class="card-header">
-                        <h5 class="mb-0">Paragraph ${i+1} (${similarity}% similar)</h5>
+                <div class="card mb-4 border-0 shadow-sm">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Paragraph ${i+1}</h5>
+                        <span class="badge bg-${similarityClass} px-3 py-2">
+                            <i class="bi bi-percent me-1"></i>${similarity}% similar
+                        </span>
                     </div>
                     <div class="card-body">
-                        <div class="diff-content">`;
+                        <div class="diff-stats mb-3">
+                            <div class="progress" style="height: 10px;">
+                                <div class="progress-bar bg-success" style="width: ${similarity}%"></div>
+                                <div class="progress-bar bg-danger" style="width: ${100-similarity}%"></div>
+                            </div>
+                            <div class="d-flex justify-content-between mt-1">
+                                <small class="text-success">${similarity}% match</small>
+                                <small class="text-danger">${(100-similarity).toFixed(1)}% different</small>
+                            </div>
+                        </div>
+                        
+                        <div class="diff-content p-3 bg-light rounded">`;
             
             // Add the diff content with color-coding
             for (const [op, text] of diffs) {
@@ -258,21 +408,47 @@
         
         // Set the HTML content
         document.getElementById(containerId).innerHTML = html;
+        
+        // Add hover effect to word heat elements
+        setTimeout(() => {
+            const wordHeatElements = document.querySelectorAll('.word-heat');
+            wordHeatElements.forEach(el => {
+                el.addEventListener('mouseenter', function() {
+                    this.style.transform = 'scale(1.1)';
+                    this.style.boxShadow = '0 2px 5px rgba(0,0,0,0.1)';
+                });
+                el.addEventListener('mouseleave', function() {
+                    this.style.transform = 'scale(1)';
+                    this.style.boxShadow = 'none';
+                });
+            });
+        }, 500);
     }
 </script>
 
 <style>
     .diff-added {
         background-color: rgba(40, 167, 69, 0.2);
+        padding: 2px 0;
+        border-radius: 2px;
     }
     
     .diff-removed {
         background-color: rgba(220, 53, 69, 0.2);
         text-decoration: line-through;
+        padding: 2px 0;
+        border-radius: 2px;
     }
     
     .word-heat {
-        font-size: 0.9rem;
+        transition: all 0.2s ease;
+        cursor: pointer;
+    }
+    
+    .search-highlight {
+        background-color: #ffeb3b;
+        padding: 2px 0;
+        border-radius: 2px;
     }
 </style>
 {% endblock %}

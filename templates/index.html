@@ -3,112 +3,210 @@
 {% block title %}Dashboard{% endblock %}
 
 {% block content %}
-    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-        <h1 class="h2">Dashboard</h1>
-        <div class="btn-toolbar mb-2 mb-md-0">
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-4">
+        <div>
+            <h1 class="h3 mb-0">Dashboard</h1>
+            <p class="text-muted fs-6 mb-0">Manage your document collection</p>
+        </div>
+        <div class="d-flex gap-2">
             {% if documents %}
-                <a href="/clear" class="btn btn-sm btn-danger me-2" onclick="return confirm('Are you sure you want to clear all data? This action cannot be undone.');">
-                    <i class="bi bi-trash"></i> Clear All Data
+                <a href="/clear" class="btn btn-danger" onclick="return confirm('Are you sure you want to clear all data? This action cannot be undone.');">
+                    <i class="bi bi-trash me-1"></i> Clear All
                 </a>
             {% endif %}
-            <button type="button" class="btn btn-sm btn-outline-primary me-2" data-bs-toggle="modal" data-bs-target="#uploadModal">
-                <i class="bi bi-upload"></i> Upload Documents
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#uploadModal">
+                <i class="bi bi-upload me-1"></i> Upload Documents
             </button>
-            <button type="button" class="btn btn-sm btn-outline-secondary me-2" data-bs-toggle="modal" data-bs-target="#folderModal">
-                <i class="bi bi-folder"></i> Import from Folder
+            <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#folderModal">
+                <i class="bi bi-folder me-1"></i> Import from Folder
             </button>
-            <a href="/export" class="btn btn-sm btn-outline-success me-2">
-                <i class="bi bi-file-excel"></i> Export to Excel
+            <a href="/export" class="btn btn-success">
+                <i class="bi bi-file-excel me-1"></i> Export
             </a>
         </div>
     </div>
 
-    <h2>Document Management</h2>
-    <div class="table-responsive">
-        <table class="table table-striped table-hover">
-            <thead>
-                <tr>
-                    <th>ID</th>
-                    <th>Filename</th>
-                    <th>Type</th>
-                    <th>Upload Date</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% if documents %}
-                    {% for doc in documents %}
+    <!-- Document statistics cards -->
+    {% if documents %}
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-gradient-primary h-100">
+                <div class="card-body text-center">
+                    <i class="bi bi-file-earmark text-primary mb-2" style="font-size: 2rem;"></i>
+                    <h2 class="mb-0">{{ documents|length }}</h2>
+                    <p class="text-muted mb-0">Total Documents</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <i class="bi bi-paragraph text-success mb-2" style="font-size: 2rem;"></i>
+                    <h2 class="mb-0">{{ total_paragraphs|default('0') }}</h2>
+                    <p class="text-muted mb-0">Total Paragraphs</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <i class="bi bi-files text-info mb-2" style="font-size: 2rem;"></i>
+                    <h2 class="mb-0">{{ duplicates|default('0') }}</h2>
+                    <p class="text-muted mb-0">Duplicate Paragraphs</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <i class="bi bi-tag text-warning mb-2" style="font-size: 2rem;"></i>
+                    <h2 class="mb-0">{{ tags|default('0') }}</h2>
+                    <p class="text-muted mb-0">Document Tags</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0"><i class="bi bi-files me-2"></i>Document Collection</h5>
+            <div>
+                <input type="text" class="form-control form-control-sm" id="documentSearch" placeholder="Search documents..." style="min-width: 200px;">
+            </div>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
                         <tr>
-                            <td>{{ doc.id }}</td>
-                            <td>{{ doc.filename }}</td>
-                            <td>{{ doc.file_type.upper() }}</td>
-                            <td>{{ doc.upload_date.split('T')[0].split('-')[2] }}-{{ doc.upload_date.split('T')[0].split('-')[1] }}-{{ doc.upload_date.split('T')[0].split('-')[0] }} {{ doc.upload_date.split('T')[1].split('.')[0][:5] }}</td>
-							<td>
-								<a href="/delete/{{ doc.id }}" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure you want to delete this document?');">
-									<i class="bi bi-trash"></i> Delete
-								</a>
-								<a href="/paragraphs?document_id={{ doc.id }}" class="btn btn-sm btn-info">
-									<i class="bi bi-eye"></i> View Paragraphs
-								</a>
-								<a href="/document/{{ doc.id }}" class="btn btn-sm btn-success">
-									<i class="bi bi-file-earmark"></i> View Document
-								</a>
-							</td>
+                            <th class="ps-3"><i class="bi bi-file-earmark me-1"></i>Document</th>
+                            <th><i class="bi bi-hash me-1"></i>ID</th>
+                            <th><i class="bi bi-type me-1"></i>Type</th>
+                            <th><i class="bi bi-calendar-date me-1"></i>Upload Date</th>
+                            <th class="text-end pe-3"><i class="bi bi-gear me-1"></i>Actions</th>
                         </tr>
-                    {% endfor %}
-                {% else %}
-                    <tr>
-                        <td colspan="5" class="text-center">No documents uploaded yet</td>
-                    </tr>
-                {% endif %}
-            </tbody>
-        </table>
+                    </thead>
+                    <tbody>
+                        {% if documents %}
+                            {% for doc in documents %}
+                                <tr class="document-row">
+                                    <td class="ps-3 fw-medium">{{ doc.filename }}</td>
+                                    <td>{{ doc.id }}</td>
+                                    <td>
+                                        {% if doc.file_type.upper() == 'PDF' %}
+                                            <span class="badge bg-danger">{{ doc.file_type.upper() }}</span>
+                                        {% elif doc.file_type.upper() == 'DOCX' %}
+                                            <span class="badge bg-primary">{{ doc.file_type.upper() }}</span>
+                                        {% elif doc.file_type.upper() == 'DOC' %}
+                                            <span class="badge bg-info">{{ doc.file_type.upper() }}</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">{{ doc.file_type.upper() }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ doc.upload_date.split('T')[0].split('-')[2] }}-{{ doc.upload_date.split('T')[0].split('-')[1] }}-{{ doc.upload_date.split('T')[0].split('-')[0] }} {{ doc.upload_date.split('T')[1].split('.')[0][:5] }}</td>
+                                    <td class="text-end pe-3">
+                                        <div class="btn-group">
+                                            <a href="/document/{{ doc.id }}" class="btn btn-sm btn-outline-primary">
+                                                <i class="bi bi-eye"></i>
+                                            </a>
+                                            <a href="/paragraphs?document_id={{ doc.id }}" class="btn btn-sm btn-outline-success">
+                                                <i class="bi bi-paragraph"></i>
+                                            </a>
+                                            <a href="/delete/{{ doc.id }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Are you sure you want to delete this document?');">
+                                                <i class="bi bi-trash"></i>
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="5" class="text-center py-5">
+                                    <div class="empty-state">
+                                        <i class="bi bi-file-earmark-x text-muted mb-3" style="font-size: 3rem;"></i>
+                                        <h5>No documents yet</h5>
+                                        <p class="text-muted">Upload documents to start analyzing paragraphs</p>
+                                        <button type="button" class="btn btn-primary mt-2" data-bs-toggle="modal" data-bs-target="#uploadModal">
+                                            <i class="bi bi-upload me-1"></i> Upload Documents
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
 
-    <!-- Upload Modal -->
-    <div class="modal fade" id="uploadModal" tabindex="-1" aria-labelledby="uploadModalLabel" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="uploadModalLabel">Upload Documents</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <form id="uploadForm" action="/upload" method="post" enctype="multipart/form-data">
-                    <div class="modal-body">
-                        <div class="mb-3">
-                            <label for="files" class="form-label">Select PDF or Word documents</label>
-                            <input class="form-control" type="file" id="files" name="files[]" multiple accept=".pdf,.doc,.docx" required>
-                            <div class="form-text">You can select multiple files at once.</div>
+    <!-- Recent Activity -->
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="bi bi-activity me-2"></i>Recent Activity</h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="list-group list-group-flush">
+                {% if documents and documents|length > 0 %}
+                    {% for doc in documents[:5] %}
+                        <div class="list-group-item d-flex align-items-center">
+                            <div class="me-3">
+                                {% if doc.file_type.upper() == 'PDF' %}
+                                    <i class="bi bi-file-earmark-pdf text-danger" style="font-size: 1.5rem;"></i>
+                                {% elif doc.file_type.upper() == 'DOCX' or doc.file_type.upper() == 'DOC' %}
+                                    <i class="bi bi-file-earmark-word text-primary" style="font-size: 1.5rem;"></i>
+                                {% else %}
+                                    <i class="bi bi-file-earmark-text text-secondary" style="font-size: 1.5rem;"></i>
+                                {% endif %}
+                            </div>
+                            <div class="flex-grow-1">
+                                <h6 class="mb-0">{{ doc.filename }}</h6>
+                                <small class="text-muted">Uploaded on {{ doc.upload_date.split('T')[0].split('-')[2] }}-{{ doc.upload_date.split('T')[0].split('-')[1] }}-{{ doc.upload_date.split('T')[0].split('-')[0] }}</small>
+                            </div>
+                            <div>
+                                <a href="/document/{{ doc.id }}" class="btn btn-sm btn-light">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                            </div>
                         </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="list-group-item text-center py-4">
+                        <p class="text-muted mb-0">No recent activity</p>
                     </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-primary">Upload</button>
-                    </div>
-                </form>
+                {% endif %}
             </div>
         </div>
     </div>
 
     <!-- Folder Modal -->
     <div class="modal fade" id="folderModal" tabindex="-1" aria-labelledby="folderModalLabel" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="folderModalLabel">Import from Folder</h5>
+                    <h5 class="modal-title" id="folderModalLabel"><i class="bi bi-folder me-2"></i>Import from Folder</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <form id="folderForm" action="/upload-folder" method="post">
                     <div class="modal-body">
                         <div class="mb-3">
                             <label for="folderPath" class="form-label">Enter folder path</label>
-                            <input type="text" class="form-control" id="folderPath" name="folder_path" required>
-                            <div class="form-text">Enter the full path to a folder containing PDF or Word documents.</div>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light">
+                                    <i class="bi bi-folder2-open"></i>
+                                </span>
+                                <input type="text" class="form-control" id="folderPath" name="folder_path" placeholder="/path/to/documents" required>
+                            </div>
+                            <div class="form-text"><i class="bi bi-info-circle me-1"></i>Enter the full path to a folder containing PDF or Word documents.</div>
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-primary">Import</button>
+                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">
+                            <i class="bi bi-x me-1"></i>Cancel
+                        </button>
+                        <button type="submit" class="btn btn-primary" id="importButton">
+                            <i class="bi bi-folder-check me-1"></i>Import
+                        </button>
                     </div>
                 </form>
             </div>
@@ -119,57 +217,44 @@
 {% block scripts %}
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        // Get the forms
-        const uploadForm = document.getElementById('uploadForm');
-        const folderForm = document.getElementById('folderForm');
-        
-        // Function to handle form submission and prevent double-submission
-        function handleFormSubmit(form) {
-            // Flag to track if the form has been submitted
-            let formSubmitted = false;
-            
-            // Add event listener to the form
-            form.addEventListener('submit', function(event) {
-                // If the form was already submitted, prevent the second submission
-                if (formSubmitted) {
-                    event.preventDefault();
-                    return false;
-                }
+        // Document search functionality
+        const searchInput = document.getElementById('documentSearch');
+        if (searchInput) {
+            searchInput.addEventListener('input', function() {
+                const searchTerm = this.value.toLowerCase();
+                const rows = document.querySelectorAll('.document-row');
                 
-                // Mark the form as submitted
-                formSubmitted = true;
-                
-                // Disable submit button to prevent double submission
-                const submitButton = form.querySelector('button[type="submit"]');
-                if (submitButton) {
-                    submitButton.disabled = true;
-                    submitButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Processing...';
-                }
-                
-                // Allow the form submission to proceed
-                return true;
-            });
-            
-            // Reset the submitted flag when the modal is hidden
-            const modalId = form.closest('.modal').id;
-            const modal = document.getElementById(modalId);
-            if (modal) {
-                modal.addEventListener('hidden.bs.modal', function() {
-                    formSubmitted = false;
-                    
-                    // Re-enable the submit button
-                    const submitButton = form.querySelector('button[type="submit"]');
-                    if (submitButton) {
-                        submitButton.disabled = false;
-                        submitButton.innerHTML = modalId === 'uploadModal' ? 'Upload' : 'Import';
+                rows.forEach(row => {
+                    const filename = row.cells[0].textContent.toLowerCase();
+                    if (filename.includes(searchTerm)) {
+                        row.style.display = '';
+                    } else {
+                        row.style.display = 'none';
                     }
                 });
-            }
+            });
         }
         
-        // Apply handlers to both forms
-        if (uploadForm) handleFormSubmit(uploadForm);
-        if (folderForm) handleFormSubmit(folderForm);
+        // Handle form submission for folder import
+        const folderForm = document.getElementById('folderForm');
+        if (folderForm) {
+            folderForm.addEventListener('submit', function() {
+                const importButton = document.getElementById('importButton');
+                importButton.disabled = true;
+                importButton.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Importing...';
+            });
+        }
+        
+        // Add hover effect for document rows
+        const documentRows = document.querySelectorAll('.document-row');
+        documentRows.forEach(row => {
+            row.addEventListener('mouseenter', function() {
+                this.classList.add('bg-light');
+            });
+            row.addEventListener('mouseleave', function() {
+                this.classList.remove('bg-light');
+            });
+        });
     });
 </script>
 {% endblock %}

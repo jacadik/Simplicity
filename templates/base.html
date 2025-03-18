@@ -3,68 +3,329 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Paragraph Analyzer - {% block title %}{% endblock %}</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css">
+    <title>Documents analyzer - {% block title %}{% endblock %}</title>
+    <!-- Bootstrap 5.3 and Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Custom CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/custom.css') }}">
-	<script src="https://cdnjs.cloudflare.com/ajax/libs/diff/5.1.0/diff.min.js"></script>
+    <!-- Diff.js for comparison -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/diff/5.1.0/diff.min.js"></script>
+    <!-- Additional Modern Styles -->
+    <style>
+        :root {
+            --primary-color: #4361ee;
+            --secondary-color: #3f37c9;
+            --accent-color: #4cc9f0;
+            --success-color: #4CAF50;
+            --warning-color: #ff9800;
+            --danger-color: #f44336;
+            --light-color: #f8f9fa;
+            --dark-color: #212529;
+            --gray-100: #f8f9fa;
+            --gray-200: #e9ecef;
+            --gray-300: #dee2e6;
+            --gray-400: #ced4da;
+            --gray-500: #adb5bd;
+            --gray-600: #6c757d;
+            --gray-700: #495057;
+            --gray-800: #343a40;
+            --gray-900: #212529;
+            --header-height: 60px;
+        }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            font-size: 0.9rem;
+            background-color: #f5f7fa;
+            color: var(--gray-800);
+        }
+        
+        h1, h2, h3, h4, h5, h6 {
+            font-family: 'Poppins', sans-serif;
+            font-weight: 600;
+        }
+        
+        /* Modern Header */
+        .app-header {
+            background: linear-gradient(to right, #4361ee, #3a0ca3);
+            padding: 0.75rem 1.5rem;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            height: var(--header-height);
+        }
+        
+        .app-brand {
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            font-size: 1.25rem;
+            color: white;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+        }
+        
+        .app-brand:hover {
+            color: rgba(255, 255, 255, 0.9);
+        }
+        
+        .app-brand i {
+            margin-right: 0.5rem;
+            font-size: 1.5rem;
+        }
+        
+        /* Modern Sidebar */
+        .app-sidebar {
+            background-color: white;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.05);
+            border-right: none;
+            height: calc(100vh - var(--header-height));
+            position: fixed;
+            top: var(--header-height);
+            left: 0;
+            z-index: 100;
+            padding: 1.5rem 0;
+            transition: all 0.3s ease;
+        }
+        
+        .sidebar-sticky {
+            position: relative;
+            top: 0;
+            height: 100%;
+            overflow-y: auto;
+            padding-top: 0.5rem;
+        }
+        
+        .nav-item {
+            margin-bottom: 0.5rem;
+            padding: 0 1rem;
+        }
+        
+        .nav-link {
+            color: var(--gray-700);
+            border-radius: 0.5rem;
+            padding: 0.75rem 1rem;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+        }
+        
+        .nav-link:hover {
+            background-color: rgba(67, 97, 238, 0.05);
+            color: var(--primary-color);
+        }
+        
+        .nav-link.active {
+            background-color: rgba(67, 97, 238, 0.1);
+            color: var(--primary-color);
+            font-weight: 600;
+        }
+        
+        .nav-link i {
+            font-size: 1.1rem;
+            margin-right: 0.75rem;
+        }
+        
+        /* Content area */
+        .main-content {
+            padding: 1.5rem;
+            margin-top: var(--header-height);
+        }
+        
+        /* Cards */
+        .card {
+            border: none;
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 25px rgba(0, 0, 0, 0.05);
+            transition: all 0.3s ease;
+            overflow: hidden;
+        }
+        
+        .card:hover {
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.1);
+        }
+        
+        .card-header {
+            background-color: white;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+            padding: 1rem 1.25rem;
+        }
+        
+        /* Buttons */
+        .btn {
+            border-radius: 0.5rem;
+            font-weight: 500;
+            padding: 0.5rem 1rem;
+            transition: all 0.2s ease;
+        }
+        
+        .btn-primary {
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
+        }
+        
+        .btn-primary:hover {
+            background-color: var(--secondary-color);
+            border-color: var(--secondary-color);
+        }
+        
+        .btn-outline-primary {
+            color: var(--primary-color);
+            border-color: var(--primary-color);
+        }
+        
+        .btn-outline-primary:hover {
+            background-color: var(--primary-color);
+            color: white;
+        }
+        
+        /* Form controls */
+        .form-control, .form-select {
+            border-radius: 0.5rem;
+            padding: 0.5rem 0.75rem;
+            border: 1px solid var(--gray-300);
+            transition: all 0.2s ease;
+        }
+        
+        .form-control:focus, .form-select:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 0.25rem rgba(67, 97, 238, 0.25);
+        }
+        
+        /* Alerts */
+        .alert {
+            border-radius: 0.5rem;
+            border: none;
+            box-shadow: 0 2px 15px rgba(0, 0, 0, 0.05);
+        }
+        
+        /* Badges */
+        .badge {
+            font-weight: 500;
+            padding: 0.35em 0.65em;
+            border-radius: 0.5rem;
+        }
+        
+        /* Tables */
+        .table {
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+        
+        .table-striped > tbody > tr:nth-of-type(odd) > * {
+            background-color: rgba(0, 0, 0, 0.01);
+        }
+        
+        .table-hover > tbody > tr:hover > * {
+            background-color: rgba(67, 97, 238, 0.05);
+        }
+        
+        /* Mobile responsiveness */
+        @media (max-width: 768px) {
+            .app-sidebar {
+                transform: translateX(-100%);
+            }
+            
+            .app-sidebar.show {
+                transform: translateX(0);
+            }
+            
+            .main-content {
+                margin-left: 0;
+            }
+        }
+    </style>
 </head>
 <body>
-    <header class="navbar navbar-dark sticky-top bg-dark flex-md-nowrap p-0 shadow">
-        <a class="navbar-brand col-md-3 col-lg-2 me-0 px-3" href="/">Paragraph Analyzer</a>
-        <button class="navbar-toggler position-absolute d-md-none collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#sidebarMenu" aria-controls="sidebarMenu" aria-expanded="false" aria-label="Toggle navigation">
-            <span class="navbar-toggler-icon"></span>
-        </button>
+    <!-- Modern Header -->
+    <header class="app-header navbar fixed-top">
+        <div class="container-fluid d-flex align-items-center">
+            <a class="app-brand" href="/">
+                <i class="bi bi-file-earmark-text"></i>
+                <span>Paragraph Analyzer</span>
+            </a>
+            <button class="navbar-toggler d-md-none collapsed me-2" type="button" data-bs-toggle="collapse" data-bs-target="#sidebarMenu" aria-controls="sidebarMenu" aria-expanded="false" aria-label="Toggle navigation">
+                <i class="bi bi-list text-white"></i>
+            </button>
+            <div class="ms-auto d-flex">
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-light dropdown-toggle" type="button" id="dropdownMenuButton" data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="bi bi-gear me-1"></i> Actions
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow" aria-labelledby="dropdownMenuButton">
+                        <li><a class="dropdown-item" href="/export"><i class="bi bi-file-excel me-2"></i>Export to Excel</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#uploadModal"><i class="bi bi-upload me-2"></i>Upload Document</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
     </header>
 
     <div class="container-fluid">
         <div class="row">
-            <nav id="sidebarMenu" class="col-md-3 col-lg-2 d-md-block bg-light sidebar collapse">
-                <div class="sidebar-sticky pt-3">
+            <!-- Modern Sidebar -->
+            <nav id="sidebarMenu" class="col-md-3 col-lg-2 d-md-block app-sidebar collapse">
+                <div class="sidebar-sticky">
                     <ul class="nav flex-column">
                         <li class="nav-item">
                             <a class="nav-link {% if request.path == '/' %}active{% endif %}" href="/">
-                                <i class="bi bi-house-door"></i> Dashboard
+                                <i class="bi bi-speedometer2"></i> Dashboard
                             </a>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link {% if '/paragraphs' in request.path %}active{% endif %}" href="/paragraphs">
-                                <i class="bi bi-file-text"></i> Paragraphs
+                                <i class="bi bi-paragraph"></i> Paragraphs
                             </a>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link {% if '/similarity' in request.path %}active{% endif %}" href="/similarity">
-                                <i class="bi bi-search"></i> Similarity Analysis
+                                <i class="bi bi-fingerprint"></i> Similarity Analysis
                             </a>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link {% if '/tags' in request.path %}active{% endif %}" href="/tags">
-                                <i class="bi bi-tag"></i> Tag Management
+                                <i class="bi bi-tags"></i> Tag Management
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="/export">
-                                <i class="bi bi-file-excel"></i> Export to Excel
+                            <a class="nav-link {% if '/clusters' in request.path %}active{% endif %}" href="/clusters">
+                                <i class="bi bi-diagram-3"></i> Paragraph Clusters
                             </a>
                         </li>
-						<li class="nav-item">
-							<a class="nav-link {% if '/clusters' in request.path %}active{% endif %}" href="/clusters">
-								<i class="bi bi-diagram-3"></i> Paragraph Clusters
-							</a>
-						</li>
                     </ul>
                 </div>
             </nav>
 
+            <!-- Main Content -->
             <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-content">
                 {% with messages = get_flashed_messages(with_categories=true) %}
                     {% if messages %}
-                        {% for category, message in messages %}
-                            <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-                                {{ message }}
-                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                            </div>
-                        {% endfor %}
+                        <div class="mt-3">
+                            {% for category, message in messages %}
+                                <div class="alert alert-{{ category }} alert-dismissible fade show shadow-sm" role="alert">
+                                    <div class="d-flex">
+                                        <div class="me-2">
+                                            {% if category == 'success' %}
+                                                <i class="bi bi-check-circle"></i>
+                                            {% elif category == 'danger' %}
+                                                <i class="bi bi-exclamation-circle"></i>
+                                            {% elif category == 'warning' %}
+                                                <i class="bi bi-exclamation-triangle"></i>
+                                            {% else %}
+                                                <i class="bi bi-info-circle"></i>
+                                            {% endif %}
+                                        </div>
+                                        <div>{{ message }}</div>
+                                    </div>
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                                </div>
+                            {% endfor %}
+                        </div>
                     {% endif %}
                 {% endwith %}
 
@@ -73,73 +334,149 @@
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-	
+    <!-- Upload Modal -->
+    <div class="modal fade" id="uploadModal" tabindex="-1" aria-labelledby="uploadModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="uploadModalLabel"><i class="bi bi-cloud-upload me-2"></i>Upload Documents</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form id="uploadForm" action="/upload" method="post" enctype="multipart/form-data">
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label for="files" class="form-label">Select PDF or Word documents</label>
+                            <div class="input-group">
+                                <input class="form-control" type="file" id="files" name="files[]" multiple accept=".pdf,.doc,.docx" required>
+                                <span class="input-group-text bg-light">
+                                    <i class="bi bi-file-earmark-text"></i>
+                                </span>
+                            </div>
+                            <div class="form-text"><i class="bi bi-info-circle me-1"></i>You can select multiple files at once.</div>
+                        </div>
+                        
+                        <div class="progress mb-3" id="uploadProgress" style="display:none;">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">
+                            <i class="bi bi-x me-1"></i>Cancel
+                        </button>
+                        <button type="submit" class="btn btn-primary" id="uploadButton">
+                            <i class="bi bi-cloud-upload me-1"></i>Upload
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 
-<script>
-$(document).ready(function() {
-    // Only target the file upload form specifically, not the folder form
-    $('#uploadForm').on('submit', function(e) {
-        console.log('Upload form submitted'); // Add debug log
-        e.preventDefault();
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="{{ url_for('static', filename='js/utils.js') }}"></script>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Mobile sidebar toggle
+        const sidebarToggle = document.querySelector('.navbar-toggler');
+        const sidebar = document.querySelector('.app-sidebar');
         
-        var files = $('#files')[0].files;
-        if (files.length === 0) {
-            alert('Please select at least one file');
-            return;
+        if (sidebarToggle && sidebar) {
+            sidebarToggle.addEventListener('click', function() {
+                sidebar.classList.toggle('show');
+            });
         }
         
-        // Create FormData object
-        var formData = new FormData(this);
-        
-        // Show progress bar and disable submit button
-        $('#uploadProgress').show();
-        $('#uploadButton').prop('disabled', true);
-        
-        // Send AJAX request
-        $.ajax({
-            url: '/upload',
-            type: 'POST',
-            data: formData,
-            contentType: false,
-            processData: false,
-            headers: {
-                'X-Requested-With': 'XMLHttpRequest'
-            },
-            xhr: function() {
-                var xhr = new window.XMLHttpRequest();
+        // Only target the file upload form specifically, not the folder form
+        const uploadForm = document.getElementById('uploadForm');
+        if (uploadForm) {
+            uploadForm.addEventListener('submit', function(e) {
+                e.preventDefault();
                 
-                // Upload progress
-                xhr.upload.addEventListener("progress", function(evt) {
-                    if (evt.lengthComputable) {
-                        var percentComplete = (evt.loaded / evt.total) * 100;
-                        $('.progress-bar').css('width', percentComplete + '%');
-                        console.log('Upload progress: ' + percentComplete + '%');
+                const files = document.getElementById('files').files;
+                if (files.length === 0) {
+                    alert('Please select at least one file');
+                    return;
+                }
+                
+                // Create FormData object
+                const formData = new FormData(this);
+                
+                // Show progress bar and disable submit button
+                const uploadProgress = document.getElementById('uploadProgress');
+                const uploadButton = document.getElementById('uploadButton');
+                
+                if (uploadProgress) {
+                    uploadProgress.style.display = 'block';
+                }
+                
+                if (uploadButton) {
+                    uploadButton.disabled = true;
+                    uploadButton.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Uploading...';
+                }
+                
+                // Send AJAX request
+                fetch('/upload', {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
                     }
-                }, false);
-                
-                return xhr;
-            },
-            success: function(response) {
-                console.log('Upload complete', response);
-                // When upload is complete, redirect to refresh the page
-                window.location.href = '/';
-            },
-            error: function(xhr, status, error) {
-                console.error('Upload error:', error);
-                // On error, show alert and reset form
-                alert('Error uploading files: ' + error);
-                $('#uploadProgress').hide();
-                $('#uploadButton').prop('disabled', false);
-                $('.progress-bar').css('width', '0%');
-            }
-        });
-    });
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok: ' + response.statusText);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    // When upload is complete, redirect to refresh the page
+                    window.location.href = '/';
+                })
+                .catch(error => {
+                    // On error, show alert and reset form
+                    alert('Error uploading files: ' + error.message);
+                    
+                    if (uploadProgress) {
+                        uploadProgress.style.display = 'none';
+                    }
+                    
+                    if (uploadButton) {
+                        uploadButton.disabled = false;
+                        uploadButton.innerHTML = '<i class="bi bi-cloud-upload me-1"></i>Upload';
+                    }
+                    
+                    const progressBar = document.querySelector('.progress-bar');
+                    if (progressBar) {
+                        progressBar.style.width = '0%';
+                    }
+                });
+            });
+        }
 
-    // Do NOT add event handler to the folder form - let it submit normally
-});
-</script>
+        // Add smooth transitions for card hover effects
+        const cards = document.querySelectorAll('.card');
+        cards.forEach(card => {
+            card.addEventListener('mouseenter', function() {
+                this.classList.add('shadow-lg');
+            });
+            card.addEventListener('mouseleave', function() {
+                this.classList.remove('shadow-lg');
+            });
+        });
+        
+        // Active sidebar item indicator
+        const activeNavLink = document.querySelector('.nav-link.active');
+        if (activeNavLink) {
+            const indicator = document.createElement('span');
+            indicator.className = 'position-absolute start-0 top-0 bottom-0 w-1 bg-primary rounded-end';
+            indicator.style.width = '4px';
+            activeNavLink.prepend(indicator);
+        }
+    });
+    </script>
 
     {% block scripts %}{% endblock %}
 </body>

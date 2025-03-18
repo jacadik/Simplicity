@@ -3,155 +3,245 @@
 {% block title %}Paragraphs{% endblock %}
 
 {% block content %}
-    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-        <h1 class="h2">Paragraphs</h1>
-        <div class="btn-toolbar mb-2 mb-md-0">
-            <a href="/export" class="btn btn-sm btn-outline-success">
-                <i class="bi bi-file-excel"></i> Export to Excel
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-4">
+        <div>
+            <h1 class="h3 mb-0">Paragraphs</h1>
+            <p class="text-muted mb-0">View and analyze paragraph content across documents</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="/export" class="btn btn-success">
+                <i class="bi bi-file-excel me-1"></i> Export to Excel
             </a>
         </div>
     </div>
 
-    <!-- Control Panel -->
-    <div class="row mb-3">
-        <div class="col-md-3">
-            <label for="documentFilter" class="form-label">Filter by Document</label>
-            <select class="form-select" id="documentFilter" onchange="filterByDocument(this.value)">
-                <option value="">All Documents</option>
-                {% for doc in documents %}
-                    <option value="{{ doc.id }}" {% if selected_document == doc.id %}selected{% endif %}>{{ doc.filename }}</option>
-                {% endfor %}
-            </select>
+    <!-- Filter Panel -->
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0"><i class="bi bi-funnel me-2"></i>Filter & Sort Options</h5>
+            <button class="btn btn-sm btn-light" type="button" data-bs-toggle="collapse" data-bs-target="#filterCollapse" aria-expanded="true">
+                <i class="bi bi-chevron-down"></i>
+            </button>
         </div>
-        <div class="col-md-3">
-            <label for="paragraphTypeFilter" class="form-label">Filter by Type</label>
-            <select class="form-select" id="paragraphTypeFilter" onchange="filterByType(this.value)">
-                <option value="">All Types</option>
-                <option value="header">Headers</option>
-                <option value="normal">Normal Paragraphs</option>
-                <option value="list">Lists</option>
-                <option value="table">Tables</option>
-                <option value="boilerplate">Boilerplate</option>
-            </select>
-        </div>
-        <div class="col-md-3">
-            <label for="tagFilter" class="form-label">Filter by Tag</label>
-            <select class="form-select" id="tagFilter" onchange="filterByTag(this.value)">
-                <option value="">All Tags</option>
-                {% for tag in tags %}
-                    <option value="{{ tag.id }}">{{ tag.name }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="col-md-3">
-            <label for="duplicateFilter" class="form-label">Show Duplicates</label>
-            <select class="form-select" id="duplicateFilter" onchange="filterByDuplicates(this.value)">
-                <option value="collapsed" {% if not show_all_duplicates %}selected{% endif %}>Show Once (Collapsed)</option>
-                <option value="all" {% if show_all_duplicates %}selected{% endif %}>Show All Instances</option>
-            </select>
-        </div>
-    </div>
-
-    <!-- Sorting Options -->
-    <div class="row mb-3">
-        <div class="col-md-4">
-            <label for="sortOption" class="form-label">Sort By</label>
-            <select class="form-select" id="sortOption" onchange="sortParagraphs(this.value)">
-                <option value="position">Default Order</option>
-                <option value="occurrences_desc" selected>Occurrences (High to Low)</option>
-                <option value="occurrences_asc">Occurrences (Low to High)</option>
-                <option value="document">Document Name</option>
-            </select>
-        </div>
-    </div>
-
-    <div class="row">
-        <div class="col-md-12">
-            {% if paragraphs %}
-                <div id="paragraphsList">
-                    {% for para in paragraphs %}
-                        <div class="card paragraph-card {{ para.paragraph_type }}" 
-                             data-type="{{ para.paragraph_type }}" 
-                             data-id="{{ para.id }}" 
-                             data-occurrences="{{ para.document_references|length }}" 
-                             data-document="{{ para.filename }}"
-                             data-tags="{{ para.tags|map(attribute='id')|join(',') }}">
-                            <div class="card-header d-flex justify-content-between align-items-center">
-                                <div>
-                                    <span class="badge bg-secondary">{{ para.paragraph_type }}</span>
-                                    {% if para.appears_in_multiple %}
-                                        <span class="badge bg-warning">Duplicate</span>
-                                    {% endif %}
-                                    <span class="badge bg-info occurrence-badge">
-                                        <i class="bi bi-files"></i> {{ para.document_references|length }}
-                                    </span>
-                                </div>
-                                <div class="paragraph-tags">
-                                    {% for tag in para.tags %}
-                                        <span class="badge tag-badge" style="background-color: {{ tag.color }}">
-                                            {{ tag.name }}
-                                            <i class="bi bi-x" onclick="removeTag({{ para.id }}, {{ tag.id }})"></i>
-                                        </span>
-                                    {% endfor %}
-                                    <button class="btn btn-sm btn-outline-primary" onclick="showTagModal({{ para.id }})">
-                                        <i class="bi bi-tag"></i>
-                                    </button>
-                                </div>
-                            </div>
-                            
-                            <div class="card-body">
-<div class="document-references mb-3">
-  <p class="text-muted mb-1"><i class="bi bi-files"></i> {% if para.appears_in_multiple %}Appears in:{% else %}Source:{% endif %}</p>
-  <div class="d-flex flex-wrap gap-2">
-      {% for filename in para.document_references %}
-          <!-- Use the lookup dictionary to directly get document ID -->
-          <a href="/document/{{ filename_to_doc_id[filename] }}" class="text-decoration-none">
-              <span class="badge bg-info">{{ filename }}</span>
-          </a>
-      {% endfor %}
-  </div>
-</div>
-                                
-                                {% if para.header_content %}
-                                    <div class="mb-2">
-                                        <strong>Header:</strong> {{ para.header_content }}
-                                    </div>
-                                {% endif %}
-                                
-                                {% if para.paragraph_type == 'table' %}
-                                    <pre class="table-content">{{ para.content }}</pre>
-                                {% else %}
-                                    <p>{{ para.content }}</p>
-                                {% endif %}
-                            </div>
-                        </div>
-                    {% endfor %}
+        <div class="collapse show" id="filterCollapse">
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <label for="documentFilter" class="form-label"><i class="bi bi-file-earmark me-1"></i>Document</label>
+                        <select class="form-select" id="documentFilter" onchange="filterByDocument(this.value)">
+                            <option value="">All Documents</option>
+                            {% for doc in documents %}
+                                <option value="{{ doc.id }}" {% if selected_document == doc.id %}selected{% endif %}>{{ doc.filename }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="paragraphTypeFilter" class="form-label"><i class="bi bi-type me-1"></i>Paragraph Type</label>
+                        <select class="form-select" id="paragraphTypeFilter" onchange="filterByType(this.value)">
+                            <option value="">All Types</option>
+                            <option value="header">Headers</option>
+                            <option value="normal">Normal Paragraphs</option>
+                            <option value="list">Lists</option>
+                            <option value="table">Tables</option>
+                            <option value="boilerplate">Boilerplate</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="tagFilter" class="form-label"><i class="bi bi-tag me-1"></i>Tag</label>
+                        <select class="form-select" id="tagFilter" onchange="filterByTag(this.value)">
+                            <option value="">All Tags</option>
+                            {% for tag in tags %}
+                                <option value="{{ tag.id }}">{{ tag.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="duplicateFilter" class="form-label"><i class="bi bi-files me-1"></i>Duplicates</label>
+                        <select class="form-select" id="duplicateFilter" onchange="filterByDuplicates(this.value)">
+                            <option value="collapsed" {% if not show_all_duplicates %}selected{% endif %}>Show Once (Collapsed)</option>
+                            <option value="all" {% if show_all_duplicates %}selected{% endif %}>Show All Instances</option>
+                        </select>
+                    </div>
                 </div>
+                
+                <!-- Sorting Options -->
+                <div class="row mt-3">
+                    <div class="col-md-4">
+                        <label for="sortOption" class="form-label"><i class="bi bi-sort-alpha-down me-1"></i>Sort By</label>
+                        <select class="form-select" id="sortOption" onchange="sortParagraphs(this.value)">
+                            <option value="position">Default Order</option>
+                            <option value="occurrences_desc" selected>Occurrences (High to Low)</option>
+                            <option value="occurrences_asc">Occurrences (Low to High)</option>
+                            <option value="document">Document Name</option>
+                        </select>
+                    </div>
+                    <div class="col-md-8">
+                        <label for="searchParagraphs" class="form-label"><i class="bi bi-search me-1"></i>Search Content</label>
+                        <input type="text" class="form-control" id="searchParagraphs" placeholder="Search paragraph content...">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Results Count and Controls -->
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <span class="badge bg-primary rounded-pill" id="paragraphCount">
+                {{ paragraphs|length }} paragraphs
+            </span>
+            {% if show_all_duplicates %}
+                <span class="badge bg-info rounded-pill ms-2">
+                    <i class="bi bi-files me-1"></i> Showing all duplicates
+                </span>
             {% else %}
-                <div class="alert alert-info">
-                    No paragraphs found. Please upload some documents first.
-                </div>
+                <span class="badge bg-secondary rounded-pill ms-2">
+                    <i class="bi bi-files me-1"></i> Duplicates collapsed
+                </span>
             {% endif %}
         </div>
+        <div>
+            <button class="btn btn-sm btn-outline-primary" id="expandAllParasBtn">
+                <i class="bi bi-arrows-expand me-1"></i> Expand All
+            </button>
+            <button class="btn btn-sm btn-outline-secondary" id="collapseAllParasBtn">
+                <i class="bi bi-arrows-collapse me-1"></i> Collapse All
+            </button>
+        </div>
+    </div>
+
+    <!-- Paragraphs List -->
+    <div id="paragraphsList">
+        {% if paragraphs %}
+            {% for para in paragraphs %}
+                <div class="card paragraph-card {{ para.paragraph_type }} mb-3" 
+                     data-type="{{ para.paragraph_type }}" 
+                     data-id="{{ para.id }}" 
+                     data-occurrences="{{ para.document_references|length }}" 
+                     data-document="{{ para.filename }}"
+                     data-tags="{{ para.tags|map(attribute='id')|join(',') }}">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <div class="d-flex align-items-center gap-2">
+                            {% if para.paragraph_type == 'header' %}
+                                <span class="badge bg-primary">{{ para.paragraph_type }}</span>
+                            {% elif para.paragraph_type == 'normal' %}
+                                <span class="badge bg-secondary">{{ para.paragraph_type }}</span>
+                            {% elif para.paragraph_type == 'list' %}
+                                <span class="badge bg-success">{{ para.paragraph_type }}</span>
+                            {% elif para.paragraph_type == 'table' %}
+                                <span class="badge bg-danger">{{ para.paragraph_type }}</span>
+                            {% elif para.paragraph_type == 'boilerplate' %}
+                                <span class="badge bg-warning">{{ para.paragraph_type }}</span>
+                            {% else %}
+                                <span class="badge bg-secondary">{{ para.paragraph_type }}</span>
+                            {% endif %}
+                            
+                            {% if para.appears_in_multiple %}
+                                <span class="badge bg-warning">
+                                    <i class="bi bi-files me-1"></i>Duplicate
+                                </span>
+                            {% endif %}
+                            
+                            <span class="badge bg-info occurrence-badge" title="Number of occurrences across documents">
+                                <i class="bi bi-files me-1"></i>{{ para.document_references|length }}
+                            </span>
+                        </div>
+                        
+                        <div class="d-flex gap-2">
+                            <div class="paragraph-tags d-flex flex-wrap gap-1">
+                                {% for tag in para.tags %}
+                                    <span class="badge tag-badge" style="background-color: {{ tag.color }}">
+                                        {{ tag.name }}
+                                        <i class="bi bi-x ms-1 remove-tag-btn" onclick="removeTag({{ para.id }}, {{ tag.id }})"></i>
+                                    </span>
+                                {% endfor %}
+                            </div>
+                            
+                            <div class="btn-group ms-2">
+                                <button class="btn btn-sm btn-light toggle-para-btn" title="Expand/Collapse">
+                                    <i class="bi bi-arrows-expand"></i>
+                                </button>
+                                <button class="btn btn-sm btn-light" onclick="showTagModal({{ para.id }})" title="Add Tag">
+                                    <i class="bi bi-tag"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="card-body">
+                        <!-- Document References - Shows where this paragraph appears -->
+                        <div class="document-references mb-3 p-3 rounded bg-light">
+                            <p class="text-muted mb-2 fw-medium">
+                                <i class="bi bi-files me-1"></i> 
+                                {% if para.appears_in_multiple %}Appears in multiple documents:{% else %}Source document:{% endif %}
+                            </p>
+                            <div class="d-flex flex-wrap gap-2">
+                                {% for filename in para.document_references %}
+                                    <a href="/document/{{ filename_to_doc_id[filename] }}" class="text-decoration-none">
+                                        <span class="badge bg-light text-dark border">
+                                            <i class="bi bi-file-earmark-text me-1"></i>{{ filename }}
+                                        </span>
+                                    </a>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        
+                        {% if para.header_content %}
+                            <div class="mb-3 p-2 rounded bg-light">
+                                <strong><i class="bi bi-type-h1 me-1"></i>Header:</strong> {{ para.header_content }}
+                            </div>
+                        {% endif %}
+                        
+                        <!-- Content preview (always visible) -->
+                        <div class="paragraph-preview mb-2">
+                            {{ para.content|truncate(150) }}
+                            <button class="btn btn-sm btn-link p-0 ms-1 read-more-btn">Read more</button>
+                        </div>
+                        
+                        <!-- Full content (hidden by default) -->
+                        <div class="paragraph-full-content p-3 bg-light rounded mb-2" style="display: none;">
+                            {% if para.paragraph_type == 'table' %}
+                                <pre class="table-content">{{ para.content }}</pre>
+                            {% else %}
+                                {{ para.content }}
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        {% else %}
+            <div class="text-center py-5">
+                <div class="empty-state">
+                    <i class="bi bi-file-earmark-x text-muted mb-3" style="font-size: 4rem;"></i>
+                    <h5>No paragraphs found</h5>
+                    <p class="text-muted">No paragraphs match your current filter criteria</p>
+                    <a href="/paragraphs" class="btn btn-primary mt-2">
+                        <i class="bi bi-arrow-repeat me-1"></i> Reset Filters
+                    </a>
+                </div>
+            </div>
+        {% endif %}
     </div>
 
     <!-- Tag Modal -->
     <div class="modal fade" id="tagModal" tabindex="-1" aria-labelledby="tagModalLabel" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="tagModalLabel">Add Tag</h5>
+                    <h5 class="modal-title" id="tagModalLabel"><i class="bi bi-tag me-2"></i>Add Tag</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
                     <input type="hidden" id="paragraphIdForTag">
                     <div class="mb-3">
                         <label class="form-label">Select Tag</label>
-                        <div class="d-flex flex-wrap gap-2">
+                        <div class="d-flex flex-wrap gap-2 tag-selection">
                             {% for tag in tags %}
-                                <span class="badge tag-badge" style="background-color: {{ tag.color }}" onclick="addTag({{ tag.id }})">
-                                    {{ tag.name }}
-                                </span>
+                                <div class="tag-item">
+                                    <span class="badge tag-badge" style="background-color: {{ tag.color }}" onclick="addTag({{ tag.id }})">
+                                        {{ tag.name }}
+                                    </span>
+                                </div>
                             {% endfor %}
                         </div>
                     </div>
@@ -163,35 +253,88 @@
 
 {% block scripts %}
 <script>
+    // Filter by document - maintain the duplicate filter state
     function filterByDocument(documentId) {
         const duplicateFilter = document.getElementById('duplicateFilter').value;
-        window.location.href = '/paragraphs' + 
-            (documentId ? '?document_id=' + documentId : '') + 
-            (duplicateFilter === 'all' ? (documentId ? '&' : '?') + 'show_all_duplicates=1' : '');
+        let url = '/paragraphs';
+        
+        // Build the query string with proper parameters
+        const params = new URLSearchParams();
+        if (documentId) {
+            params.append('document_id', documentId);
+        }
+        if (duplicateFilter === 'all') {
+            params.append('show_all_duplicates', '1');
+        }
+        
+        // Add the query string to the URL if we have parameters
+        if (params.toString()) {
+            url += '?' + params.toString();
+        }
+        
+        window.location.href = url;
     }
     
+    // Filter for showing duplicates
     function filterByDuplicates(mode) {
         const documentId = new URLSearchParams(window.location.search).get('document_id');
-        window.location.href = '/paragraphs' + 
-            (documentId ? '?document_id=' + documentId : '') + 
-            (mode === 'all' ? (documentId ? '&' : '?') + 'show_all_duplicates=1' : '');
+        let url = '/paragraphs';
+        
+        // Build the query string with proper parameters
+        const params = new URLSearchParams();
+        if (documentId) {
+            params.append('document_id', documentId);
+        }
+        if (mode === 'all') {
+            params.append('show_all_duplicates', '1');
+        }
+        
+        // Add the query string to the URL if we have parameters
+        if (params.toString()) {
+            url += '?' + params.toString();
+        }
+        
+        window.location.href = url;
     }
     
+    // Filter by paragraph type
     function filterByType(type) {
         const paragraphs = document.querySelectorAll('.paragraph-card');
+        let visibleCount = 0;
+        
         if (!type) {
-            paragraphs.forEach(p => p.style.display = 'block');
-            applySortingAndTagFilters(); // Reapply other filters
+            paragraphs.forEach(p => {
+                p.style.display = 'block';
+                p.classList.add('highlight-sort');
+                setTimeout(() => {
+                    p.classList.remove('highlight-sort');
+                }, 1000);
+                visibleCount++;
+            });
+            
+            // Update count
+            document.getElementById('paragraphCount').textContent = visibleCount + ' paragraphs';
+            
+            // Reapply other filters
+            applySortingAndTagFilters();
             return;
         }
         
         paragraphs.forEach(p => {
             if (p.dataset.type === type) {
                 p.style.display = 'block';
+                p.classList.add('highlight-sort');
+                setTimeout(() => {
+                    p.classList.remove('highlight-sort');
+                }, 1000);
+                visibleCount++;
             } else {
                 p.style.display = 'none';
             }
         });
+        
+        // Update count
+        document.getElementById('paragraphCount').textContent = visibleCount + ' paragraphs';
         
         // Make sure tag filter is still applied
         const tagFilter = document.getElementById('tagFilter').value;
@@ -200,6 +343,7 @@
         }
     }
     
+    // Filter by tag
     function filterByTag(tagId) {
         if (!tagId) {
             // If no tag selected, just reapply type filter
@@ -210,30 +354,43 @@
         // Apply tag filter while respecting type filter
         const typeFilter = document.getElementById('paragraphTypeFilter').value;
         const paragraphs = document.querySelectorAll('.paragraph-card');
+        let visibleCount = 0;
         
         paragraphs.forEach(p => {
             // First check if it passes the type filter
             const passesTypeFilter = !typeFilter || p.dataset.type === typeFilter;
             
             // Then check if it has the selected tag
-            const tags = p.dataset.tags.split(',');
+            const tags = p.dataset.tags.split(',').filter(tag => tag !== '');  // Filter out empty tags
             const passesTagFilter = tags.includes(tagId);
             
             // Only show if passes both filters
             if (passesTypeFilter && passesTagFilter) {
                 p.style.display = 'block';
+                p.classList.add('highlight-sort');
+                setTimeout(() => {
+                    p.classList.remove('highlight-sort');
+                }, 1000);
+                visibleCount++;
             } else {
                 p.style.display = 'none';
             }
         });
+        
+        // Update count
+        document.getElementById('paragraphCount').textContent = visibleCount + ' paragraphs';
     }
     
+    // Sort paragraphs
     function sortParagraphs(sortOption) {
         const paragraphsList = document.getElementById('paragraphsList');
         const paragraphs = Array.from(paragraphsList.children);
         
+        // Filter out non-paragraph elements
+        const paragraphElements = paragraphs.filter(el => el.classList.contains('paragraph-card'));
+        
         // Sort based on selected option
-        paragraphs.sort((a, b) => {
+        paragraphElements.sort((a, b) => {
             switch(sortOption) {
                 case 'occurrences_desc':
                     return parseInt(b.dataset.occurrences) - parseInt(a.dataset.occurrences);
@@ -247,12 +404,36 @@
         });
         
         // Re-append elements in sorted order
-        paragraphs.forEach(p => paragraphsList.appendChild(p));
+        paragraphElements.forEach(p => {
+            paragraphsList.appendChild(p);
+            p.classList.add('highlight-sort');
+            setTimeout(() => {
+                p.classList.remove('highlight-sort');
+            }, 1000);
+        });
+        
+        // Show sort success message
+        const alertDiv = document.createElement('div');
+        alertDiv.className = 'alert alert-success alert-dismissible fade show position-fixed bottom-0 end-0 m-3';
+        alertDiv.innerHTML = `
+            <div class="d-flex">
+                <div class="me-2"><i class="bi bi-check-circle"></i></div>
+                <div>Sorted by ${sortOption.replace('_', ' ')}</div>
+            </div>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        `;
+        document.body.appendChild(alertDiv);
+        
+        // Remove the alert after 2 seconds
+        setTimeout(() => {
+            alertDiv.remove();
+        }, 2000);
         
         // Reapply filters after sorting
         applySortingAndTagFilters();
     }
     
+    // Reapply any active filters after sorting
     function applySortingAndTagFilters() {
         const typeFilter = document.getElementById('paragraphTypeFilter').value;
         const tagFilter = document.getElementById('tagFilter').value;
@@ -266,13 +447,26 @@
         }
     }
     
+    // Show tag modal
     function showTagModal(paragraphId) {
         document.getElementById('paragraphIdForTag').value = paragraphId;
         new bootstrap.Modal(document.getElementById('tagModal')).show();
     }
     
+    // Add tag to paragraph
     function addTag(tagId) {
         const paragraphId = document.getElementById('paragraphIdForTag').value;
+        
+        // Show loading state
+        const tagSelection = document.querySelector('.tag-selection');
+        tagSelection.innerHTML = `
+            <div class="w-100 text-center">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="mt-2 mb-0">Adding tag...</p>
+            </div>
+        `;
         
         $.ajax({
             url: '/tag-paragraph',
@@ -283,7 +477,22 @@
             },
             success: function(response) {
                 if (response.success) {
-                    window.location.reload();
+                    // Show success message
+                    const alertDiv = document.createElement('div');
+                    alertDiv.className = 'alert alert-success alert-dismissible fade show position-fixed bottom-0 end-0 m-3';
+                    alertDiv.innerHTML = `
+                        <div class="d-flex">
+                            <div class="me-2"><i class="bi bi-check-circle"></i></div>
+                            <div>Tag added successfully!</div>
+                        </div>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    `;
+                    document.body.appendChild(alertDiv);
+                    
+                    // Reload page
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
                 } else {
                     alert('Failed to add tag: ' + response.message);
                 }
@@ -294,6 +503,7 @@
         });
     }
     
+    // Remove tag from paragraph
     function removeTag(paragraphId, tagId) {
         if (!confirm('Are you sure you want to remove this tag?')) {
             return;
@@ -308,7 +518,22 @@
             },
             success: function(response) {
                 if (response.success) {
-                    window.location.reload();
+                    // Show success message
+                    const alertDiv = document.createElement('div');
+                    alertDiv.className = 'alert alert-success alert-dismissible fade show position-fixed bottom-0 end-0 m-3';
+                    alertDiv.innerHTML = `
+                        <div class="d-flex">
+                            <div class="me-2"><i class="bi bi-check-circle"></i></div>
+                            <div>Tag removed successfully!</div>
+                        </div>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    `;
+                    document.body.appendChild(alertDiv);
+                    
+                    // Reload page
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
                 } else {
                     alert('Failed to remove tag: ' + response.message);
                 }
@@ -319,10 +544,178 @@
         });
     }
     
-    // Initialize sorting and filtering on page load
+    // Initialize UI interactions on page load
     document.addEventListener('DOMContentLoaded', function() {
         // Apply default sorting by occurrences (high to low)
         sortParagraphs('occurrences_desc');
+        
+        // Add hover effects to paragraph cards
+        const paragraphCards = document.querySelectorAll('.paragraph-card');
+        paragraphCards.forEach(card => {
+            card.addEventListener('mouseenter', function() {
+                this.classList.add('shadow');
+            });
+            card.addEventListener('mouseleave', function() {
+                this.classList.remove('shadow');
+            });
+        });
+        
+        // Toggle paragraph content
+        const readMoreBtns = document.querySelectorAll('.read-more-btn');
+        readMoreBtns.forEach(btn => {
+            btn.addEventListener('click', function() {
+                const paragraphCard = this.closest('.paragraph-card');
+                const preview = paragraphCard.querySelector('.paragraph-preview');
+                const fullContent = paragraphCard.querySelector('.paragraph-full-content');
+                
+                if (fullContent.style.display === 'none') {
+                    preview.style.display = 'none';
+                    fullContent.style.display = 'block';
+                    
+                    // Update any toggle buttons in this card
+                    const toggleBtn = paragraphCard.querySelector('.toggle-para-btn');
+                    if (toggleBtn) {
+                        toggleBtn.innerHTML = '<i class="bi bi-arrows-collapse"></i>';
+                        toggleBtn.title = 'Collapse';
+                    }
+                } else {
+                    preview.style.display = 'block';
+                    fullContent.style.display = 'none';
+                    
+                    // Update any toggle buttons in this card
+                    const toggleBtn = paragraphCard.querySelector('.toggle-para-btn');
+                    if (toggleBtn) {
+                        toggleBtn.innerHTML = '<i class="bi bi-arrows-expand"></i>';
+                        toggleBtn.title = 'Expand';
+                    }
+                }
+            });
+        });
+        
+        // Toggle paragraphs with the toggle buttons
+        const toggleParaBtns = document.querySelectorAll('.toggle-para-btn');
+        toggleParaBtns.forEach(btn => {
+            btn.addEventListener('click', function() {
+                const paragraphCard = this.closest('.paragraph-card');
+                const preview = paragraphCard.querySelector('.paragraph-preview');
+                const fullContent = paragraphCard.querySelector('.paragraph-full-content');
+                
+                if (fullContent.style.display === 'none') {
+                    preview.style.display = 'none';
+                    fullContent.style.display = 'block';
+                    this.innerHTML = '<i class="bi bi-arrows-collapse"></i>';
+                    this.title = 'Collapse';
+                } else {
+                    preview.style.display = 'block';
+                    fullContent.style.display = 'none';
+                    this.innerHTML = '<i class="bi bi-arrows-expand"></i>';
+                    this.title = 'Expand';
+                }
+            });
+        });
+        
+        // Expand/Collapse All buttons
+        const expandAllBtn = document.getElementById('expandAllParasBtn');
+        const collapseAllBtn = document.getElementById('collapseAllParasBtn');
+        
+        if (expandAllBtn) {
+            expandAllBtn.addEventListener('click', function() {
+                document.querySelectorAll('.paragraph-preview').forEach(preview => {
+                    preview.style.display = 'none';
+                });
+                document.querySelectorAll('.paragraph-full-content').forEach(fullContent => {
+                    fullContent.style.display = 'block';
+                });
+                document.querySelectorAll('.toggle-para-btn').forEach(button => {
+                    button.innerHTML = '<i class="bi bi-arrows-collapse"></i>';
+                    button.title = 'Collapse';
+                });
+                
+                // Show notification
+                const alertDiv = document.createElement('div');
+                alertDiv.className = 'alert alert-info alert-dismissible fade show position-fixed bottom-0 end-0 m-3';
+                alertDiv.innerHTML = `
+                    <div class="d-flex">
+                        <div class="me-2"><i class="bi bi-arrows-expand"></i></div>
+                        <div>All paragraphs expanded</div>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                `;
+                document.body.appendChild(alertDiv);
+                
+                // Remove the alert after 2 seconds
+                setTimeout(() => {
+                    alertDiv.remove();
+                }, 2000);
+            });
+        }
+        
+        if (collapseAllBtn) {
+            collapseAllBtn.addEventListener('click', function() {
+                document.querySelectorAll('.paragraph-preview').forEach(preview => {
+                    preview.style.display = 'block';
+                });
+                document.querySelectorAll('.paragraph-full-content').forEach(fullContent => {
+                    fullContent.style.display = 'none';
+                });
+                document.querySelectorAll('.toggle-para-btn').forEach(button => {
+                    button.innerHTML = '<i class="bi bi-arrows-expand"></i>';
+                    button.title = 'Expand';
+                });
+                
+                // Show notification
+                const alertDiv = document.createElement('div');
+                alertDiv.className = 'alert alert-info alert-dismissible fade show position-fixed bottom-0 end-0 m-3';
+                alertDiv.innerHTML = `
+                    <div class="d-flex">
+                        <div class="me-2"><i class="bi bi-arrows-collapse"></i></div>
+                        <div>All paragraphs collapsed</div>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                `;
+                document.body.appendChild(alertDiv);
+                
+                // Remove the alert after 2 seconds
+                setTimeout(() => {
+                    alertDiv.remove();
+                }, 2000);
+            });
+        }
+        
+        // Search paragraph content
+        const searchInput = document.getElementById('searchParagraphs');
+        if (searchInput) {
+            searchInput.addEventListener('input', function() {
+                const searchTerm = this.value.toLowerCase();
+                let visibleCount = 0;
+                
+                document.querySelectorAll('.paragraph-card').forEach(card => {
+                    const content = card.querySelector('.paragraph-full-content').textContent.toLowerCase();
+                    
+                    if (content.includes(searchTerm)) {
+                        card.style.display = 'block';
+                        
+                        // Expand the paragraph to show the match if there's a search term
+                        if (searchTerm) {
+                            card.querySelector('.paragraph-preview').style.display = 'none';
+                            card.querySelector('.paragraph-full-content').style.display = 'block';
+                            const toggleBtn = card.querySelector('.toggle-para-btn');
+                            if (toggleBtn) {
+                                toggleBtn.innerHTML = '<i class="bi bi-arrows-collapse"></i>';
+                                toggleBtn.title = 'Collapse';
+                            }
+                        }
+                        
+                        visibleCount++;
+                    } else {
+                        card.style.display = 'none';
+                    }
+                });
+                
+                // Update count
+                document.getElementById('paragraphCount').textContent = visibleCount + ' paragraphs';
+            });
+        }
     });
 </script>
 {% endblock %}

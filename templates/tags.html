@@ -3,51 +3,140 @@
 {% block title %}Tag Management{% endblock %}
 
 {% block content %}
-    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-        <h1 class="h2">Tag Management</h1>
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-4">
+        <div>
+            <h1 class="h3 mb-0">Tag Management</h1>
+            <p class="text-muted mb-0">Create and manage tags for your paragraphs</p>
+        </div>
+    </div>
+
+    <!-- Tag Statistics -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <i class="bi bi-tags text-primary mb-2" style="font-size: 2rem;"></i>
+                    <h2 class="mb-0">{{ tags|length }}</h2>
+                    <p class="text-muted mb-0">Total Tags</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <i class="bi bi-palette text-success mb-2" style="font-size: 2rem;"></i>
+                    <h2 class="mb-0">{{ tags|selectattr('color', 'defined')|list|length }}</h2>
+                    <p class="text-muted mb-0">Custom Colors</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <i class="bi bi-paragraph text-info mb-2" style="font-size: 2rem;"></i>
+                    <h2 class="mb-0">{{ tagged_paragraphs|default(0) }}</h2>
+                    <p class="text-muted mb-0">Tagged Paragraphs</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <i class="bi bi-bar-chart text-warning mb-2" style="font-size: 2rem;"></i>
+                    <h2 class="mb-0">{{ most_used_tag_count|default(0) }}</h2>
+                    <p class="text-muted mb-0">Most Used Tag</p>
+                </div>
+            </div>
+        </div>
     </div>
 
     <div class="row">
-        <div class="col-md-6">
-            <div class="card">
+        <!-- Create New Tag -->
+        <div class="col-lg-5 mb-4">
+            <div class="card h-100 border-0 shadow-sm">
                 <div class="card-header">
-                    <h5>Create New Tag</h5>
+                    <h5 class="mb-0"><i class="bi bi-plus-circle me-2"></i>Create New Tag</h5>
                 </div>
                 <div class="card-body">
                     <form action="/add-tag" method="post">
                         <div class="mb-3">
                             <label for="tagName" class="form-label">Tag Name</label>
-                            <input type="text" class="form-control" id="tagName" name="name" required>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="bi bi-tag"></i></span>
+                                <input type="text" class="form-control" id="tagName" name="name" placeholder="Enter tag name" required>
+                            </div>
+                            <div class="form-text">
+                                Short, descriptive names work best (e.g., "Important", "Legal", "To Review")
+                            </div>
                         </div>
-                        <div class="mb-3">
+                        
+                        <div class="mb-4">
                             <label for="tagColor" class="form-label">Tag Color</label>
-                            <input type="color" class="form-control form-control-color" id="tagColor" name="color" value="#563d7c" title="Choose tag color">
+                            <div class="d-flex align-items-center gap-3">
+                                <input type="color" class="form-control form-control-color" id="tagColor" name="color" value="#563d7c" title="Choose tag color">
+                                <div class="color-preview flex-grow-1 py-2 px-3 rounded text-white" style="background-color: #563d7c;">
+                                    <i class="bi bi-tag me-2"></i><span id="previewTagName">Sample Tag</span>
+                                </div>
+                            </div>
+                            <div class="form-text">
+                                Choose a color that helps visually categorize your tags
+                            </div>
                         </div>
-                        <button type="submit" class="btn btn-primary">Create Tag</button>
+                        
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-plus-circle me-1"></i>Create Tag
+                            </button>
+                        </div>
                     </form>
                 </div>
             </div>
         </div>
         
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header">
-                    <h5>Existing Tags</h5>
+        <!-- Existing Tags -->
+        <div class="col-lg-7 mb-4">
+            <div class="card h-100 border-0 shadow-sm">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-tags me-2"></i>Existing Tags</h5>
+                    <div>
+                        <input type="text" class="form-control form-control-sm" id="tagSearch" placeholder="Search tags..." style="min-width: 200px;">
+                    </div>
                 </div>
                 <div class="card-body">
                     {% if tags %}
-                        <div class="d-flex flex-wrap gap-2">
+                        <div class="row g-3 tag-container">
                             {% for tag in tags %}
-                                <span class="badge p-2 tag-item" id="tag-{{ tag.id }}" style="background-color: {{ tag.color }}">
-                                    {{ tag.name }}
-                                    <button type="button" class="btn-close btn-close-white ms-2" 
-                                            aria-label="Delete" style="font-size: 0.5rem;" 
-                                            onclick="deleteTag({{ tag.id }}, '{{ tag.name }}', this)"></button>
-                                </span>
+                                <div class="col-md-6 tag-item-container">
+                                    <div class="card tag-item h-100 border-0" id="tag-{{ tag.id }}" data-tag-name="{{ tag.name }}">
+                                        <div class="card-body d-flex justify-content-between align-items-center p-3" style="background-color: {{ tag.color }}; color: white; border-radius: 0.5rem;">
+                                            <div>
+                                                <i class="bi bi-tag me-2"></i>
+                                                <span class="tag-name">{{ tag.name }}</span>
+                                            </div>
+                                            <div class="d-flex align-items-center">
+                                                <span class="badge bg-light text-dark me-2" title="Number of paragraphs with this tag">
+                                                    {{ tag.usage_count|default(0) }}
+                                                </span>
+                                                <button type="button" class="btn btn-sm btn-light delete-tag-btn" 
+                                                        aria-label="Delete"
+                                                        data-tag-id="{{ tag.id }}"
+                                                        data-tag-name="{{ tag.name }}">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             {% endfor %}
                         </div>
                     {% else %}
-                        <p class="text-muted">No tags created yet.</p>
+                        <div class="text-center py-5">
+                            <div class="empty-state">
+                                <i class="bi bi-tags text-muted mb-3" style="font-size: 4rem;"></i>
+                                <h5>No tags created yet</h5>
+                                <p class="text-muted">Create tags to organize and categorize your paragraphs</p>
+                            </div>
+                        </div>
                     {% endif %}
                 </div>
             </div>
@@ -56,50 +145,10 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
-function deleteTag(tagId, tagName, element) {
-    if (confirm(`Are you sure you want to delete the tag "${tagName}"? This will remove it from all paragraphs.`)) {
-        $.ajax({
-            url: '/delete-tag',
-            method: 'POST',
-            headers: {
-                'X-Requested-With': 'XMLHttpRequest'
-            },
-            data: {
-                tag_id: tagId
-            },
-            success: function(response) {
-                if (response.success) {
-                    // Remove the tag element from DOM
-                    $(element).closest('.tag-item').fadeOut(300, function() { 
-                        $(this).remove(); 
-                        
-                        // Show empty message if no tags left
-                        if ($('.tag-item').length === 0) {
-                            $('.card-body').append('<p class="text-muted">No tags created yet.</p>');
-                        }
-                    });
-                    
-                    // Show success message
-                    const alert = $('<div class="alert alert-success alert-dismissible fade show" role="alert">' +
-                        'Tag "' + tagName + '" deleted successfully' +
-                        '<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>' +
-                        '</div>');
-                    $('.card-header').after(alert);
-                    
-                    // Auto-dismiss the alert after 3 seconds
-                    setTimeout(function() {
-                        $('.alert').alert('close');
-                    }, 3000);
-                } else {
-                    alert('Failed to delete tag: ' + response.message);
-                }
-            },
-            error: function() {
-                alert('An error occurred while deleting the tag');
-            }
-        });
-    }
+<script src="{{ url_for('static', filename='js/tags.js') }}"></script>
+<style>
+.tag-item {
+    transition: all 0.2s ease;
 }
-</script>
+</style>
 {% endblock %}

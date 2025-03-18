@@ -1,4 +1,10 @@
-/* Main layout styles */
+/* 
+   Document Analyzer Application
+   Main CSS Stylesheet
+   Version: 2.0
+*/
+
+/* ------- Base Layout Styles ------- */
 .sidebar {
     position: fixed;
     top: 0;
@@ -31,10 +37,24 @@
     padding-top: 1.5rem;
 }
 
-/* Tag related styles */
+/* ------- Card and Component Styles ------- */
+.card {
+    transition: all 0.2s ease;
+}
+
+.card:hover {
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* ------- Tag Management ------- */
 .tag-badge {
     margin-right: 5px;
     cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.tag-badge:hover {
+    transform: scale(1.05);
 }
 
 .tag-badge i {
@@ -46,7 +66,19 @@
     color: #f8f9fa;
 }
 
-/* Similarity analysis styles */
+.tag-item {
+    transition: all 0.2s ease;
+}
+
+.tag-item .badge {
+    transition: all 0.2s ease;
+}
+
+.tag-item .badge:hover {
+    transform: scale(1.1);
+}
+
+/* ------- Similarity Analysis Styles ------- */
 .similarity-slider {
     width: 100%;
 }
@@ -56,6 +88,11 @@
     border-radius: 5px;
     padding: 15px;
     margin-bottom: 20px;
+    transition: all 0.2s ease-in-out;
+}
+
+.similarity-container:hover {
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
 }
 
 .similarity-score {
@@ -74,242 +111,6 @@
     background-color: #fff;
     border-radius: 5px;
     border: 1px solid #dee2e6;
-}
-
-/* Paragraph card styles */
-.paragraph-card {
-    margin-bottom: 1rem;
-    border-left: 5px solid #6c757d;
-}
-
-.paragraph-card.header {
-    border-left-color: #007bff;
-}
-
-.paragraph-card.list {
-    border-left-color: #28a745;
-}
-
-.paragraph-card.table {
-    border-left-color: #dc3545;
-}
-
-.paragraph-card.boilerplate {
-    border-left-color: #ffc107;
-}
-
-pre.table-content {
-    white-space: pre-wrap;
-    font-family: monospace;
-    background-color: #f8f9fa;
-    padding: 10px;
-    border-radius: 5px;
-}
-
-/* Document upload styles */
-.form-control-color {
-    max-width: 5rem;
-}
-
-/* Styles for duplicate paragraphs */
-.document-references {
-    background-color: #f8f9fa;
-    padding: 10px;
-    border-radius: 5px;
-    border-left: 3px solid #17a2b8;
-    margin-bottom: 15px;
-}
-
-.document-references .badge {
-    font-size: 0.85em;
-}
-
-/* Make the duplicate badge more noticeable */
-.badge.bg-warning {
-    font-weight: 500;
-}
-
-/* Filter controls */
-.filter-controls {
-    margin-bottom: 20px;
-}
-
-/* Responsive adjustments */
-@media (max-width: 768px) {
-    .content-compare {
-        flex-direction: column;
-    }
-    
-    .content-column {
-        margin-bottom: 10px;
-    }
-    
-    .similarity-score {
-        font-size: 20px;
-    }
-}
-/* Enhanced styles for similarity analysis page */
-
-/* Similarity container styling */
-.similarity-container {
-    margin-bottom: 30px;
-}
-
-.similarity-score-badge {
-    font-size: 24px;
-    text-align: center;
-    min-width: 80px;
-}
-
-/* Content panel styling */
-.content-panel {
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-}
-
-.content-body {
-    flex-grow: 1;
-    overflow-y: auto;
-    max-height: 300px;
-}
-
-/* Highlight differences */
-.diff-info {
-    font-size: 0.9rem;
-    line-height: 1.5;
-}
-
-/* Filter controls */
-.filter-controls {
-    margin-bottom: 20px;
-}
-
-/* Summary statistics */
-.summary-item {
-    text-align: center;
-    padding: 15px;
-}
-
-.summary-item .icon {
-    font-size: 2rem;
-    margin-bottom: 10px;
-}
-
-.summary-item .value {
-    font-size: 1.5rem;
-    font-weight: bold;
-}
-
-.summary-item .label {
-    font-size: 0.9rem;
-    color: #6c757d;
-}
-
-/* Tag selection */
-.tag-item .badge {
-    transition: transform 0.2s;
-}
-
-.tag-item .badge:hover {
-    transform: scale(1.1);
-}
-
-/* Responsive adjustments */
-@media (max-width: 768px) {
-    .row.content-row {
-        flex-direction: column;
-    }
-    
-    .content-panel {
-        margin-bottom: 20px;
-    }
-    
-    .similarity-score-badge {
-        font-size: 18px;
-    }
-}/* Add to your custom.css file */
-
-/* Styling for occurrence badge */
-.occurrence-badge {
-    display: inline-flex;
-    align-items: center;
-    margin-left: 5px;
-}
-
-.occurrence-badge i {
-    margin-right: 4px;
-}
-
-/* Make filter controls more consistent */
-.filter-controls {
-    margin-bottom: 15px;
-}
-
-/* Improve tag filter dropdown */
-#tagFilter option {
-    padding: 5px;
-}
-
-/* Hover effect for paragraph cards */
-.paragraph-card {
-    transition: transform 0.1s ease-in-out, box-shadow 0.2s ease-in-out;
-}
-
-.paragraph-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-}
-
-/* Additional styling for the sorting dropdown */
-#sortOption {
-    font-weight: 500;
-}
-
-/* Paragraph sorting animation */
-@keyframes highlightSort {
-    0% {
-        background-color: rgba(255, 251, 204, 0.8);
-    }
-    100% {
-        background-color: transparent;
-    }
-}
-
-.highlight-sort {
-    animation: highlightSort 1.5s ease-out;
-}
-
-/* Document viewer styles */
-.document-viewer-container {
-    background-color: #f5f5f5;
-    min-height: 800px;
-    border: 1px solid #ddd;
-}
-
-.pdf-viewer {
-    width: 100%;
-    height: 800px;
-}
-
-.paragraphs-list {
-    max-height: 800px;
-    overflow-y: auto;
-    border-left: 1px solid #dee2e6;
-    border-right: 1px solid #dee2e6;
-    border-bottom: 1px solid #dee2e6;
-}
-
-/* Dual similarity metrics styling */
-
-/* Similarity container styling */
-.similarity-container {
-    margin-bottom: 30px;
-    transition: all 0.2s ease-in-out;
-}
-
-.similarity-container:hover {
-    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
 }
 
 /* Dual similarity score badges styling */
@@ -350,13 +151,121 @@ pre.table-content {
     padding: 0.5rem 0.8rem;
 }
 
-/* Tooltip styling for badges */
-[title] {
-    position: relative;
-    cursor: help;
+/* ------- Paragraph Card Styles ------- */
+.paragraph-card {
+    margin-bottom: 1rem;
+    border-left: 5px solid #6c757d;
+    transition: transform 0.1s ease-in-out, box-shadow 0.2s ease-in-out;
 }
 
-/* Enhanced diff visualization */
+.paragraph-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.paragraph-card.header {
+    border-left-color: #007bff;
+}
+
+.paragraph-card.list {
+    border-left-color: #28a745;
+}
+
+.paragraph-card.table {
+    border-left-color: #dc3545;
+}
+
+.paragraph-card.boilerplate {
+    border-left-color: #ffc107;
+}
+
+pre.table-content {
+    white-space: pre-wrap;
+    font-family: monospace;
+    background-color: #f8f9fa;
+    padding: 10px;
+    border-radius: 5px;
+}
+
+/* ------- Document References ------- */
+.document-references {
+    background-color: #f8f9fa;
+    padding: 10px;
+    border-radius: 5px;
+    border-left: 3px solid #17a2b8;
+    margin-bottom: 15px;
+}
+
+.document-references .badge {
+    font-size: 0.85em;
+}
+
+/* Make the duplicate badge more noticeable */
+.badge.bg-warning {
+    font-weight: 500;
+}
+
+/* ------- Filter Controls ------- */
+.filter-controls {
+    margin-bottom: 20px;
+}
+
+/* Style for occurrence badge */
+.occurrence-badge {
+    display: inline-flex;
+    align-items: center;
+    margin-left: 5px;
+}
+
+.occurrence-badge i {
+    margin-right: 4px;
+}
+
+/* Tag filter dropdown */
+#tagFilter option {
+    padding: 5px;
+}
+
+/* Sorting dropdown */
+#sortOption {
+    font-weight: 500;
+}
+
+/* ------- Animations ------- */
+@keyframes highlightSort {
+    0% {
+        background-color: rgba(255, 251, 204, 0.8);
+    }
+    100% {
+        background-color: transparent;
+    }
+}
+
+.highlight-sort {
+    animation: highlightSort 1.5s ease-out;
+}
+
+/* ------- Document Viewer ------- */
+.document-viewer-container {
+    background-color: #f5f5f5;
+    min-height: 800px;
+    border: 1px solid #ddd;
+}
+
+.pdf-viewer {
+    width: 100%;
+    height: 800px;
+}
+
+.paragraphs-list {
+    max-height: 800px;
+    overflow-y: auto;
+    border-left: 1px solid #dee2e6;
+    border-right: 1px solid #dee2e6;
+    border-bottom: 1px solid #dee2e6;
+}
+
+/* ------- Diff Visualization ------- */
 .diff-stats {
     background-color: #f8f9fa;
     padding: 1rem;
@@ -403,7 +312,11 @@ pre.table-content {
     color: #495057;
 }
 
-/* Filter controls animation */
+/* ------- Forms ------- */
+.form-control-color {
+    max-width: 5rem;
+}
+
 .form-select {
     transition: border-color 0.2s ease;
 }
@@ -413,25 +326,7 @@ pre.table-content {
     box-shadow: 0 0 0 0.25rem rgba(0, 123, 255, 0.25);
 }
 
-/* Responsive adjustments */
-@media (max-width: 768px) {
-    .similarity-legend {
-        flex-direction: column;
-        gap: 0.75rem;
-    }
-    
-    .similarity-score-badges {
-        flex-direction: column;
-        align-items: flex-end;
-        gap: 0.5rem;
-    }
-    
-    .diff-stats .row {
-        margin-bottom: 1rem;
-    }
-}
-
-/* Progress bar animations */
+/* ------- Progress Bars ------- */
 .progress {
     height: 1.5rem;
     font-size: 0.875rem;
@@ -446,7 +341,7 @@ pre.table-content {
     transition: width 0.6s ease;
 }
 
-/* Color overlay for the exact matches */
+/* ------- Exact Matches Highlighting ------- */
 .similarity-container[data-type="exact"] .content-body {
     position: relative;
 }
@@ -461,4 +356,54 @@ pre.table-content {
     background-color: rgba(40, 167, 69, 0.05);
     pointer-events: none;
     border-radius: 0.25rem;
+}
+
+/* ------- Responsive Design ------- */
+@media (max-width: 768px) {
+    .content-compare {
+        flex-direction: column;
+    }
+    
+    .content-column {
+        margin-bottom: 10px;
+    }
+    
+    .similarity-score {
+        font-size: 20px;
+    }
+    
+    .similarity-legend {
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+    
+    .similarity-score-badges {
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 0.5rem;
+    }
+    
+    .diff-stats .row {
+        margin-bottom: 1rem;
+    }
+    
+    .row.content-row {
+        flex-direction: column;
+    }
+    
+    .content-panel {
+        margin-bottom: 20px;
+    }
+}
+
+/* ------- Helper Classes ------- */
+.search-highlight {
+    background-color: #ffeb3b;
+    padding: 2px 0;
+    border-radius: 2px;
+}
+
+.word-heat {
+    transition: all 0.2s ease;
+    cursor: pointer;
 }
