@@ -1258,3 +1258,7 @@ SyntaxError: expected 'except' or 'finally' block
 2025-03-18 13:46:59,730 INFO: Paragraph Analyzer startup [in C:\Simplicity\app.py:83]
 2025-03-18 13:47:09,244 WARNING: Failed to save metadata for document sample_10.pdf [in C:\Simplicity\app.py:152]
 2025-03-18 13:47:09,328 INFO: Processed 5 paragraphs from sample_10.pdf [in C:\Simplicity\app.py:164]
+2025-03-18 13:52:07,089 INFO: Paragraph Analyzer startup [in C:\Simplicity\app.py:83]
+2025-03-18 13:52:11,150 INFO: Paragraph Analyzer startup [in C:\Simplicity\app.py:83]
+2025-03-18 13:52:22,741 WARNING: Failed to save metadata for document sample_7.pdf [in C:\Simplicity\app.py:152]
+2025-03-18 13:52:22,842 INFO: Processed 5 paragraphs from sample_7.pdf [in C:\Simplicity\app.py:164]

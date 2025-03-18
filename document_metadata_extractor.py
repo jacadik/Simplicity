@@ -34,8 +34,8 @@ class DocumentMetadataExtractor:
         metadata = {
             'file_size': os.path.getsize(file_path),
             'file_size_formatted': self._format_file_size(os.path.getsize(file_path)),
-            'creation_time': datetime.fromtimestamp(os.path.getctime(file_path)).isoformat(),
-            'modification_time': datetime.fromtimestamp(os.path.getmtime(file_path)).isoformat(),
+            'creation_date': datetime.fromtimestamp(os.path.getctime(file_path)).isoformat(),
+            'modification_date': datetime.fromtimestamp(os.path.getmtime(file_path)).isoformat(),
             'file_extension': os.path.splitext(file_path)[1].lower(),
             'filename': os.path.basename(file_path)
         }
