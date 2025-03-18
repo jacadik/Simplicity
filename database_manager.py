@@ -1,10 +1,12 @@
 import os
 import logging
 import pandas as pd
+import json 
 from datetime import datetime
 from typing import List, Dict, Tuple, Optional, Any
+from typing import Dict, Any, Optional
 
-from sqlalchemy import create_engine, Column, Integer, String, Float, ForeignKey, Text, Table, and_, func, Index, or_
+from sqlalchemy import create_engine, Column, Integer, String, Float, ForeignKey, Text, Table, and_, func, Index, or_, inspect, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker, Session
 from document_parser import Paragraph as ParserParagraph
@@ -41,6 +43,7 @@ class Document(Base):
     
     # Relationships
     paragraphs = relationship("Paragraph", back_populates="document", cascade="all, delete-orphan")
+    file_metadata = relationship("DocumentFileMetadata", back_populates="document", uselist=False, cascade="all, delete-orphan")
 
 class Paragraph(Base):
     """Paragraph model representing extracted text from documents."""
@@ -167,6 +170,49 @@ class Cluster(Base):
     # Relationships
     paragraphs = relationship("Paragraph", secondary=cluster_paragraphs, back_populates="clusters")
 
+class DocumentFileMetadata(Base):
+    """Model for storing metadata about uploaded document files."""
+    __tablename__ = 'document_file_metadata'
+    
+    id = Column(Integer, primary_key=True)
+    document_id = Column(Integer, ForeignKey('documents.id', ondelete='CASCADE'), nullable=False)
+    file_size = Column(Integer, nullable=True)
+    file_size_formatted = Column(String, nullable=True)
+    creation_date = Column(String, nullable=True)
+    modification_date = Column(String, nullable=True)
+    page_count = Column(Integer, nullable=True)
+    paragraph_count = Column(Integer, nullable=True)
+    image_count = Column(Integer, nullable=True)
+    author = Column(String, nullable=True)
+    title = Column(String, nullable=True)
+    subject = Column(String, nullable=True)
+    creator = Column(String, nullable=True)
+    producer = Column(String, nullable=True)
+    pdf_version = Column(String, nullable=True)
+    is_encrypted = Column(Integer, nullable=True)  # Using Integer for boolean in SQLite
+    has_signatures = Column(Integer, nullable=True)
+    has_forms = Column(Integer, nullable=True)
+    has_toc = Column(Integer, nullable=True)
+    toc_items = Column(Integer, nullable=True)
+    annotation_count = Column(Integer, nullable=True)
+    fonts_used = Column(Text, nullable=True)  # Stored as JSON array
+    table_count = Column(Integer, nullable=True)
+    section_count = Column(Integer, nullable=True)
+    has_headers = Column(Integer, nullable=True)
+    has_footers = Column(Integer, nullable=True)
+    styles_used = Column(Text, nullable=True)  # Stored as JSON array
+    
+    # Relationship with Document
+    document = relationship("Document", back_populates="file_metadata")
+    
+    # Index definitions
+    __table_args__ = (
+        Index('idx_file_metadata_document_id', 'document_id'),
+        Index('idx_file_metadata_page_count', 'page_count'),
+        Index('idx_file_metadata_paragraph_count', 'paragraph_count'),
+        Index('idx_file_metadata_file_size', 'file_size'),
+    )
+
 class DatabaseManager:
     """
     Manages all database operations for the paragraph analysis system using PostgreSQL with SQLAlchemy.
@@ -196,6 +242,99 @@ class DatabaseManager:
         try:
             # Create tables if they don't exist
             Base.metadata.create_all(self.engine)
+            
+            # Ensure metadata table exists
+            # This handles the case where the table is not created by SQLAlchemy
+            self.logger.info("Checking document_file_metadata table")
+            inspector = inspect(self.engine)
+            tables = inspector.get_table_names()
+            
+            if 'document_file_metadata' not in tables:
+                self.logger.info("Creating document_file_metadata table")
+                # Create the table directly with SQL
+                with self.engine.connect() as conn:
+                    if 'sqlite' in self.db_url:
+                        conn.execute(text("""
+                        CREATE TABLE IF NOT EXISTS document_file_metadata (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            document_id INTEGER NOT NULL,
+                            file_size INTEGER,
+                            file_size_formatted TEXT,
+                            creation_date TEXT,
+                            modification_date TEXT,
+                            page_count INTEGER,
+                            paragraph_count INTEGER,
+                            image_count INTEGER,
+                            author TEXT,
+                            title TEXT,
+                            subject TEXT,
+                            creator TEXT,
+                            producer TEXT,
+                            pdf_version TEXT,
+                            is_encrypted INTEGER,
+                            has_signatures INTEGER,
+                            has_forms INTEGER,
+                            has_toc INTEGER,
+                            toc_items INTEGER,
+                            annotation_count INTEGER,
+                            fonts_used TEXT,
+                            table_count INTEGER,
+                            section_count INTEGER,
+                            has_headers INTEGER,
+                            has_footers INTEGER,
+                            styles_used TEXT,
+                            FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE
+                        )
+                        """))
+                        
+                        # Create indices
+                        conn.execute(text("CREATE INDEX IF NOT EXISTS idx_file_metadata_document_id ON document_file_metadata(document_id)"))
+                        conn.execute(text("CREATE INDEX IF NOT EXISTS idx_file_metadata_page_count ON document_file_metadata(page_count)"))
+                        conn.execute(text("CREATE INDEX IF NOT EXISTS idx_file_metadata_paragraph_count ON document_file_metadata(paragraph_count)"))
+                        conn.execute(text("CREATE INDEX IF NOT EXISTS idx_file_metadata_file_size ON document_file_metadata(file_size)"))
+                    else:
+                        # PostgreSQL
+                        conn.execute(text("""
+                        CREATE TABLE IF NOT EXISTS document_file_metadata (
+                            id SERIAL PRIMARY KEY,
+                            document_id INTEGER NOT NULL,
+                            file_size BIGINT,
+                            file_size_formatted TEXT,
+                            creation_date TEXT,
+                            modification_date TEXT,
+                            page_count INTEGER,
+                            paragraph_count INTEGER,
+                            image_count INTEGER,
+                            author TEXT,
+                            title TEXT,
+                            subject TEXT,
+                            creator TEXT,
+                            producer TEXT,
+                            pdf_version TEXT,
+                            is_encrypted BOOLEAN,
+                            has_signatures BOOLEAN,
+                            has_forms BOOLEAN,
+                            has_toc BOOLEAN,
+                            toc_items INTEGER,
+                            annotation_count INTEGER,
+                            fonts_used TEXT,
+                            table_count INTEGER,
+                            section_count INTEGER,
+                            has_headers BOOLEAN,
+                            has_footers BOOLEAN,
+                            styles_used TEXT,
+                            FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE
+                        )
+                        """))
+                        
+                        # Create indices
+                        conn.execute(text("CREATE INDEX IF NOT EXISTS idx_file_metadata_document_id ON document_file_metadata(document_id)"))
+                        conn.execute(text("CREATE INDEX IF NOT EXISTS idx_file_metadata_page_count ON document_file_metadata(page_count)"))
+                        conn.execute(text("CREATE INDEX IF NOT EXISTS idx_file_metadata_paragraph_count ON document_file_metadata(paragraph_count)"))
+                        conn.execute(text("CREATE INDEX IF NOT EXISTS idx_file_metadata_file_size ON document_file_metadata(file_size)"))
+                    
+                    conn.commit()
+                    self.logger.info("document_file_metadata table created")
             
             # Create default tags if they don't exist
             session = self.Session()
@@ -1113,6 +1252,128 @@ class DatabaseManager:
         except Exception as e:
             session.rollback()
             self.logger.error(f"Error clearing database: {str(e)}", exc_info=True)
+            return False
+        finally:
+            session.close()
+    
+    def add_document_file_metadata(self, document_id: int, metadata: Dict[str, Any]) -> bool:
+        """
+        Add file metadata for a document using SQLAlchemy ORM.
+        
+        Args:
+            document_id: ID of the document
+            metadata: Dictionary of metadata attributes
+                
+        Returns:
+            Boolean indicating success
+        """
+        self.logger.info(f"Adding file metadata for document ID: {document_id}")
+        
+        session = self.Session()
+        try:
+            # Process metadata - convert lists/dicts to JSON strings
+            metadata_to_store = {}
+            for key, value in metadata.items():
+                if isinstance(value, (list, dict)):
+                    metadata_to_store[key] = json.dumps(value)
+                else:
+                    metadata_to_store[key] = value
+            
+            # Check if metadata already exists
+            existing = session.query(DocumentFileMetadata).filter_by(document_id=document_id).first()
+            
+            if existing:
+                # Update existing metadata
+                for key, value in metadata_to_store.items():
+                    if hasattr(existing, key):
+                        setattr(existing, key, value)
+            else:
+                # Create new metadata entry
+                metadata_to_store['document_id'] = document_id
+                metadata_obj = DocumentFileMetadata(**metadata_to_store)
+                session.add(metadata_obj)
+            
+            session.commit()
+            self.logger.info(f"Successfully added file metadata for document ID: {document_id}")
+            return True
+            
+        except Exception as e:
+            session.rollback()
+            self.logger.error(f"Error adding file metadata: {str(e)}", exc_info=True)
+            return False
+        finally:
+            session.close()
+
+    def get_document_file_metadata(self, document_id: int) -> Optional[Dict[str, Any]]:
+        """
+        Get file metadata for a document using SQLAlchemy ORM.
+        
+        Args:
+            document_id: ID of the document
+            
+        Returns:
+            Dictionary of metadata attributes or None if not found
+        """
+        self.logger.info(f"Retrieving file metadata for document ID: {document_id}")
+        
+        session = self.Session()
+        try:
+            metadata_obj = session.query(DocumentFileMetadata).filter_by(document_id=document_id).first()
+            
+            if not metadata_obj:
+                self.logger.info(f"No file metadata found for document ID: {document_id}")
+                return None
+            
+            # Convert to dictionary and process JSON strings
+            metadata = {}
+            for column in metadata_obj.__table__.columns:
+                column_name = column.name
+                if column_name != 'id':  # Skip the ID field
+                    value = getattr(metadata_obj, column_name)
+                    if isinstance(value, str) and (value.startswith('[') or value.startswith('{')):
+                        try:
+                            metadata[column_name] = json.loads(value)
+                        except json.JSONDecodeError:
+                            metadata[column_name] = value
+                    else:
+                        metadata[column_name] = value
+            
+            return metadata
+            
+        except Exception as e:
+            self.logger.error(f"Error retrieving file metadata: {str(e)}", exc_info=True)
+            return None
+        finally:
+            session.close()
+
+    def delete_document_file_metadata(self, document_id: int) -> bool:
+        """
+        Delete file metadata for a document using SQLAlchemy ORM.
+        
+        Args:
+            document_id: ID of the document
+            
+        Returns:
+            Boolean indicating success
+        """
+        self.logger.info(f"Deleting file metadata for document ID: {document_id}")
+        
+        session = self.Session()
+        try:
+            # Find and delete metadata
+            metadata = session.query(DocumentFileMetadata).filter_by(document_id=document_id).first()
+            if metadata:
+                session.delete(metadata)
+                session.commit()
+                self.logger.info(f"Successfully deleted file metadata for document ID: {document_id}")
+            else:
+                self.logger.info(f"No metadata found to delete for document ID: {document_id}")
+            
+            return True
+            
+        except Exception as e:
+            session.rollback()
+            self.logger.error(f"Error deleting file metadata: {str(e)}", exc_info=True)
             return False
         finally:
             session.close()
