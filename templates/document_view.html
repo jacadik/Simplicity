@@ -15,270 +15,10 @@
         </div>
     </div>
 
-    <!-- File Metadata Panel -->
+    <!-- Document Viewer and Metadata Side by Side -->
     <div class="row mb-4">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5><i class="bi bi-info-circle"></i> File Metadata</h5>
-                    <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#metadataCollapse" aria-expanded="true" aria-controls="metadataCollapse">
-                        <i class="bi bi-chevron-down"></i>
-                    </button>
-                </div>
-                <div class="collapse show" id="metadataCollapse">
-                    <div class="card-body">
-                        {% if file_metadata %}
-                            <div class="row">
-                                <!-- Basic File Information -->
-                                <div class="col-md-4">
-                                    <div class="card mb-3">
-                                        <div class="card-header bg-light">
-                                            <h6 class="mb-0">Basic Information</h6>
-                                        </div>
-                                        <div class="card-body">
-                                            <ul class="list-group list-group-flush">
-                                                <li class="list-group-item d-flex justify-content-between align-items-center">
-                                                    <span>File Size</span>
-                                                    <span class="badge bg-primary rounded-pill">{{ file_metadata.file_size_formatted }}</span>
-                                                </li>
-                                                <li class="list-group-item d-flex justify-content-between align-items-center">
-                                                    <span>Page Count</span>
-                                                    <span class="badge bg-primary rounded-pill">{{ file_metadata.page_count }}</span>
-                                                </li>
-                                                <li class="list-group-item d-flex justify-content-between align-items-center">
-                                                    <span>Paragraph Count</span>
-                                                    <span class="badge bg-primary rounded-pill">{{ file_metadata.paragraph_count }}</span>
-                                                </li>
-                                                <li class="list-group-item d-flex justify-content-between align-items-center">
-                                                    <span>Created</span>
-                                                    <span>{{ file_metadata.creation_date.split('T')[0] }}</span>
-                                                </li>
-                                                <li class="list-group-item d-flex justify-content-between align-items-center">
-                                                    <span>Modified</span>
-                                                    <span>{{ file_metadata.modification_date.split('T')[0] }}</span>
-                                                </li>
-                                            </ul>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <!-- Document Properties -->
-                                <div class="col-md-4">
-                                    <div class="card mb-3">
-                                        <div class="card-header bg-light">
-                                            <h6 class="mb-0">Document Properties</h6>
-                                        </div>
-                                        <div class="card-body">
-                                            <ul class="list-group list-group-flush">
-                                                {% if file_metadata.author %}
-                                                <li class="list-group-item d-flex justify-content-between align-items-center">
-                                                    <span>Author</span>
-                                                    <span>{{ file_metadata.author }}</span>
-                                                </li>
-                                                {% endif %}
-                                                
-                                                {% if file_metadata.title %}
-                                                <li class="list-group-item d-flex justify-content-between align-items-center">
-                                                    <span>Title</span>
-                                                    <span>{{ file_metadata.title }}</span>
-                                                </li>
-                                                {% endif %}
-                                                
-                                                {% if file_metadata.subject %}
-                                                <li class="list-group-item d-flex justify-content-between align-items-center">
-                                                    <span>Subject</span>
-                                                    <span>{{ file_metadata.subject }}</span>
-                                                </li>
-                                                {% endif %}
-                                                
-                                                {% if file_metadata.creator %}
-                                                <li class="list-group-item d-flex justify-content-between align-items-center">
-                                                    <span>Creator</span>
-                                                    <span>{{ file_metadata.creator }}</span>
-                                                </li>
-                                                {% endif %}
-                                                
-                                                {% if file_metadata.producer %}
-                                                <li class="list-group-item d-flex justify-content-between align-items-center">
-                                                    <span>Producer</span>
-                                                    <span>{{ file_metadata.producer }}</span>
-                                                </li>
-                                                {% endif %}
-                                                
-                                                {% if file_metadata.pdf_version %}
-                                                <li class="list-group-item d-flex justify-content-between align-items-center">
-                                                    <span>PDF Version</span>
-                                                    <span>{{ file_metadata.pdf_version }}</span>
-                                                </li>
-                                                {% endif %}
-                                            </ul>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <!-- Structure Details -->
-                                <div class="col-md-4">
-                                    <div class="card mb-3">
-                                        <div class="card-header bg-light">
-                                            <h6 class="mb-0">Structure Details</h6>
-                                        </div>
-                                        <div class="card-body">
-                                            <ul class="list-group list-group-flush">
-                                                <li class="list-group-item d-flex justify-content-between align-items-center">
-                                                    <span>Images</span>
-                                                    <span class="badge bg-success rounded-pill">{{ file_metadata.image_count }}</span>
-                                                </li>
-                                                
-                                                {% if file_metadata.table_count is defined %}
-                                                <li class="list-group-item d-flex justify-content-between align-items-center">
-                                                    <span>Tables</span>
-                                                    <span class="badge bg-success rounded-pill">{{ file_metadata.table_count }}</span>
-                                                </li>
-                                                {% endif %}
-                                                
-                                                {% if file_metadata.section_count is defined %}
-                                                <li class="list-group-item d-flex justify-content-between align-items-center">
-                                                    <span>Sections</span>
-                                                    <span class="badge bg-success rounded-pill">{{ file_metadata.section_count }}</span>
-                                                </li>
-                                                {% endif %}
-                                                
-                                                {% if file_metadata.has_forms is defined %}
-                                                <li class="list-group-item d-flex justify-content-between align-items-center">
-                                                    <span>Form Fields</span>
-                                                    <span>
-                                                        {% if file_metadata.has_forms %}
-                                                            <i class="bi bi-check-circle text-success"></i> Yes
-                                                        {% else %}
-                                                            <i class="bi bi-x-circle text-danger"></i> No
-                                                        {% endif %}
-                                                    </span>
-                                                </li>
-                                                {% endif %}
-                                                
-                                                {% if file_metadata.has_toc is defined %}
-                                                <li class="list-group-item d-flex justify-content-between align-items-center">
-                                                    <span>Table of Contents</span>
-                                                    <span>
-                                                        {% if file_metadata.has_toc %}
-                                                            <i class="bi bi-check-circle text-success"></i> Yes ({{ file_metadata.toc_items }} items)
-                                                        {% else %}
-                                                            <i class="bi bi-x-circle text-danger"></i> No
-                                                        {% endif %}
-                                                    </span>
-                                                </li>
-                                                {% endif %}
-                                                
-                                                {% if file_metadata.annotation_count is defined %}
-                                                <li class="list-group-item d-flex justify-content-between align-items-center">
-                                                    <span>Annotations</span>
-                                                    <span class="badge bg-success rounded-pill">{{ file_metadata.annotation_count }}</span>
-                                                </li>
-                                                {% endif %}
-                                            </ul>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <!-- Fonts and Styles -->
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <div class="card mb-3">
-                                        <div class="card-header bg-light">
-                                            <h6 class="mb-0">Fonts Used</h6>
-                                        </div>
-                                        <div class="card-body font-details">
-                                            {% if file_metadata.fonts_used %}
-                                                <div class="d-flex flex-wrap">
-                                                    {% for font in file_metadata.fonts_used %}
-                                                        <span class="badge bg-info m-1 p-2">{{ font }}</span>
-                                                    {% endfor %}
-                                                </div>
-                                            {% else %}
-                                                <p class="text-muted">No font information available</p>
-                                            {% endif %}
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <div class="col-md-6">
-                                    <div class="card mb-3">
-                                        <div class="card-header bg-light">
-                                            <h6 class="mb-0">Document Security</h6>
-                                        </div>
-                                        <div class="card-body">
-                                            <ul class="list-group list-group-flush">
-                                                {% if file_metadata.is_encrypted is defined %}
-                                                <li class="list-group-item d-flex justify-content-between align-items-center">
-                                                    <span>Encrypted</span>
-                                                    <span>
-                                                        {% if file_metadata.is_encrypted %}
-                                                            <i class="bi bi-lock-fill text-warning"></i> Yes
-                                                        {% else %}
-                                                            <i class="bi bi-unlock text-success"></i> No
-                                                        {% endif %}
-                                                    </span>
-                                                </li>
-                                                {% endif %}
-                                                
-                                                {% if file_metadata.has_signatures is defined %}
-                                                <li class="list-group-item d-flex justify-content-between align-items-center">
-                                                    <span>Digital Signatures</span>
-                                                    <span>
-                                                        {% if file_metadata.has_signatures %}
-                                                            <i class="bi bi-check-circle text-success"></i> Yes
-                                                        {% else %}
-                                                            <i class="bi bi-x-circle text-danger"></i> No
-                                                        {% endif %}
-                                                    </span>
-                                                </li>
-                                                {% endif %}
-                                                
-                                                {% if file_metadata.has_headers is defined %}
-                                                <li class="list-group-item d-flex justify-content-between align-items-center">
-                                                    <span>Headers</span>
-                                                    <span>
-                                                        {% if file_metadata.has_headers %}
-                                                            <i class="bi bi-check-circle text-success"></i> Yes
-                                                        {% else %}
-                                                            <i class="bi bi-x-circle text-danger"></i> No
-                                                        {% endif %}
-                                                    </span>
-                                                </li>
-                                                {% endif %}
-                                                
-                                                {% if file_metadata.has_footers is defined %}
-                                                <li class="list-group-item d-flex justify-content-between align-items-center">
-                                                    <span>Footers</span>
-                                                    <span>
-                                                        {% if file_metadata.has_footers %}
-                                                            <i class="bi bi-check-circle text-success"></i> Yes
-                                                        {% else %}
-                                                            <i class="bi bi-x-circle text-danger"></i> No
-                                                        {% endif %}
-                                                    </span>
-                                                </li>
-                                                {% endif %}
-                                            </ul>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        {% else %}
-                            <div class="alert alert-info">
-                                <i class="bi bi-info-circle"></i> No metadata available for this document.
-                            </div>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Document Viewer - Full Width -->
-    <div class="row mb-4">
-        <div class="col-12">
+        <!-- Document Viewer -->
+        <div class="col-md-8">
             <div class="card">
                 <div class="card-header">
                     <h5>Document Content</h5>
@@ -287,9 +27,9 @@
                     {% if file_type == 'pdf' %}
                         <!-- PDF Viewer with direct file embedding -->
                         <div class="pdf-container position-relative">
-                            <object id="pdfViewer" data="/serve-document/{{ document.id }}" type="application/pdf" width="100%" height="700">
+                            <iframe id="pdfViewer" src="/serve-document/{{ document.id }}" type="application/pdf" width="100%" height="1000" frameborder="0">
                                 <p>Your browser does not support embedded PDFs. <a href="/serve-document/{{ document.id }}">Click here to download the PDF</a>.</p>
-                            </object>
+                            </iframe>
                         </div>
                     {% elif file_type in ['doc', 'docx'] %}
                         <!-- DOCX Viewer (limited support) -->
@@ -313,9 +53,187 @@
                 </div>
             </div>
         </div>
+
+        <!-- File Metadata Panel -->
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5><i class="bi bi-info-circle"></i> File Metadata</h5>
+                    <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#metadataCollapse" aria-expanded="true" aria-controls="metadataCollapse">
+                        <i class="bi bi-chevron-down"></i>
+                    </button>
+                </div>
+                <div class="collapse show" id="metadataCollapse">
+                    <div class="card-body">
+                        {% if file_metadata %}
+                            <!-- Basic File Information -->
+                            <div class="card mb-3">
+                                <div class="card-header bg-light">
+                                    <h6 class="mb-0">Basic Information</h6>
+                                </div>
+                                <div class="card-body">
+                                    <ul class="list-group list-group-flush">
+                                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                                            <span>File Size</span>
+                                            <span class="badge bg-primary rounded-pill">{{ file_metadata.file_size_formatted }}</span>
+                                        </li>
+                                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                                            <span>Page Count</span>
+                                            <span class="badge bg-primary rounded-pill">{{ file_metadata.page_count }}</span>
+                                        </li>
+                                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                                            <span>Paragraph Count</span>
+                                            <span class="badge bg-primary rounded-pill">{{ paragraphs|length }}</span>
+                                        </li>
+
+                                    </ul>
+                                </div>
+                            </div>
+                            
+                            <!-- Document Properties -->
+                            <div class="card mb-3">
+                                <div class="card-header bg-light">
+                                    <h6 class="mb-0">Document Properties</h6>
+                                </div>
+                                <div class="card-body">
+                                    <ul class="list-group list-group-flush">
+                                        {% if file_metadata.author %}
+                                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                                            <span>Author</span>
+                                            <span>{{ file_metadata.author }}</span>
+                                        </li>
+                                        {% endif %}
+                                        
+                                        {% if file_metadata.title %}
+                                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                                            <span>Title</span>
+                                            <span>{{ file_metadata.title }}</span>
+                                        </li>
+                                        {% endif %}
+                                        
+                                        {% if file_metadata.subject %}
+                                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                                            <span>Subject</span>
+                                            <span>{{ file_metadata.subject }}</span>
+                                        </li>
+                                        {% endif %}
+                                        
+                                        {% if file_metadata.creator %}
+                                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                                            <span>Creator</span>
+                                            <span>{{ file_metadata.creator }}</span>
+                                        </li>
+                                        {% endif %}
+                                        
+                                        {% if file_metadata.producer %}
+                                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                                            <span>Producer</span>
+                                            <span>{{ file_metadata.producer }}</span>
+                                        </li>
+                                        {% endif %}
+                                        
+                                        {% if file_metadata.pdf_version %}
+                                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                                            <span>PDF Version</span>
+                                            <span>{{ file_metadata.pdf_version }}</span>
+                                        </li>
+                                        {% endif %}
+                                    </ul>
+                                </div>
+                            </div>
+                            
+                            <!-- Structure Details -->
+                            <div class="card mb-3">
+                                <div class="card-header bg-light">
+                                    <h6 class="mb-0">Structure Details</h6>
+                                </div>
+                                <div class="card-body">
+                                    <ul class="list-group list-group-flush">
+                                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                                            <span>Images</span>
+                                            <span class="badge bg-success rounded-pill">{{ file_metadata.image_count }}</span>
+                                        </li>
+                                        
+                                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                                            <span>Tables</span>
+                                            <span class="badge bg-success rounded-pill">{{ paragraphs|selectattr('paragraph_type', 'equalto', 'table')|list|length }}</span>
+                                        </li>
+                                        
+                                        {% if file_metadata.section_count is defined %}
+                                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                                            <span>Sections</span>
+                                            <span class="badge bg-success rounded-pill">{{ file_metadata.section_count }}</span>
+                                        </li>
+                                        {% endif %}
+                                        
+                                        {% if file_metadata.has_forms is defined %}
+                                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                                            <span>Form Fields</span>
+                                            <span>
+                                                {% if file_metadata.has_forms %}
+                                                    <i class="bi bi-check-circle text-success"></i> Yes
+                                                {% else %}
+                                                    <i class="bi bi-x-circle text-danger"></i> No
+                                                {% endif %}
+                                            </span>
+                                        </li>
+                                        {% endif %}
+                                        
+                                        {% if file_metadata.has_toc is defined %}
+                                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                                            <span>Table of Contents</span>
+                                            <span>
+                                                {% if file_metadata.has_toc %}
+                                                    <i class="bi bi-check-circle text-success"></i> Yes ({{ file_metadata.toc_items }} items)
+                                                {% else %}
+                                                    <i class="bi bi-x-circle text-danger"></i> No
+                                                {% endif %}
+                                            </span>
+                                        </li>
+                                        {% endif %}
+                                        
+                                        {% if file_metadata.annotation_count is defined %}
+                                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                                            <span>Annotations</span>
+                                            <span class="badge bg-success rounded-pill">{{ file_metadata.annotation_count }}</span>
+                                        </li>
+                                        {% endif %}
+                                    </ul>
+                                </div>
+                            </div>
+                            
+
+                            
+                            <!-- Fonts Used -->
+                            <div class="card mb-3">
+                                <div class="card-header bg-light">
+                                    <h6 class="mb-0">Fonts Used</h6>
+                                </div>
+                                <div class="card-body font-details">
+                                    {% if file_metadata.fonts_used %}
+                                        <div class="d-flex flex-wrap">
+                                            {% set font_list = file_metadata.fonts_used.strip('[]\'\"').split(',') %}
+                                            {% for font in font_list %}
+                                                <span class="badge bg-info m-1 p-2">{{ font.strip() }}</span>
+                                            {% endfor %}
+                                        </div>
+                                    {% else %}
+                                        <p class="text-muted">No font information available</p>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        {% else %}
+                            <div class="alert alert-info">
+                                <i class="bi bi-info-circle"></i> No metadata available for this document.
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
-    <!-- Paragraphs List - Now Below Document -->
+    <!-- Paragraphs List - Below both panels -->
     <div class="row">
         <div class="col-12">
             <div class="card">
@@ -415,7 +333,7 @@
     
     #pdfViewer {
         width: 100%;
-        height: 700px;
+        height: 1000px;
         border: 1px solid #ddd;
     }
     
@@ -498,7 +416,7 @@
     }
     
     .paragraphs-list {
-        max-height: none;
+        overflow-y: visible;
     }
 </style>
 

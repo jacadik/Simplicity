@@ -35,17 +35,18 @@ class DocumentMetadataExtractor:
             'file_size': os.path.getsize(file_path),
             'file_size_formatted': self._format_file_size(os.path.getsize(file_path)),
             'creation_date': datetime.fromtimestamp(os.path.getctime(file_path)).isoformat(),
-            'modification_date': datetime.fromtimestamp(os.path.getmtime(file_path)).isoformat(),
-            'file_extension': os.path.splitext(file_path)[1].lower(),
-            'filename': os.path.basename(file_path)
+            'modification_date': datetime.fromtimestamp(os.path.getmtime(file_path)).isoformat()
         }
+        
+        # Local variable, not included in returned metadata
+        file_extension = os.path.splitext(file_path)[1].lower()
         
         # Extract format-specific metadata
         try:
-            if metadata['file_extension'] == '.pdf':
+            if file_extension == '.pdf':
                 pdf_metadata = self._extract_pdf_metadata(file_path)
                 metadata.update(pdf_metadata)
-            elif metadata['file_extension'] in ['.doc', '.docx']:
+            elif file_extension in ['.doc', '.docx']:
                 docx_metadata = self._extract_docx_metadata(file_path)
                 metadata.update(docx_metadata)
         except Exception as e:
@@ -85,8 +86,18 @@ class DocumentMetadataExtractor:
                 if hasattr(pdf, 'metadata') and pdf.metadata:
                     for key, value in pdf.metadata.items():
                         if key and value and isinstance(value, (str, int, float, bool)):
-                            cleaned_key = key.lower().replace('/', '_').replace(':', '_')
-                            pdf_metadata[cleaned_key] = value
+                            # Use the database column name for common PDF metadata fields
+                            if key.lower() == 'author':
+                                pdf_metadata['author'] = value
+                            elif key.lower() == 'title':
+                                pdf_metadata['title'] = value
+                            elif key.lower() == 'subject':
+                                pdf_metadata['subject'] = value
+                            elif key.lower() == 'creator':
+                                pdf_metadata['creator'] = value
+                            elif key.lower() == 'producer':
+                                pdf_metadata['producer'] = value
+                            # Skip other fields that don't map to our database columns
         except Exception as e:
             self.logger.warning(f"pdfplumber metadata extraction error: {str(e)}")
         
@@ -94,65 +105,96 @@ class DocumentMetadataExtractor:
         try:
             doc = fitz.open(file_path)
             
-            # Get document metadata
-            pdf_metadata['pdf_version'] = f"PDF {doc.pdf_version}"
-            pdf_metadata['is_encrypted'] = doc.is_encrypted
-            pdf_metadata['has_signatures'] = bool(doc.permissions & fitz.PDF_PERM_PRINT) == False  # Simplistic check
-            
-            # Get document metadata
-            meta = doc.metadata
-            if meta:
-                for key, value in meta.items():
-                    if key and value and isinstance(value, (str, int, float, bool)):
-                        cleaned_key = key.lower().replace('/', '_').replace(':', '_')
-                        pdf_metadata[cleaned_key] = value
-            
-            # Extract font information
-            fonts = set()
-            fonts_by_page = {}
-            
-            for page_num, page in enumerate(doc):
-                page_fonts = set()
-                font_list = page.get_fonts()
+            # Get document metadata - safely
+            try:
+                if hasattr(doc, "pdf_version"):
+                    pdf_metadata['pdf_version'] = f"PDF {doc.pdf_version}"
+            except AttributeError as e:
+                self.logger.warning(f"Error accessing pdf_version: {str(e)}")
                 
-                for font in font_list:
-                    font_name = font[3]  # Font name is at index 3
-                    fonts.add(font_name)
-                    page_fonts.add(font_name)
+            try:
+                if hasattr(doc, "is_encrypted"):
+                    # Convert boolean to integer for SQLite compatibility
+                    pdf_metadata['is_encrypted'] = 1 if doc.is_encrypted else 0
+            except AttributeError as e:
+                self.logger.warning(f"Error checking encryption: {str(e)}")
                 
-                fonts_by_page[page_num + 1] = list(page_fonts)
+            try:
+                # Simplistic check for signatures
+                has_signatures = False
+                if hasattr(doc, "permissions"):
+                    has_signatures = bool(doc.permissions & fitz.PDF_PERM_PRINT) == False
+                pdf_metadata['has_signatures'] = 1 if has_signatures else 0
+            except AttributeError as e:
+                self.logger.warning(f"Error checking signatures: {str(e)}")
             
-            pdf_metadata['fonts_used'] = list(fonts)
-            pdf_metadata['fonts_by_page'] = fonts_by_page
+            # Extract font information safely
+            try:
+                fonts = set()
+                
+                for page_num, page in enumerate(doc):
+                    try:
+                        if hasattr(page, "get_fonts"):
+                            font_list = page.get_fonts()
+                            
+                            for font in font_list:
+                                if len(font) > 3:  # Make sure the tuple has enough elements
+                                    font_name = font[3]  # Font name is at index 3
+                                    fonts.add(font_name)
+                    except Exception as e:
+                        self.logger.warning(f"Error getting fonts from page {page_num}: {str(e)}")
+                
+                pdf_metadata['fonts_used'] = str(list(fonts))
+            except Exception as e:
+                self.logger.warning(f"Error extracting fonts: {str(e)}")
             
-            # Count images
-            image_count = 0
-            for page_num, page in enumerate(doc):
-                image_list = page.get_images()
-                image_count += len(image_list)
+            # Count images safely
+            try:
+                image_count = 0
+                for page_num, page in enumerate(doc):
+                    try:
+                        if hasattr(page, "get_images"):
+                            image_list = page.get_images()
+                            image_count += len(image_list)
+                    except Exception as e:
+                        self.logger.warning(f"Error counting images on page {page_num}: {str(e)}")
+                
+                pdf_metadata['image_count'] = image_count
+            except Exception as e:
+                self.logger.warning(f"Error counting images: {str(e)}")
             
-            pdf_metadata['image_count'] = image_count
+            # Check for form fields safely
+            try:
+                has_forms = False
+                for page in doc:
+                    if hasattr(page, "widget_count") and page.widget_count > 0:
+                        has_forms = True
+                        break
+                
+                pdf_metadata['has_forms'] = 1 if has_forms else 0
+            except Exception as e:
+                self.logger.warning(f"Error checking for forms: {str(e)}")
             
-            # Check for form fields
-            has_forms = False
-            for page in doc:
-                if page.widget_count > 0:
-                    has_forms = True
-                    break
+            # Check for annotations safely
+            try:
+                annotation_count = 0
+                for page in doc:
+                    if hasattr(page, "annots"):
+                        annotation_count += len(page.annots())
+                
+                pdf_metadata['annotation_count'] = annotation_count
+            except Exception as e:
+                self.logger.warning(f"Error checking annotations: {str(e)}")
             
-            pdf_metadata['has_forms'] = has_forms
-            
-            # Check for annotations
-            annotation_count = 0
-            for page in doc:
-                annotation_count += len(page.annots())
-            
-            pdf_metadata['annotation_count'] = annotation_count
-            
-            # Check if document has TOC/bookmarks
-            toc = doc.get_toc()
-            pdf_metadata['has_toc'] = len(toc) > 0
-            pdf_metadata['toc_items'] = len(toc)
+            # Check if document has TOC/bookmarks safely
+            try:
+                toc = []
+                if hasattr(doc, "get_toc"):
+                    toc = doc.get_toc()
+                pdf_metadata['has_toc'] = 1 if len(toc) > 0 else 0
+                pdf_metadata['toc_items'] = len(toc)
+            except Exception as e:
+                self.logger.warning(f"Error checking TOC: {str(e)}")
             
             doc.close()
         except Exception as e:
@@ -180,20 +222,10 @@ class DocumentMetadataExtractor:
             if core_props:
                 if core_props.author:
                     docx_metadata['author'] = core_props.author
-                if core_props.created:
-                    docx_metadata['created'] = core_props.created.isoformat() if hasattr(core_props.created, 'isoformat') else str(core_props.created)
-                if core_props.modified:
-                    docx_metadata['modified'] = core_props.modified.isoformat() if hasattr(core_props.modified, 'isoformat') else str(core_props.modified)
                 if core_props.title:
                     docx_metadata['title'] = core_props.title
                 if core_props.subject:
                     docx_metadata['subject'] = core_props.subject
-                if core_props.keywords:
-                    docx_metadata['keywords'] = core_props.keywords
-                if core_props.category:
-                    docx_metadata['category'] = core_props.category
-                if core_props.comments:
-                    docx_metadata['comments'] = core_props.comments
             
             # Count document elements
             docx_metadata['paragraph_count'] = len(doc.paragraphs)
@@ -206,7 +238,7 @@ class DocumentMetadataExtractor:
                 if paragraph.style:
                     styles_used.add(paragraph.style.name)
             
-            docx_metadata['styles_used'] = list(styles_used)
+            docx_metadata['styles_used'] = str(list(styles_used))
             
             # Count images (a bit complex in docx)
             image_count = 0
@@ -228,8 +260,8 @@ class DocumentMetadataExtractor:
                 if section.footer.is_linked_to_previous == False and section.footer.paragraphs:
                     has_footers = True
                     
-            docx_metadata['has_headers'] = has_headers
-            docx_metadata['has_footers'] = has_footers
+            docx_metadata['has_headers'] = 1 if has_headers else 0
+            docx_metadata['has_footers'] = 1 if has_footers else 0
             
         except Exception as e:
             self.logger.error(f"Error extracting DOCX metadata: {str(e)}")
