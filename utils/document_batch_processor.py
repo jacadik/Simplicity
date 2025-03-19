@@ -2,18 +2,25 @@ import os
 import logging
 import time
 import shutil
-from typing import List, Dict, Any, Optional
+import threading
+from typing import List, Dict, Any, Optional, Callable
 from datetime import datetime
 from werkzeug.utils import secure_filename
+from sqlalchemy.orm import Session
+from sqlalchemy import text
 
 from utils.thread_pool_manager import ThreadPoolManager
 from utils.document_parser import DocumentParser
 from utils.document_metadata_extractor import DocumentMetadataExtractor
 from utils.database_manager import DatabaseManager
 
+# Thread-local storage for database sessions
+local_sessions = threading.local()
+
 class DocumentBatchProcessor:
     """
-    Handles processing batches of documents with multi-threading support.
+    Handles processing batches of documents with multi-threading support
+    and optimized database session management.
     """
     def __init__(self, 
                  db_manager: DatabaseManager,
@@ -40,9 +47,9 @@ class DocumentBatchProcessor:
         self.thread_pool = ThreadPoolManager(max_workers=max_workers, logging_level=logging_level)
         self.logger = self._setup_logger(logging_level)
         
-    def process_uploaded_files(self, files: List, progress_callback=None) -> Dict[str, Any]:
+    def process_uploaded_files(self, files: List, progress_callback: Optional[Callable] = None) -> Dict[str, Any]:
         """
-        Process uploaded files in parallel.
+        Process uploaded files in parallel with optimized database session handling.
         
         Args:
             files: List of file objects from request.files
@@ -79,7 +86,7 @@ class DocumentBatchProcessor:
                     'file_type': filename.rsplit('.', 1)[1].lower()
                 })
         
-        # Step 2: Process all documents in parallel
+        # Step 2: Process all documents in parallel with thread-local sessions
         results = self.thread_pool.process_batch(
             document_infos, 
             self._process_single_document,
@@ -100,9 +107,9 @@ class DocumentBatchProcessor:
             'results': results
         }
     
-    def process_folder(self, folder_path: str, progress_callback=None) -> Dict[str, Any]:
+    def process_folder(self, folder_path: str, progress_callback: Optional[Callable] = None) -> Dict[str, Any]:
         """
-        Process all compatible files in a folder.
+        Process all compatible files in a folder with optimized database session handling.
         
         Args:
             folder_path: Path to the folder
@@ -141,7 +148,7 @@ class DocumentBatchProcessor:
                     'file_type': filename.rsplit('.', 1)[1].lower()
                 })
         
-        # Step 2: Process all documents in parallel
+        # Step 2: Process all documents in parallel with thread-local sessions
         if document_infos:
             results = self.thread_pool.process_batch(
                 document_infos, 
@@ -171,9 +178,21 @@ class DocumentBatchProcessor:
                 'results': []
             }
     
+    def _get_session(self) -> Session:
+        """
+        Get a thread-local session or create a new one if it doesn't exist.
+        
+        Returns:
+            SQLAlchemy session
+        """
+        if not hasattr(local_sessions, 'session'):
+            local_sessions.session = self.db_manager.Session()
+        return local_sessions.session
+    
     def _process_single_document(self, doc_info: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Process a single document in a worker thread.
+        Process a single document in a worker thread using thread-local session
+        with savepoints for isolation.
         
         Args:
             doc_info: Dictionary with document information
@@ -188,15 +207,24 @@ class DocumentBatchProcessor:
         self.logger.info(f"Processing document in thread: {filename}")
         
         try:
-            # Create a new session for this thread to ensure thread safety
-            session = self.db_manager.Session()
+            # Get thread-local session
+            session = self._get_session()
+            
+            # Create a savepoint for this document's transaction
+            if hasattr(session, 'begin_nested'):
+                savepoint = session.begin_nested()
+            else:
+                # For databases that don't support savepoints, use plain transaction
+                # This means if this document fails, all documents in this thread will rollback
+                savepoint = session.begin()
             
             try:
                 # Step 1: Add document to database
-                doc_id = self.db_manager.add_document(filename, file_type, file_path)
+                doc_id = self._add_document(session, filename, file_type, file_path)
                 
                 if doc_id <= 0:
                     self.logger.error(f"Failed to add document to database: {filename}")
+                    savepoint.rollback()
                     return {
                         'success': False,
                         'error': 'Failed to add document to database',
@@ -207,7 +235,7 @@ class DocumentBatchProcessor:
                 try:
                     metadata = self.metadata_extractor.extract_metadata(file_path)
                     if metadata:
-                        metadata_saved = self.db_manager.add_document_file_metadata(doc_id, metadata)
+                        metadata_saved = self._add_document_metadata(session, doc_id, metadata)
                         if not metadata_saved:
                             self.logger.warning(f"Failed to save metadata for document {filename}")
                 except Exception as e:
@@ -218,6 +246,9 @@ class DocumentBatchProcessor:
                 
                 if not paragraphs:
                     self.logger.warning(f"No paragraphs extracted from {filename}")
+                    # Still commit this document even if no paragraphs were found
+                    savepoint.commit()
+                    session.commit()
                     return {
                         'success': True,
                         'doc_id': doc_id,
@@ -226,16 +257,22 @@ class DocumentBatchProcessor:
                     }
                 
                 # Step 4: Add paragraphs to database
-                paragraph_ids = self.db_manager.add_paragraphs(paragraphs)
+                paragraph_ids = self._add_paragraphs(session, paragraphs)
                 
                 if not paragraph_ids:
                     self.logger.warning(f"Failed to add paragraphs from {filename}")
+                    savepoint.commit()
+                    session.commit()
                     return {
                         'success': True,
                         'doc_id': doc_id,
                         'filename': filename,
                         'paragraph_count': 0
                     }
+                
+                # Commit this document's changes
+                savepoint.commit()
+                session.commit()
                 
                 self.logger.info(f"Processed {len(paragraphs)} paragraphs from {filename}")
                 
@@ -245,17 +282,116 @@ class DocumentBatchProcessor:
                     'filename': filename,
                     'paragraph_count': len(paragraphs)
                 }
-            finally:
-                # Always close the session
-                session.close()
-                
+            except Exception as e:
+                savepoint.rollback()
+                self.logger.error(f"Error processing document {filename}: {str(e)}", exc_info=True)
+                return {
+                    'success': False,
+                    'error': str(e),
+                    'filename': filename
+                }
         except Exception as e:
-            self.logger.error(f"Error processing document {filename}: {str(e)}", exc_info=True)
+            self.logger.error(f"Session error processing document {filename}: {str(e)}", exc_info=True)
+            # Try to close the session and create a new one for future operations
+            self._cleanup_session()
             return {
                 'success': False,
                 'error': str(e),
                 'filename': filename
             }
+    
+    def _cleanup_session(self):
+        """Close the thread-local session if it exists."""
+        if hasattr(local_sessions, 'session'):
+            try:
+                local_sessions.session.close()
+            except:
+                pass
+            delattr(local_sessions, 'session')
+    
+    def _add_document(self, session: Session, filename: str, file_type: str, file_path: str) -> int:
+        """Add a document to the database using the provided session."""
+        from utils.database_manager import Document
+        
+        try:
+            # Create new document record
+            upload_date = datetime.now().isoformat()
+            
+            document = Document(
+                filename=filename,
+                file_type=file_type,
+                file_path=file_path,
+                upload_date=upload_date
+            )
+            
+            session.add(document)
+            session.flush()  # Flush to get the ID but don't commit yet
+            
+            return document.id
+        except Exception as e:
+            self.logger.error(f"Error adding document: {str(e)}", exc_info=True)
+            return -1
+    
+    def _add_document_metadata(self, session: Session, document_id: int, metadata: Dict) -> bool:
+        """Add document metadata using the provided session."""
+        from utils.database_manager import DocumentFileMetadata
+        import json
+        
+        try:
+            # Process metadata - convert lists/dicts to JSON strings
+            metadata_to_store = {}
+            for key, value in metadata.items():
+                if isinstance(value, (list, dict)):
+                    metadata_to_store[key] = json.dumps(value)
+                else:
+                    metadata_to_store[key] = value
+            
+            # Check if metadata already exists
+            existing = session.query(DocumentFileMetadata).filter_by(document_id=document_id).first()
+            
+            if existing:
+                # Update existing metadata
+                for key, value in metadata_to_store.items():
+                    if hasattr(existing, key):
+                        setattr(existing, key, value)
+            else:
+                # Create new metadata entry
+                metadata_to_store['document_id'] = document_id
+                metadata_obj = DocumentFileMetadata(**metadata_to_store)
+                session.add(metadata_obj)
+            
+            session.flush()
+            return True
+        except Exception as e:
+            self.logger.error(f"Error adding file metadata: {str(e)}", exc_info=True)
+            return False
+    
+    def _add_paragraphs(self, session: Session, paragraphs: List) -> List[int]:
+        """Add paragraphs to the database using the provided session."""
+        from utils.database_manager import Paragraph
+        
+        try:
+            paragraph_ids = []
+            
+            for para in paragraphs:
+                # Create new paragraph record
+                db_paragraph = Paragraph(
+                    content=para.content,
+                    document_id=para.doc_id,
+                    paragraph_type=para.paragraph_type,
+                    position=para.position,
+                    header_content=para.header_content
+                )
+                
+                session.add(db_paragraph)
+                # Flush to get the ID but don't commit yet
+                session.flush()
+                paragraph_ids.append(db_paragraph.id)
+            
+            return paragraph_ids
+        except Exception as e:
+            self.logger.error(f"Error adding paragraphs: {str(e)}", exc_info=True)
+            return []
     
     def _allowed_file(self, filename: str) -> bool:
         """Check if a file has an allowed extension."""

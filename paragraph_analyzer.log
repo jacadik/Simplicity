@@ -88,3 +88,5 @@
 2025-03-19 12:13:46,944 INFO: Finding similar paragraphs... [in C:\Simplicity\app.py:383]
 2025-03-19 12:13:48,093 INFO: Found 505 similar paragraphs [in C:\Simplicity\app.py:385]
 2025-03-19 12:13:48,093 INFO: Saving 962 similarity results to database [in C:\Simplicity\app.py:392]
+2025-03-19 12:40:37,030 INFO: Paragraph Analyzer startup [in C:\Simplicity\app.py:91]
+2025-03-19 12:40:42,910 INFO: Paragraph Analyzer startup [in C:\Simplicity\app.py:91]
