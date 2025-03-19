@@ -107,6 +107,43 @@ class DocumentBatchProcessor:
             'results': results
         }
     
+    def process_batch_documents(self, document_infos: List[Dict[str, Any]], progress_callback: Optional[Callable] = None) -> Dict[str, Any]:
+        """
+        Process a batch of prepared document information in parallel.
+        
+        Args:
+            document_infos: List of dictionaries containing document information
+                Each dict should have: filename, file_path, file_type
+            progress_callback: Optional callback function for progress updates
+            
+        Returns:
+            Dictionary with processing results
+        """
+        start_time = time.time()
+        total_documents = len(document_infos)
+        self.logger.info(f"Starting to process {total_documents} prepared documents")
+        
+        # Process all documents in parallel with thread-local sessions
+        results = self.thread_pool.process_batch(
+            document_infos, 
+            self._process_single_document,
+            progress_callback
+        )
+        
+        # Prepare summary
+        success_count = sum(1 for result in results if result.get('success', False))
+        
+        elapsed_time = time.time() - start_time
+        self.logger.info(f"Completed processing {total_documents} documents in {elapsed_time:.2f} seconds")
+        
+        return {
+            'success': success_count > 0,
+            'total': total_documents,
+            'processed': success_count,
+            'elapsed_time': elapsed_time,
+            'results': results
+        }
+    
     def process_folder(self, folder_path: str, progress_callback: Optional[Callable] = None) -> Dict[str, Any]:
         """
         Process all compatible files in a folder with optimized database session handling.

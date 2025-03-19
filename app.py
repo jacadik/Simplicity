@@ -164,6 +164,32 @@ def upload_documents():
     batch_results = []
     batch_start_time = time.time()
     
+    # Define the progress callback function
+    def progress_callback(completed, total, result):
+        """Send progress updates via Socket.IO."""
+        app.logger.info(f"Progress: {completed}/{total} - Processing: {result.get('filename', 'Unknown')}")
+        
+        # Calculate success count
+        success_count = sum(1 for r in batch_results[:completed] if r.get('success', False))
+        
+        # Calculate average time per file
+        elapsed = time.time() - batch_start_time
+        avg_time = elapsed / max(completed, 1)
+        
+        # Emit progress update
+        socketio.emit('upload_progress', {
+            'completed': completed,
+            'total': total,
+            'current_file': result.get('filename', 'Unknown'),
+            'success': result.get('success', False),
+            'progress_percent': int((completed / total) * 100),
+            'stats': {
+                'success_count': success_count,
+                'total': total,
+                'avg_time': avg_time
+            }
+        })
+    
     # Process files using multi-threaded batch processor
     results = batch_processor.process_uploaded_files(files, progress_callback=progress_callback)
     
@@ -193,6 +219,7 @@ def upload_documents():
     
     return redirect(url_for('index'))
 
+# Add this new route to scan a folder before processing
 @app.route('/upload-folder', methods=['POST'])
 def upload_folder():
     """Handle folder upload via path with multi-threaded processing."""
@@ -201,25 +228,169 @@ def upload_folder():
     folder_path = request.form.get('folder_path', '').strip()
     
     if not folder_path or not os.path.isdir(folder_path):
+        if g.is_xhr:
+            return jsonify({'success': False, 'message': 'Invalid folder path'})
         flash('Invalid folder path', 'danger')
         return redirect(url_for('index'))
+    
+    # First scan the folder to count eligible files
+    eligible_files = []
+    total_scanned = 0
+    
+    app.logger.info(f"Scanning folder: {folder_path}")
+    
+    try:
+        for root, dirs, files in os.walk(folder_path):
+            for filename in files:
+                total_scanned += 1
+                if allowed_file(filename):
+                    source_path = os.path.join(root, filename)
+                    eligible_files.append({
+                        'filename': filename, 
+                        'source_path': source_path
+                    })
+                
+                # Send scanning progress update every 10 files
+                if total_scanned % 10 == 0:
+                    app.logger.info(f"Scanning progress: found {len(eligible_files)} eligible files out of {total_scanned} scanned")
+                    socketio.emit('folder_scan_progress', {
+                        'file_count': len(eligible_files),
+                        'total_scanned': total_scanned,
+                        'scanning': True
+                    })
+    except Exception as e:
+        app.logger.error(f"Error scanning folder: {str(e)}")
+        if g.is_xhr:
+            return jsonify({'success': False, 'message': f'Error scanning folder: {str(e)}'})
+        flash(f'Error scanning folder: {str(e)}', 'danger')
+        return redirect(url_for('index'))
+    
+    # Final scan update
+    socketio.emit('folder_scan_progress', {
+        'file_count': len(eligible_files),
+        'total_scanned': total_scanned,
+        'scanning': False
+    })
+    
+    if not eligible_files:
+        if g.is_xhr:
+            return jsonify({'success': False, 'message': 'No eligible files found in folder'})
+        flash('No eligible files found in folder', 'danger')
+        return redirect(url_for('index'))
+    
+    app.logger.info(f"Found {len(eligible_files)} eligible files in folder {folder_path}")
     
     # Reset batch results and start time
     batch_results = []
     batch_start_time = time.time()
     
-    # Process folder using multi-threaded batch processor
-    results = batch_processor.process_folder(folder_path, progress_callback=progress_callback)
+    # Prepare documents for processing
+    document_infos = []
+    
+    for file_info in eligible_files:
+        filename = file_info['filename']
+        source_path = file_info['source_path']
+        dest_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        
+        # Add timestamp to filename if it already exists
+        if os.path.exists(dest_path):
+            name, ext = os.path.splitext(filename)
+            timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+            new_filename = f"{name}_{timestamp}{ext}"
+            dest_path = os.path.join(app.config['UPLOAD_FOLDER'], new_filename)
+        else:
+            new_filename = filename
+        
+        # Copy the file
+        try:
+            shutil.copy2(source_path, dest_path)
+            
+            # Prepare document info for processing
+            document_infos.append({
+                'filename': new_filename,
+                'file_path': dest_path,
+                'file_type': filename.rsplit('.', 1)[1].lower()
+            })
+        except Exception as e:
+            app.logger.error(f"Error copying file {source_path}: {str(e)}")
+            # Continue with other files
+    
+    # Define a folder-specific progress callback
+    def folder_progress_callback(completed, total, result):
+        """Send progress updates via Socket.IO specifically for folder uploads."""
+        app.logger.info(f"Folder progress: {completed}/{total} - Processing: {result.get('filename', 'Unknown')}")
+        
+        # Calculate success count
+        success_count = sum(1 for r in batch_results[:completed] if r.get('success', False))
+        
+        # Calculate average time per file
+        elapsed = time.time() - batch_start_time
+        avg_time = elapsed / max(completed, 1)
+        
+        # Emit progress update
+        socketio.emit('folder_upload_progress', {
+            'completed': completed,
+            'total': total,
+            'current_file': result.get('filename', 'Unknown'),
+            'success': result.get('success', False),
+            'progress_percent': int((completed / total) * 100),
+            'stats': {
+                'success_count': success_count,
+                'total': total,
+                'avg_time': avg_time
+            }
+        })
+    
+    # Process documents using multi-threaded batch processor
+    results = batch_processor.process_batch_documents(document_infos, progress_callback=folder_progress_callback)
     
     # Store results for progress tracking
     batch_results = results.get('results', [])
     
     # Send completion event
-    socketio.emit('upload_complete', {
+    socketio.emit('folder_upload_complete', {
         'processed': results['processed'],
         'total': results['total'],
         'elapsed_time': results['elapsed_time']
     })
+    
+    if g.is_xhr:
+        return jsonify({
+            'success': results['success'],
+            'message': f'Successfully processed {results["processed"]} document(s) from folder' if results['success'] else 'Failed to process documents from folder',
+            'total': results['total'],
+            'processed': results['processed'],
+            'elapsed_time': results['elapsed_time']
+        })
+    
+    if results['success']:
+        flash(f'Successfully processed {results["processed"]} document(s) from folder', 'success')
+    else:
+        flash('Failed to process documents from folder', 'danger')
+    
+    return redirect(url_for('index'))
+    
+    # Process documents using multi-threaded batch processor
+    results = batch_processor.process_batch_documents(document_infos, progress_callback=folder_progress_callback)
+    
+    # Store results for progress tracking
+    batch_results = results.get('results', [])
+    
+    # Send completion event
+    socketio.emit('folder_upload_complete', {
+        'processed': results['processed'],
+        'total': results['total'],
+        'elapsed_time': results['elapsed_time']
+    })
+    
+    if g.is_xhr:
+        return jsonify({
+            'success': results['success'],
+            'message': f'Successfully processed {results["processed"]} document(s) from folder' if results['success'] else 'Failed to process documents from folder',
+            'total': results['total'],
+            'processed': results['processed'],
+            'elapsed_time': results['elapsed_time']
+        })
     
     if results['success']:
         flash(f'Successfully processed {results["processed"]} document(s) from folder', 'success')
