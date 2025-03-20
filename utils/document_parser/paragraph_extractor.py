@@ -1,6 +1,6 @@
 """
 Paragraph Extractor module for classifying and processing raw paragraphs.
-Enhanced with improved list handling and header association.
+Enhanced with improved list handling, header association, and table detection.
 """
 
 import re
@@ -50,11 +50,11 @@ class ParagraphExtractor:
         # 1. Classify paragraph types
         classified_paragraphs = self._classify_paragraphs(raw_paragraphs)
         
-        # 2. Combine lists
-        combined_lists = self._combine_lists(classified_paragraphs)
+        # 2. Combine lists and tables
+        combined = self._combine_structure_elements(classified_paragraphs)
         
         # 3. Associate headers with paragraphs
-        with_headers = self._associate_headers(combined_lists)
+        with_headers = self._associate_headers(combined)
         
         # 4. Create final paragraph objects
         paragraphs = []
@@ -115,6 +115,12 @@ class ParagraphExtractor:
                 classified.append(para)
                 continue
             
+            # Check if paragraph is a table row
+            if self._is_table_row(content):
+                para['type'] = 'table'
+                classified.append(para)
+                continue
+            
             # Check if paragraph is a list
             if self._is_list_item(content):
                 para['type'] = 'list'
@@ -152,10 +158,112 @@ class ParagraphExtractor:
         content = para.get('content', '')
         return content.strip().endswith(':')
         
+    def _combine_structure_elements(self, paragraphs: List[Dict]) -> List[Dict]:
+        """
+        Combine consecutive structural elements (lists and tables) into single paragraphs
+        and attach them to their introducing paragraphs.
+        
+        Args:
+            paragraphs: List of paragraphs
+            
+        Returns:
+            List of paragraphs with combined elements
+        """
+        if not paragraphs:
+            return []
+            
+        combined = []
+        current_element = None
+        current_type = None
+        
+        for i, para in enumerate(paragraphs):
+            para_type = para['type']
+            
+            # Handle structured elements (lists and tables)
+            if para_type in ('list', 'table'):
+                # Extract column if available
+                column = para.get('column')
+                
+                if current_element is None:
+                    # Check if the previous paragraph introduces this element
+                    if combined and self._paragraph_introduces_list(combined[-1]):
+                        # Same column check if applicable
+                        prev_column = combined[-1].get('column')
+                        if prev_column is None or column is None or prev_column == column:
+                            # Attach to the previous paragraph
+                            prev_para = combined[-1]
+                            self.logger.debug(f"Attaching {para_type} to previous paragraph that ends with colon")
+                            
+                            # Create a combined paragraph + element content
+                            prev_para['content'] = f"{prev_para['content']}\n{para['content']}"
+                            
+                            # Continue to next paragraph
+                            continue
+                    
+                    # If not attached to previous paragraph, create a new element
+                    current_element = {
+                        'content': para['content'],
+                        'type': para_type,
+                        'position': para.get('position', 0),
+                        'column': column  # Preserve column information
+                    }
+                    current_type = para_type
+                    # Preserve metadata if available
+                    if 'metadata' in para:
+                        current_element['metadata'] = para['metadata']
+                else:
+                    # If current element is a table and this is also a table row, always combine
+                    # regardless of column, ensuring table rows stay together
+                    if current_type == 'table' and para_type == 'table':
+                        current_element['content'] += '\n' + para['content']
+                    # For list items, only combine in the same column
+                    elif current_type == 'list' and para_type == 'list':
+                        if column is None or current_element.get('column') is None or column == current_element['column']:
+                            current_element['content'] += '\n' + para['content']
+                        else:
+                            # If different columns, add current list and start a new one
+                            combined.append(current_element)
+                            current_element = {
+                                'content': para['content'],
+                                'type': para_type,
+                                'position': para.get('position', 0),
+                                'column': column
+                            }
+                            if 'metadata' in para:
+                                current_element['metadata'] = para['metadata']
+                    # If current element is a list and this is a table row (or vice versa)
+                    # finish the current element and start a new one
+                    else:
+                        combined.append(current_element)
+                        current_element = {
+                            'content': para['content'],
+                            'type': para_type,
+                            'position': para.get('position', 0),
+                            'column': column
+                        }
+                        current_type = para_type
+                        if 'metadata' in para:
+                            current_element['metadata'] = para['metadata']
+            else:
+                if current_element is not None:
+                    combined.append(current_element)
+                    current_element = None
+                    current_type = None
+                combined.append(para)
+        
+        # Add the last element if there is one
+        if current_element is not None:
+            combined.append(current_element)
+        
+        return combined
+    
     def _combine_lists(self, paragraphs: List[Dict]) -> List[Dict]:
         """
         Combine consecutive list items into a single paragraph and
         attach lists to their introducing paragraphs.
+        
+        DEPRECATED: Use _combine_structure_elements instead which handles both lists and tables.
+        This method is kept for backward compatibility.
         
         Args:
             paragraphs: List of paragraphs
@@ -163,69 +271,7 @@ class ParagraphExtractor:
         Returns:
             List of paragraphs with combined lists
         """
-        if not paragraphs:
-            return []
-            
-        combined = []
-        current_list = None
-        
-        for i, para in enumerate(paragraphs):
-            if para['type'] == 'list':
-                # Extract column if available
-                column = para.get('column')
-                
-                if current_list is None:
-                    # Check if the previous paragraph introduces this list
-                    if combined and self._paragraph_introduces_list(combined[-1]):
-                        # Same column check if applicable
-                        prev_column = combined[-1].get('column')
-                        if prev_column is None or column is None or prev_column == column:
-                            # Attach list to the previous paragraph
-                            prev_para = combined[-1]
-                            self.logger.debug(f"Attaching list to previous paragraph that ends with colon")
-                            
-                            # Create a combined paragraph + list content
-                            prev_para['content'] = f"{prev_para['content']}\n{para['content']}"
-                            
-                            # Continue to next paragraph
-                            continue
-                    
-                    # If not attached to previous paragraph, create a new list
-                    current_list = {
-                        'content': para['content'],
-                        'type': 'list',
-                        'position': para.get('position', 0),
-                        'column': column  # Preserve column information
-                    }
-                    # Preserve metadata if available
-                    if 'metadata' in para:
-                        current_list['metadata'] = para['metadata']
-                else:
-                    # Only combine lists in the same column
-                    if column is None or current_list.get('column') is None or column == current_list['column']:
-                        current_list['content'] += '\n' + para['content']
-                    else:
-                        # If different columns, add current list and start a new one
-                        combined.append(current_list)
-                        current_list = {
-                            'content': para['content'],
-                            'type': 'list',
-                            'position': para.get('position', 0),
-                            'column': column
-                        }
-                        if 'metadata' in para:
-                            current_list['metadata'] = para['metadata']
-            else:
-                if current_list is not None:
-                    combined.append(current_list)
-                    current_list = None
-                combined.append(para)
-        
-        # Add the last list if there is one
-        if current_list is not None:
-            combined.append(current_list)
-        
-        return combined
+        return self._combine_structure_elements(paragraphs)
     
     def _associate_headers(self, paragraphs: List[Dict]) -> List[Dict]:
         """
@@ -306,6 +352,40 @@ class ParagraphExtractor:
         
         return False
     
+    def _is_table_row(self, content: str) -> bool:
+        """
+        Determine if a paragraph is a table row.
+        
+        Args:
+            content: Paragraph content
+            
+        Returns:
+            True if paragraph is a table row, False otherwise
+        """
+        # Check for common table row patterns
+        # Pipe-separated values (typical for markdown tables)
+        if '|' in content and content.count('|') >= 2:
+            return True
+            
+        # Check for tab-separated values
+        if '\t' in content and content.count('\t') >= 1:
+            return True
+            
+        # Check for consistent spacing that might indicate columns
+        # (like 2+ groups of text separated by 3+ spaces)
+        if re.search(r'\w+\s{3,}\w+', content):
+            return True
+            
+        # Check for markdown table divider rows
+        if re.match(r'^\s*\|?\s*[-:]+\s*\|(?:\s*[-:]+\s*\|)*\s*$', content):
+            return True
+            
+        # Check for HTML table tags
+        if re.search(r'<tr>|<td>|<th>', content):
+            return True
+            
+        return False
+    
     def _is_list_item(self, content: str) -> bool:
         """
         Determine if a paragraph is a list item.
@@ -365,6 +445,23 @@ class ParagraphExtractor:
             items.append(current_item)
             
         return items
+    
+    def _extract_table_rows(self, text: str) -> List[str]:
+        """
+        Extract individual table rows from text.
+        
+        Args:
+            text: Text to extract rows from
+            
+        Returns:
+            List of extracted rows
+        """
+        # Simple approach: split by newlines
+        rows = []
+        for line in text.split('\n'):
+            if line.strip():
+                rows.append(line.strip())
+        return rows
     
     def _is_address(self, content: str) -> bool:
         """
