@@ -137,9 +137,46 @@ def allowed_file(filename):
 
 @app.route('/')
 def index():
-    """Main page with document management."""
+    """Main page with document management and pagination."""
+    # Get pagination parameters
+    page = request.args.get('page', 1, type=int)
+    per_page = 10  # Number of documents per page
+    
+    # Get all documents first
     documents = db_manager.get_documents()
-    return render_template('index.html', documents=documents)
+    
+    # Calculate total pages
+    total_documents = len(documents)
+    total_pages = (total_documents + per_page - 1) // per_page  # Ceiling division
+    
+    # Ensure page is within valid range
+    if page < 1:
+        page = 1
+    elif page > total_pages and total_pages > 0:
+        page = total_pages
+    
+    # Get slice of documents for current page
+    start_idx = (page - 1) * per_page
+    end_idx = start_idx + per_page
+    paginated_documents = documents[start_idx:end_idx] if documents else []
+    
+    # Get additional statistics
+    # Here you could add queries to get total paragraphs, duplicates, tags etc.
+    total_paragraphs = 0  # Replace with actual query
+    duplicates = 0        # Replace with actual query
+    tags = 0              # Replace with actual query
+    
+    return render_template(
+        'index.html',
+        documents=documents,            # All documents (for stats)
+        paginated_documents=paginated_documents,  # Documents for current page
+        page=page,
+        total_pages=total_pages,
+        per_page=per_page,
+        total_paragraphs=total_paragraphs,
+        duplicates=duplicates,
+        tags=tags
+    )
 
 @app.route('/upload', methods=['POST'])
 def upload_documents():
