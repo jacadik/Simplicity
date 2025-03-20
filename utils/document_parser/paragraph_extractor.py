@@ -1,10 +1,11 @@
 """
 Paragraph Extractor module for classifying and processing raw paragraphs.
+Enhanced with improved list handling and header association.
 """
 
 import re
 import logging
-from typing import List, Dict, Set
+from typing import List, Dict, Set, Optional
 
 from .paragraph import Paragraph
 
@@ -64,13 +65,15 @@ class ParagraphExtractor:
             if para['type'] == 'address' or not para['content'].strip():
                 self.logger.debug(f"Skipping {para['type']} paragraph: {para['content'][:30]}...")
                 continue
-                
+            
+            # Create paragraph object
             paragraph = Paragraph(
                 content=para['content'],
                 doc_id=doc_id,
                 paragraph_type=para['type'],
                 position=i,
-                header_content=header_content
+                header_content=header_content,
+                column=para.get('column')  # Include column position if available
             )
             paragraphs.append(paragraph)
         
@@ -97,9 +100,13 @@ class ParagraphExtractor:
             if not content:
                 continue
             
-            # If already classified as table, keep it
-            if para_type == 'table':
-                classified.append(para)
+            # Pass through already classified paragraphs
+            if para_type != 'unknown':
+                # Ensure column is preserved
+                if 'column' in para:
+                    classified.append(para)
+                else:
+                    classified.append(para)
                 continue
             
             # Check if paragraph is a header
@@ -109,7 +116,7 @@ class ParagraphExtractor:
                 continue
             
             # Check if paragraph is a list
-            if self._is_list(content):
+            if self._is_list_item(content):
                 para['type'] = 'list'
                 classified.append(para)
                 continue
@@ -132,9 +139,23 @@ class ParagraphExtractor:
         
         return classified
     
+    def _paragraph_introduces_list(self, para: Dict) -> bool:
+        """
+        Check if a paragraph introduces a list (ends with a colon).
+        
+        Args:
+            para: Paragraph dictionary
+            
+        Returns:
+            True if paragraph introduces a list, False otherwise
+        """
+        content = para.get('content', '')
+        return content.strip().endswith(':')
+        
     def _combine_lists(self, paragraphs: List[Dict]) -> List[Dict]:
         """
-        Combine consecutive list items into a single paragraph.
+        Combine consecutive list items into a single paragraph and
+        attach lists to their introducing paragraphs.
         
         Args:
             paragraphs: List of paragraphs
@@ -148,16 +169,52 @@ class ParagraphExtractor:
         combined = []
         current_list = None
         
-        for para in paragraphs:
+        for i, para in enumerate(paragraphs):
             if para['type'] == 'list':
+                # Extract column if available
+                column = para.get('column')
+                
                 if current_list is None:
+                    # Check if the previous paragraph introduces this list
+                    if combined and self._paragraph_introduces_list(combined[-1]):
+                        # Same column check if applicable
+                        prev_column = combined[-1].get('column')
+                        if prev_column is None or column is None or prev_column == column:
+                            # Attach list to the previous paragraph
+                            prev_para = combined[-1]
+                            self.logger.debug(f"Attaching list to previous paragraph that ends with colon")
+                            
+                            # Create a combined paragraph + list content
+                            prev_para['content'] = f"{prev_para['content']}\n{para['content']}"
+                            
+                            # Continue to next paragraph
+                            continue
+                    
+                    # If not attached to previous paragraph, create a new list
                     current_list = {
                         'content': para['content'],
                         'type': 'list',
-                        'position': para.get('position', 0)
+                        'position': para.get('position', 0),
+                        'column': column  # Preserve column information
                     }
+                    # Preserve metadata if available
+                    if 'metadata' in para:
+                        current_list['metadata'] = para['metadata']
                 else:
-                    current_list['content'] += '\n' + para['content']
+                    # Only combine lists in the same column
+                    if column is None or current_list.get('column') is None or column == current_list['column']:
+                        current_list['content'] += '\n' + para['content']
+                    else:
+                        # If different columns, add current list and start a new one
+                        combined.append(current_list)
+                        current_list = {
+                            'content': para['content'],
+                            'type': 'list',
+                            'position': para.get('position', 0),
+                            'column': column
+                        }
+                        if 'metadata' in para:
+                            current_list['metadata'] = para['metadata']
             else:
                 if current_list is not None:
                     combined.append(current_list)
@@ -184,17 +241,23 @@ class ParagraphExtractor:
             return []
             
         result = []
-        last_header = None
+        headers_by_column = {}  # Track headers by column to maintain proper association
         
         for para in paragraphs:
+            column = para.get('column')
+            
             if para['type'] == 'header':
-                last_header = para['content']
+                # Store header by column
+                headers_by_column[column] = para['content']
                 # Add the header as a standalone paragraph too
                 result.append(para)
             else:
-                if last_header is not None:
-                    para['header_content'] = last_header
-                    last_header = None  # Only associate with the immediately following paragraph
+                # Associate with appropriate header for this column
+                if column in headers_by_column:
+                    para['header_content'] = headers_by_column[column]
+                    # Clear header association after using it (only associate with next paragraph)
+                    del headers_by_column[column]
+                
                 result.append(para)
         
         return result
@@ -210,6 +273,16 @@ class ParagraphExtractor:
         Returns:
             True if paragraph is a header, False otherwise
         """
+        # If already classified as header, respect that
+        if para_info.get('type') == 'header':
+            return True
+            
+        # If metadata contains header info, use that
+        if 'metadata' in para_info:
+            metadata = para_info['metadata']
+            if metadata.get('is_bold') and metadata.get('font_size', 0) > 10:
+                return True
+        
         # Check if style indicates a header (for DOCX)
         if 'style' in para_info and any(term in para_info['style'].lower() for term in ['head', 'title', 'subtitle']):
             return True
@@ -233,7 +306,7 @@ class ParagraphExtractor:
         
         return False
     
-    def _is_list(self, content: str) -> bool:
+    def _is_list_item(self, content: str) -> bool:
         """
         Determine if a paragraph is a list item.
         
@@ -248,10 +321,50 @@ class ParagraphExtractor:
             return True
             
         # Check for numbered lists
-        if re.match(r'^\s*(\d+[\.\)]\s+|\([a-z\d]\)\s+|[a-z\d][\.\)]\s+)', content):
+        if re.match(r'^\s*(\d+[\.\)]\s+|\([a-z\d]\)\s+|[a-z\d][\.\)]\s+|[ivxIVX]+[\.\)]\s+)', content):
             return True
             
+        # Check for multi-line lists with continuation lines
+        lines = content.split('\n')
+        if len(lines) > 1:
+            if any(self._is_list_item(line) for line in lines):
+                return True
+                
         return False
+    
+    def _extract_list_items(self, text: str) -> List[str]:
+        """
+        Extract individual list items from text.
+        
+        Args:
+            text: Text to extract items from
+            
+        Returns:
+            List of extracted items
+        """
+        items = []
+        current_item = None
+        
+        for line in text.split('\n'):
+            line = line.strip()
+            if not line:
+                continue
+                
+            if self._is_list_item(line):
+                if current_item:
+                    items.append(current_item)
+                current_item = line
+            elif current_item:
+                # Continuation of previous item
+                current_item += ' ' + line
+            else:
+                # Not part of a list
+                current_item = line
+        
+        if current_item:
+            items.append(current_item)
+            
+        return items
     
     def _is_address(self, content: str) -> bool:
         """
