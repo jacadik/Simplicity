@@ -4,6 +4,8 @@ from logging.handlers import RotatingFileHandler
 import tempfile
 import shutil
 import time
+import threading
+from queue import Queue
 from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, send_file, g
 from werkzeug.utils import secure_filename
@@ -38,7 +40,10 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16 MB max upload size
 app.secret_key = 'paragraph_analyzer_secret_key'  # For flash messages
 
 # Initialize Flask-SocketIO
-socketio = SocketIO(app, cors_allowed_origins="*")
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
+
+# Create a thread-safe queue for progress updates
+progress_queue = Queue()
 
 def _setup_logger(self, level: str) -> logging.Logger:
     """Set up a logger instance."""
@@ -114,9 +119,62 @@ batch_processor = DocumentBatchProcessor(
 batch_results = []
 batch_start_time = 0
 
-# Socket.IO progress event handler
+# Socket.IO event handlers
+@socketio.on('connect')
+def handle_connect():
+    """Handle client connection."""
+    logger.info(f"Socket.IO client connected from thread {threading.get_ident()}")
+    
+    # Start a background task to process the progress queue
+    socketio.start_background_task(target=process_progress_queue)
+
+def process_progress_queue():
+    """Process the progress queue in a separate thread."""
+    logger.info(f"Starting progress queue processor in thread {threading.get_ident()}")
+    
+    while True:
+        if not progress_queue.empty():
+            try:
+                # Get progress data from queue
+                data = progress_queue.get()
+                event_type = data.pop('event_type', 'upload_progress')
+                
+                # Emit the event
+                logger.debug(f"Emitting {event_type} event: {data}")
+                socketio.emit(event_type, data)
+            except Exception as e:
+                logger.error(f"Error processing progress queue: {str(e)}", exc_info=True)
+        
+        # Sleep briefly to avoid high CPU usage
+        socketio.sleep(0.1)
+
+@socketio.on('echo')
+def handle_echo(data):
+    """Echo test for Socket.IO connectivity."""
+    logger.info(f"Received echo request: {data}")
+    socketio.emit('echo_response', {'received': data, 'time': time.time()})
+
+# Thread-safe progress callback
+# In app.py, modify the progress_callback function:
+
 def progress_callback(completed, total, result):
-    """Send progress updates via WebSocket."""
+    """Send progress updates via Socket.IO."""
+    app.logger.info(f"Progress: {completed}/{total} - Processing: {result.get('filename', 'Unknown')}")
+    
+    # Add the missing update to batch_results
+    if len(batch_results) < completed:
+        batch_results.append(result)
+    elif len(batch_results) >= completed:
+        batch_results[completed-1] = result
+    
+    # Calculate success count
+    success_count = sum(1 for r in batch_results[:completed] if r.get('success', False))
+    
+    # Calculate average time per file
+    elapsed = time.time() - batch_start_time
+    avg_time = elapsed / max(completed, 1)
+    
+    # Emit progress update with namespace
     socketio.emit('upload_progress', {
         'completed': completed,
         'total': total,
@@ -124,11 +182,27 @@ def progress_callback(completed, total, result):
         'success': result.get('success', False),
         'progress_percent': int((completed / total) * 100),
         'stats': {
-            'success_count': sum(1 for r in batch_results[:completed] if r.get('success', False)),
+            'success_count': success_count,
             'total': total,
-            'avg_time': (time.time() - batch_start_time) / max(completed, 1)
+            'avg_time': avg_time
         }
     })
+
+# Thread-safe completion callback
+def completion_callback(data):
+    """Queue a completion event."""
+    logger.info(f"Completion callback from thread {threading.get_ident()}")
+    
+    try:
+        # Queue completion event
+        progress_queue.put({
+            'event_type': 'upload_complete',
+            'processed': data['processed'],
+            'total': data['total'],
+            'elapsed_time': data['elapsed_time']
+        })
+    except Exception as e:
+        logger.error(f"Error in completion callback: {str(e)}", exc_info=True)
 
 # Utility functions
 def allowed_file(filename):
@@ -183,6 +257,9 @@ def upload_documents():
     """Handle document upload with multi-threaded processing."""
     global batch_results, batch_start_time
     
+    # Log current thread for debugging
+    logger.info(f"Upload handler running in thread {threading.get_ident()}")
+    
     if 'files[]' not in request.files:
         if g.is_xhr:  # Check if it's an AJAX request using g object
             return jsonify({'success': False, 'message': 'No files selected'})
@@ -201,31 +278,8 @@ def upload_documents():
     batch_results = []
     batch_start_time = time.time()
     
-    # Define the progress callback function
-    def progress_callback(completed, total, result):
-        """Send progress updates via Socket.IO."""
-        app.logger.info(f"Progress: {completed}/{total} - Processing: {result.get('filename', 'Unknown')}")
-        
-        # Calculate success count
-        success_count = sum(1 for r in batch_results[:completed] if r.get('success', False))
-        
-        # Calculate average time per file
-        elapsed = time.time() - batch_start_time
-        avg_time = elapsed / max(completed, 1)
-        
-        # Emit progress update
-        socketio.emit('upload_progress', {
-            'completed': completed,
-            'total': total,
-            'current_file': result.get('filename', 'Unknown'),
-            'success': result.get('success', False),
-            'progress_percent': int((completed / total) * 100),
-            'stats': {
-                'success_count': success_count,
-                'total': total,
-                'avg_time': avg_time
-            }
-        })
+    # Log the start of processing
+    logger.info(f"Starting to process {len(files)} files")
     
     # Process files using multi-threaded batch processor
     results = batch_processor.process_uploaded_files(files, progress_callback=progress_callback)
@@ -233,12 +287,8 @@ def upload_documents():
     # Store results for progress tracking
     batch_results = results.get('results', [])
     
-    # Send completion event
-    socketio.emit('upload_complete', {
-        'processed': results['processed'],
-        'total': results['total'],
-        'elapsed_time': results['elapsed_time']
-    })
+    # Queue completion event instead of direct emission
+    completion_callback(results)
     
     if g.is_xhr:
         return jsonify({
@@ -255,6 +305,21 @@ def upload_documents():
         flash('Failed to process uploaded documents', 'danger')
     
     return redirect(url_for('index'))
+
+# Testing route for Socket.IO
+@app.route('/test-socket')
+def test_socket():
+    """Test route for Socket.IO connectivity."""
+    logger.info(f"Socket.IO test from thread {threading.get_ident()}")
+    
+    # Queue a test message
+    progress_queue.put({
+        'event_type': 'test_event',
+        'message': 'Test event from server',
+        'time': time.time()
+    })
+    
+    return "Socket.IO test event sent. Check browser console to see if it was received."
 
 # Add this new route to scan a folder before processing
 @app.route('/upload-folder', methods=['POST'])
@@ -274,7 +339,7 @@ def upload_folder():
     eligible_files = []
     total_scanned = 0
     
-    app.logger.info(f"Scanning folder: {folder_path}")
+    logger.info(f"Scanning folder: {folder_path}")
     
     try:
         for root, dirs, files in os.walk(folder_path):
@@ -289,21 +354,24 @@ def upload_folder():
                 
                 # Send scanning progress update every 10 files
                 if total_scanned % 10 == 0:
-                    app.logger.info(f"Scanning progress: found {len(eligible_files)} eligible files out of {total_scanned} scanned")
-                    socketio.emit('folder_scan_progress', {
+                    logger.info(f"Scanning progress: found {len(eligible_files)} eligible files out of {total_scanned} scanned")
+                    # Queue folder scan progress update
+                    progress_queue.put({
+                        'event_type': 'folder_scan_progress',
                         'file_count': len(eligible_files),
                         'total_scanned': total_scanned,
                         'scanning': True
                     })
     except Exception as e:
-        app.logger.error(f"Error scanning folder: {str(e)}")
+        logger.error(f"Error scanning folder: {str(e)}")
         if g.is_xhr:
             return jsonify({'success': False, 'message': f'Error scanning folder: {str(e)}'})
         flash(f'Error scanning folder: {str(e)}', 'danger')
         return redirect(url_for('index'))
     
     # Final scan update
-    socketio.emit('folder_scan_progress', {
+    progress_queue.put({
+        'event_type': 'folder_scan_progress',
         'file_count': len(eligible_files),
         'total_scanned': total_scanned,
         'scanning': False
@@ -315,7 +383,7 @@ def upload_folder():
         flash('No eligible files found in folder', 'danger')
         return redirect(url_for('index'))
     
-    app.logger.info(f"Found {len(eligible_files)} eligible files in folder {folder_path}")
+    logger.info(f"Found {len(eligible_files)} eligible files in folder {folder_path}")
     
     # Reset batch results and start time
     batch_results = []
@@ -349,72 +417,18 @@ def upload_folder():
                 'file_type': filename.rsplit('.', 1)[1].lower()
             })
         except Exception as e:
-            app.logger.error(f"Error copying file {source_path}: {str(e)}")
+            logger.error(f"Error copying file {source_path}: {str(e)}")
             # Continue with other files
     
-    # Define a folder-specific progress callback
-    def folder_progress_callback(completed, total, result):
-        """Send progress updates via Socket.IO specifically for folder uploads."""
-        app.logger.info(f"Folder progress: {completed}/{total} - Processing: {result.get('filename', 'Unknown')}")
-        
-        # Calculate success count
-        success_count = sum(1 for r in batch_results[:completed] if r.get('success', False))
-        
-        # Calculate average time per file
-        elapsed = time.time() - batch_start_time
-        avg_time = elapsed / max(completed, 1)
-        
-        # Emit progress update
-        socketio.emit('folder_upload_progress', {
-            'completed': completed,
-            'total': total,
-            'current_file': result.get('filename', 'Unknown'),
-            'success': result.get('success', False),
-            'progress_percent': int((completed / total) * 100),
-            'stats': {
-                'success_count': success_count,
-                'total': total,
-                'avg_time': avg_time
-            }
-        })
-    
     # Process documents using multi-threaded batch processor
-    results = batch_processor.process_batch_documents(document_infos, progress_callback=folder_progress_callback)
+    results = batch_processor.process_batch_documents(document_infos, progress_callback=progress_callback)
     
     # Store results for progress tracking
     batch_results = results.get('results', [])
     
-    # Send completion event
-    socketio.emit('folder_upload_complete', {
-        'processed': results['processed'],
-        'total': results['total'],
-        'elapsed_time': results['elapsed_time']
-    })
-    
-    if g.is_xhr:
-        return jsonify({
-            'success': results['success'],
-            'message': f'Successfully processed {results["processed"]} document(s) from folder' if results['success'] else 'Failed to process documents from folder',
-            'total': results['total'],
-            'processed': results['processed'],
-            'elapsed_time': results['elapsed_time']
-        })
-    
-    if results['success']:
-        flash(f'Successfully processed {results["processed"]} document(s) from folder', 'success')
-    else:
-        flash('Failed to process documents from folder', 'danger')
-    
-    return redirect(url_for('index'))
-    
-    # Process documents using multi-threaded batch processor
-    results = batch_processor.process_batch_documents(document_infos, progress_callback=folder_progress_callback)
-    
-    # Store results for progress tracking
-    batch_results = results.get('results', [])
-    
-    # Send completion event
-    socketio.emit('folder_upload_complete', {
+    # Queue completion event
+    progress_queue.put({
+        'event_type': 'folder_upload_complete',
         'processed': results['processed'],
         'total': results['total'],
         'elapsed_time': results['elapsed_time']
@@ -558,17 +572,7 @@ def analyze_similarity():
         flash('No paragraphs available for analysis', 'warning')
         return redirect(url_for('view_similarity'))
     
-    app.logger.info(f"Retrieved {len(paragraphs)} paragraphs for similarity analysis")
-    
-    # Log document distribution for debugging
-    doc_counts = {}
-    for para in paragraphs:
-        doc_id = para['document_id']
-        if doc_id not in doc_counts:
-            doc_counts[doc_id] = 0
-        doc_counts[doc_id] += 1
-    
-    app.logger.info(f"Paragraph distribution by document: {doc_counts}")
+    logger.info(f"Retrieved {len(paragraphs)} paragraphs for similarity analysis")
     
     # Prepare data for similarity analysis
     para_data = []
@@ -583,21 +587,21 @@ def analyze_similarity():
     db_manager.clear_similarity_results()
     
     # Find exact matches first
-    app.logger.info("Finding exact matches...")
+    logger.info("Finding exact matches...")
     exact_matches = similarity_analyzer.find_exact_matches(para_data)
-    app.logger.info(f"Found {len(exact_matches)} exact matches")
+    logger.info(f"Found {len(exact_matches)} exact matches")
     
     # Find similar paragraphs with the converted threshold
-    app.logger.info("Finding similar paragraphs...")
+    logger.info("Finding similar paragraphs...")
     similar_paragraphs = similarity_analyzer.find_similar_paragraphs(para_data, threshold)
-    app.logger.info(f"Found {len(similar_paragraphs)} similar paragraphs")
+    logger.info(f"Found {len(similar_paragraphs)} similar paragraphs")
     
     # Combine results
     all_results = exact_matches + similar_paragraphs
     
     if all_results:
         # Save results to database
-        app.logger.info(f"Saving {len(all_results)} similarity results to database")
+        logger.info(f"Saving {len(all_results)} similarity results to database")
         db_manager.add_similarity_results(all_results)
         flash(f'Found {len(exact_matches)} exact matches and {len(similar_paragraphs)} similar paragraphs', 'success')
     else:
@@ -675,7 +679,7 @@ def tag_paragraph():
         tag_id = int(tag_id)
         
         # Debug logging
-        app.logger.info(f"Tagging paragraph {paragraph_id} with tag {tag_id}, tag_all_duplicates: {tag_all_duplicates}")
+        logger.info(f"Tagging paragraph {paragraph_id} with tag {tag_id}, tag_all_duplicates: {tag_all_duplicates}")
         
         # Call database manager with the tag_all_duplicates parameter
         success = db_manager.tag_paragraph(paragraph_id, tag_id, tag_all_duplicates)
@@ -685,7 +689,7 @@ def tag_paragraph():
         else:
             return jsonify({'success': False, 'message': 'Failed to add tag'})
     except Exception as e:
-        app.logger.error(f"Error in tag_paragraph: {str(e)}", exc_info=True)
+        logger.error(f"Error in tag_paragraph: {str(e)}", exc_info=True)
         return jsonify({'success': False, 'message': str(e)})
 
 # Route handler for untagging paragraphs
@@ -706,7 +710,7 @@ def untag_paragraph():
         tag_id = int(tag_id)
         
         # Debug logging
-        app.logger.info(f"Untagging paragraph {paragraph_id} with tag {tag_id}, untag_all_duplicates: {untag_all_duplicates}")
+        logger.info(f"Untagging paragraph {paragraph_id} with tag {tag_id}, untag_all_duplicates: {untag_all_duplicates}")
         
         # Call database manager with the untag_all_duplicates parameter
         success = db_manager.untag_paragraph(paragraph_id, tag_id, untag_all_duplicates)
@@ -716,7 +720,7 @@ def untag_paragraph():
         else:
             return jsonify({'success': False, 'message': 'Failed to remove tag'})
     except Exception as e:
-        app.logger.error(f"Error in untag_paragraph: {str(e)}", exc_info=True)
+        logger.error(f"Error in untag_paragraph: {str(e)}", exc_info=True)
         return jsonify({'success': False, 'message': str(e)})
 
 
@@ -875,8 +879,9 @@ def page_not_found(error):
 @app.errorhandler(500)
 def internal_server_error(error):
     """Handle 500 error."""
-    logger.error(f"Internal server error: {str(error)}", exc_info=True)
+    logger.error(f"Internal server error: {str(e)}", exc_info=True)
     return render_template('500.html'), 500
 
 if __name__ == '__main__':
+    # NOTE: Using socketio.run instead of app.run is critical for Socket.IO to work
     socketio.run(app, debug=True)

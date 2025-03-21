@@ -239,6 +239,7 @@
             }
         }
     </style>
+    {% block head %}{% endblock %}
 </head>
 <body>
     <!-- Modern Header -->
@@ -389,71 +390,75 @@
             });
         }
         
-        // Only target the file upload form specifically, not the folder form
-        const uploadForm = document.getElementById('uploadForm');
-        if (uploadForm) {
-            uploadForm.addEventListener('submit', function(e) {
-                e.preventDefault();
-                
-                const files = document.getElementById('files').files;
-                if (files.length === 0) {
-                    alert('Please select at least one file');
-                    return;
-                }
-                
-                // Create FormData object
-                const formData = new FormData(this);
-                
-                // Show progress bar and disable submit button
-                const uploadProgress = document.getElementById('uploadProgress');
-                const uploadButton = document.getElementById('uploadButton');
-                
-                if (uploadProgress) {
-                    uploadProgress.style.display = 'block';
-                }
-                
-                if (uploadButton) {
-                    uploadButton.disabled = true;
-                    uploadButton.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Uploading...';
-                }
-                
-                // Send AJAX request
-                fetch('/upload', {
-                    method: 'POST',
-                    body: formData,
-                    headers: {
-                        'X-Requested-With': 'XMLHttpRequest'
+        // Check if document_upload.js is included in the page
+        // If not, only then apply the basic upload form handler
+        if (!window.documentUploadInitialized) {
+            // Only target the file upload form specifically, not the folder form
+            const uploadForm = document.getElementById('uploadForm');
+            if (uploadForm) {
+                uploadForm.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    
+                    const files = document.getElementById('files').files;
+                    if (files.length === 0) {
+                        alert('Please select at least one file');
+                        return;
                     }
-                })
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error('Network response was not ok: ' + response.statusText);
-                    }
-                    return response.json();
-                })
-                .then(data => {
-                    // When upload is complete, redirect to refresh the page
-                    window.location.href = '/';
-                })
-                .catch(error => {
-                    // On error, show alert and reset form
-                    alert('Error uploading files: ' + error.message);
+                    
+                    // Create FormData object
+                    const formData = new FormData(this);
+                    
+                    // Show progress bar and disable submit button
+                    const uploadProgress = document.getElementById('uploadProgress');
+                    const uploadButton = document.getElementById('uploadButton');
                     
                     if (uploadProgress) {
-                        uploadProgress.style.display = 'none';
+                        uploadProgress.style.display = 'block';
                     }
                     
                     if (uploadButton) {
-                        uploadButton.disabled = false;
-                        uploadButton.innerHTML = '<i class="bi bi-cloud-upload me-1"></i>Upload';
+                        uploadButton.disabled = true;
+                        uploadButton.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Uploading...';
                     }
                     
-                    const progressBar = document.querySelector('.progress-bar');
-                    if (progressBar) {
-                        progressBar.style.width = '0%';
-                    }
+                    // Send AJAX request
+                    fetch('/upload', {
+                        method: 'POST',
+                        body: formData,
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }
+                    })
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('Network response was not ok: ' + response.statusText);
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        // When upload is complete, redirect to refresh the page
+                        window.location.href = '/';
+                    })
+                    .catch(error => {
+                        // On error, show alert and reset form
+                        alert('Error uploading files: ' + error.message);
+                        
+                        if (uploadProgress) {
+                            uploadProgress.style.display = 'none';
+                        }
+                        
+                        if (uploadButton) {
+                            uploadButton.disabled = false;
+                            uploadButton.innerHTML = '<i class="bi bi-cloud-upload me-1"></i>Upload';
+                        }
+                        
+                        const progressBar = document.querySelector('.progress-bar');
+                        if (progressBar) {
+                            progressBar.style.width = '0%';
+                        }
+                    });
                 });
-            });
+            }
         }
 
         // Add smooth transitions for card hover effects

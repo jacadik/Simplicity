@@ -1,11 +1,14 @@
 /**
  * Document Batch Upload Handler
  * Handles large batch uploads with real-time progress tracking
- * Version: 2.0 with debugging
+ * Version: 3.0 with enhanced counters
  */
 
 document.addEventListener('DOMContentLoaded', function() {
     console.log('Document upload script loaded');
+    
+    // Set a flag to notify base.html that the upload handler is initialized
+    window.documentUploadInitialized = true;
     
     // Get form elements
     const uploadForm = document.getElementById('uploadForm');
@@ -37,10 +40,15 @@ document.addEventListener('DOMContentLoaded', function() {
     const estimatedFolderTimeRemainingElement = document.getElementById('estimatedFolderTimeRemaining');
     const folderStatsContainer = document.getElementById('folderStats');
     
+    // Upload process counter elements
+    const uploadCounterElement = document.getElementById('uploadCounter');
+    const uploadCounterContainer = document.getElementById('uploadCounterContainer');
+    
     console.log('Upload form found:', !!uploadForm);
     console.log('Folder form found:', !!folderForm);
     console.log('Progress container found:', !!progressContainer);
     console.log('Folder progress container found:', !!folderProgressContainer);
+    console.log('Upload counter found:', !!uploadCounterElement);
     
     // Socket.IO initialization for real-time progress updates
     let socket;
@@ -62,30 +70,37 @@ document.addEventListener('DOMContentLoaded', function() {
             socket.on('upload_progress', function(data) {
                 console.log('Received upload_progress event:', data);
                 updateProgressUI(data, 'file');
+                updateUploadCounter(data.total - data.completed);
             });
             
             // Handle progress updates for folder uploads
             socket.on('folder_upload_progress', function(data) {
                 console.log('Received folder_upload_progress event:', data);
                 updateProgressUI(data, 'folder');
+                updateUploadCounter(data.total - data.completed);
             });
             
             // Handle batch completion
             socket.on('upload_complete', function(data) {
                 console.log('Received upload_complete event:', data);
                 showCompletionMessage(data, 'file');
+                updateUploadCounter(0);
             });
             
             // Handle folder batch completion
             socket.on('folder_upload_complete', function(data) {
                 console.log('Received folder_upload_complete event:', data);
                 showCompletionMessage(data, 'folder');
+                updateUploadCounter(0);
             });
             
             // Handle folder scanning progress
             socket.on('folder_scan_progress', function(data) {
                 console.log('Received folder_scan_progress event:', data);
                 updateFolderScanProgress(data);
+                if (data.file_count > 0) {
+                    updateUploadCounter(data.file_count);
+                }
             });
         } else {
             console.warn('Socket.IO library not found. Real-time progress updates will not be available.');
@@ -106,6 +121,30 @@ document.addEventListener('DOMContentLoaded', function() {
             const hours = Math.floor(seconds / 3600);
             const minutes = Math.floor((seconds % 3600) / 60);
             return `${hours}h ${minutes}m`;
+        }
+    }
+    
+    // Update the upload counter in the header
+    function updateUploadCounter(remainingFiles) {
+        if (uploadCounterElement) {
+            if (remainingFiles > 0) {
+                uploadCounterElement.textContent = remainingFiles;
+                
+                if (uploadCounterContainer) {
+                    uploadCounterContainer.style.display = 'inline-flex';
+                    
+                    // Add pulse animation
+                    uploadCounterContainer.classList.add('counter-pulse');
+                    setTimeout(() => {
+                        uploadCounterContainer.classList.remove('counter-pulse');
+                    }, 1000);
+                }
+            } else {
+                // Hide counter when no files remain
+                if (uploadCounterContainer) {
+                    uploadCounterContainer.style.display = 'none';
+                }
+            }
         }
     }
     
@@ -314,6 +353,9 @@ document.addEventListener('DOMContentLoaded', function() {
             
             console.log(`Uploading ${files.length} files`);
             
+            // Update the upload counter with total files
+            updateUploadCounter(files.length);
+            
             // Show file count warning for large batches
             if (files.length > 50) {
                 if (!confirm(`You are about to upload ${files.length} files. This may take some time. Continue?`)) {
@@ -398,6 +440,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         total: data.total,
                         elapsed_time: data.elapsed_time || 0
                     }, 'file');
+                    updateUploadCounter(0);
                 }
                 
                 // If requested by server or after 5 seconds, redirect to refresh the page
@@ -422,6 +465,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     uploadButton.disabled = false;
                     uploadButton.innerHTML = '<i class="bi bi-cloud-upload me-1"></i>Upload';
                 }
+                
+                // Reset upload counter
+                updateUploadCounter(0);
             });
         });
     }
@@ -511,6 +557,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         total: data.total,
                         elapsed_time: data.elapsed_time || 0
                     }, 'folder');
+                    updateUploadCounter(0);
                 }
                 
                 // If requested by server or after 5 seconds, redirect to refresh the page
@@ -535,6 +582,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     importButton.disabled = false;
                     importButton.innerHTML = '<i class="bi bi-folder-check me-1"></i>Import';
                 }
+                
+                // Reset upload counter
+                updateUploadCounter(0);
             });
         });
     }
@@ -590,6 +640,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (remainingFilesCountElement) {
                     remainingFilesCountElement.textContent = files.length;
                 }
+                
+                // Update upload counter
+                updateUploadCounter(files.length);
             }
         }
     }
@@ -611,6 +664,9 @@ document.addEventListener('DOMContentLoaded', function() {
             if (remainingFilesCountElement) {
                 remainingFilesCountElement.textContent = this.files.length;
             }
+            
+            // Update upload counter
+            updateUploadCounter(this.files.length);
         });
     }
 });

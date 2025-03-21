@@ -1,12 +1,11 @@
 import os
 import logging
 import pandas as pd
-import json 
+import json
 from datetime import datetime
-from typing import List, Dict, Tuple, Optional, Any
-from typing import Dict, Any, Optional
+from typing import List, Dict, Tuple, Optional, Any, Callable, TypeVar, cast, Union
 
-from sqlalchemy import create_engine, Column, Integer, String, Float, ForeignKey, Text, Table, and_, func, Index, or_, inspect, text
+from sqlalchemy import create_engine, Column, Integer, String, Float, ForeignKey, Text, Table, and_, func, Index
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker, Session
 from utils.document_parser import Paragraph as ParserParagraph
@@ -14,6 +13,9 @@ from utils.similarity_analyzer import SimilarityResult as AnalyzerSimilarityResu
 
 # Initialize SQLAlchemy Base
 Base = declarative_base()
+
+# Type variable for generic session function
+T = TypeVar('T')
 
 # Define the many-to-many association table
 paragraph_tags = Table(
@@ -55,7 +57,7 @@ class Paragraph(Base):
     paragraph_type = Column(String, nullable=False)
     position = Column(Integer, nullable=False)
     header_content = Column(Text, nullable=True)
-    column = Column(Integer, nullable=True)  # New column to track column position
+    column = Column(Integer, nullable=True)  # Column position
     
     # Relationships
     document = relationship("Document", back_populates="paragraphs")
@@ -76,51 +78,6 @@ class Paragraph(Base):
         cascade="all, delete-orphan", 
         back_populates="paragraph2"
     )
-
-# Database migration script to add the column field
-# You can add this to a new file or to an existing migration script
-
-def migrate_paragraphs_table():
-    """Add column field to paragraphs table if it doesn't exist."""
-    import sqlite3
-    import os
-    from sqlalchemy import create_engine, inspect, text
-    
-    # Use the DB_URL from your app.py
-    # For SQLite:
-    # DB_URL = f"sqlite:///{os.path.join(os.path.dirname(os.path.abspath(__file__)), 'paragraph_analyzer.db')}"
-    # For PostgreSQL:
-    DB_URL = "postgresql://paragraph_user:pass@localhost/paragraph_analyzer"
-    
-    try:
-        # Create engine
-        engine = create_engine(DB_URL)
-        inspector = inspect(engine)
-        
-        # Check if column exists
-        columns = [col['name'] for col in inspector.get_columns('paragraphs')]
-        
-        if 'column' not in columns:
-            # Add column
-            with engine.connect() as conn:
-                # For SQLite
-                if 'sqlite' in DB_URL:
-                    conn.execute(text("ALTER TABLE paragraphs ADD COLUMN column INTEGER"))
-                # For PostgreSQL
-                else:
-                    conn.execute(text("ALTER TABLE paragraphs ADD COLUMN column INTEGER"))
-                    
-                conn.commit()
-                
-            print("Added 'column' field to paragraphs table")
-        else:
-            print("'column' field already exists in paragraphs table")
-            
-    except Exception as e:
-        print(f"Error migrating paragraphs table: {str(e)}")
-        return False
-        
-    return True
 
 class Tag(Base):
     """Tag model for categorizing paragraphs."""
@@ -235,7 +192,28 @@ class DatabaseManager:
         # Initialize database
         self._init_db()
     
-    def _init_db(self):
+    def _with_session(self, func: Callable[[Session], T]) -> T:
+        """
+        Execute a function with a database session, handling session lifecycle.
+        
+        Args:
+            func: Function that takes a session as its argument
+            
+        Returns:
+            The result of the provided function
+        """
+        session = self.Session()
+        try:
+            result = func(session)
+            return result
+        except Exception as e:
+            session.rollback()
+            self.logger.error(f"Database error: {str(e)}", exc_info=True)
+            raise
+        finally:
+            session.close()
+    
+    def _init_db(self) -> None:
         """Initialize the database schema if it doesn't exist."""
         self.logger.info(f"Initializing database with SQLAlchemy using {self.db_url}")
         
@@ -243,102 +221,7 @@ class DatabaseManager:
             # Create tables if they don't exist
             Base.metadata.create_all(self.engine)
             
-            # Ensure metadata table exists
-            # This handles the case where the table is not created by SQLAlchemy
-            self.logger.info("Checking document_file_metadata table")
-            inspector = inspect(self.engine)
-            tables = inspector.get_table_names()
-            
-            if 'document_file_metadata' not in tables:
-                self.logger.info("Creating document_file_metadata table")
-                # Create the table directly with SQL
-                with self.engine.connect() as conn:
-                    if 'sqlite' in self.db_url:
-                        conn.execute(text("""
-                        CREATE TABLE IF NOT EXISTS document_file_metadata (
-                            id INTEGER PRIMARY KEY AUTOINCREMENT,
-                            document_id INTEGER NOT NULL,
-                            file_size INTEGER,
-                            file_size_formatted TEXT,
-                            creation_date TEXT,
-                            modification_date TEXT,
-                            page_count INTEGER,
-                            paragraph_count INTEGER,
-                            image_count INTEGER,
-                            author TEXT,
-                            title TEXT,
-                            subject TEXT,
-                            creator TEXT,
-                            producer TEXT,
-                            pdf_version TEXT,
-                            is_encrypted INTEGER,
-                            has_signatures INTEGER,
-                            has_forms INTEGER,
-                            has_toc INTEGER,
-                            toc_items INTEGER,
-                            annotation_count INTEGER,
-                            fonts_used TEXT,
-                            table_count INTEGER,
-                            section_count INTEGER,
-                            has_headers INTEGER,
-                            has_footers INTEGER,
-                            styles_used TEXT,
-                            FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE
-                        )
-                        """))
-                        
-                        # Create indices
-                        conn.execute(text("CREATE INDEX IF NOT EXISTS idx_file_metadata_document_id ON document_file_metadata(document_id)"))
-                        conn.execute(text("CREATE INDEX IF NOT EXISTS idx_file_metadata_page_count ON document_file_metadata(page_count)"))
-                        conn.execute(text("CREATE INDEX IF NOT EXISTS idx_file_metadata_paragraph_count ON document_file_metadata(paragraph_count)"))
-                        conn.execute(text("CREATE INDEX IF NOT EXISTS idx_file_metadata_file_size ON document_file_metadata(file_size)"))
-                    else:
-                        # PostgreSQL
-                        conn.execute(text("""
-                        CREATE TABLE IF NOT EXISTS document_file_metadata (
-                            id SERIAL PRIMARY KEY,
-                            document_id INTEGER NOT NULL,
-                            file_size BIGINT,
-                            file_size_formatted TEXT,
-                            creation_date TEXT,
-                            modification_date TEXT,
-                            page_count INTEGER,
-                            paragraph_count INTEGER,
-                            image_count INTEGER,
-                            author TEXT,
-                            title TEXT,
-                            subject TEXT,
-                            creator TEXT,
-                            producer TEXT,
-                            pdf_version TEXT,
-                            is_encrypted BOOLEAN,
-                            has_signatures BOOLEAN,
-                            has_forms BOOLEAN,
-                            has_toc BOOLEAN,
-                            toc_items INTEGER,
-                            annotation_count INTEGER,
-                            fonts_used TEXT,
-                            table_count INTEGER,
-                            section_count INTEGER,
-                            has_headers BOOLEAN,
-                            has_footers BOOLEAN,
-                            styles_used TEXT,
-                            FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE
-                        )
-                        """))
-                        
-                        # Create indices
-                        conn.execute(text("CREATE INDEX IF NOT EXISTS idx_file_metadata_document_id ON document_file_metadata(document_id)"))
-                        conn.execute(text("CREATE INDEX IF NOT EXISTS idx_file_metadata_page_count ON document_file_metadata(page_count)"))
-                        conn.execute(text("CREATE INDEX IF NOT EXISTS idx_file_metadata_paragraph_count ON document_file_metadata(paragraph_count)"))
-                        conn.execute(text("CREATE INDEX IF NOT EXISTS idx_file_metadata_file_size ON document_file_metadata(file_size)"))
-                    
-                    conn.commit()
-                    self.logger.info("document_file_metadata table created")
-            
-            # Create default tags if they don't exist
-            session = self.Session()
-            try:
+            def create_default_tags(session: Session) -> None:
                 default_tags = [
                     ('Header', '#007bff'),
                     ('Footer', '#6c757d'),
@@ -353,23 +236,28 @@ class DatabaseManager:
                 
                 session.commit()
                 self.logger.info("Database initialized successfully")
-                
-            except Exception as e:
-                session.rollback()
-                raise e
-            finally:
-                session.close()
+            
+            self._with_session(create_default_tags)
                 
         except Exception as e:
             self.logger.error(f"Error initializing database: {str(e)}", exc_info=True)
             raise
     
     def add_document(self, filename: str, file_type: str, file_path: str) -> int:
-        """Add a document to the database and return its ID."""
+        """
+        Add a document to the database and return its ID.
+        
+        Args:
+            filename: The name of the file
+            file_type: The file extension or MIME type
+            file_path: The path where the file is stored
+            
+        Returns:
+            The document ID if successful, -1 otherwise
+        """
         self.logger.info(f"Adding document to database: {filename}")
         
-        session = self.Session()
-        try:
+        def db_add_document(session: Session) -> int:
             # Create new document record
             upload_date = datetime.now().isoformat()
             
@@ -386,23 +274,29 @@ class DatabaseManager:
             doc_id = document.id
             self.logger.info(f"Document added with ID: {doc_id}")
             return doc_id
-            
+        
+        try:
+            return self._with_session(db_add_document)
         except Exception as e:
-            session.rollback()
-            self.logger.error(f"Error adding document: {str(e)}", exc_info=True)
+            self.logger.error(f"Error adding document: {str(e)}")
             return -1
-        finally:
-            session.close()
     
     def add_paragraphs(self, paragraphs: List[ParserParagraph]) -> List[int]:
-        """Add paragraphs to the database and return their IDs."""
+        """
+        Add paragraphs to the database and return their IDs.
+        
+        Args:
+            paragraphs: List of paragraph objects to add
+            
+        Returns:
+            List of paragraph IDs if successful, empty list otherwise
+        """
         if not paragraphs:
             return []
             
         self.logger.info(f"Adding {len(paragraphs)} paragraphs to database")
         
-        session = self.Session()
-        try:
+        def db_add_paragraphs(session: Session) -> List[int]:
             paragraph_ids = []
             
             for para in paragraphs:
@@ -412,7 +306,8 @@ class DatabaseManager:
                     document_id=para.doc_id,
                     paragraph_type=para.paragraph_type,
                     position=para.position,
-                    header_content=para.header_content
+                    header_content=para.header_content,
+                    column=para.column   # Include column information if available
                 )
                 
                 session.add(db_paragraph)
@@ -425,36 +320,41 @@ class DatabaseManager:
             
             self.logger.info(f"Added {len(paragraph_ids)} paragraphs")
             return paragraph_ids
-            
+        
+        try:
+            return self._with_session(db_add_paragraphs)
         except Exception as e:
-            session.rollback()
-            self.logger.error(f"Error adding paragraphs: {str(e)}", exc_info=True)
+            self.logger.error(f"Error adding paragraphs: {str(e)}")
             return []
-        finally:
-            session.close()
     
     def clear_similarity_results(self) -> bool:
         """Clear all similarity results from the database."""
         self.logger.info("Clearing all similarity results")
         
-        session = self.Session()
-        try:
+        def db_clear_similarity_results(session: Session) -> int:
             # Delete all similarity results
             count = session.query(SimilarityResult).delete()
             session.commit()
-            
+            return count
+        
+        try:
+            count = self._with_session(db_clear_similarity_results)
             self.logger.info(f"Deleted {count} similarity results")
             return True
-            
         except Exception as e:
-            session.rollback()
-            self.logger.error(f"Error clearing similarity results: {str(e)}", exc_info=True)
+            self.logger.error(f"Error clearing similarity results: {str(e)}")
             return False
-        finally:
-            session.close()
     
     def add_similarity_results(self, results: List[AnalyzerSimilarityResult]) -> bool:
-        """Add similarity results to the database."""
+        """
+        Add similarity results to the database.
+        
+        Args:
+            results: List of similarity results to add
+            
+        Returns:
+            True if successful, False otherwise
+        """
         if not results:
             self.logger.warning("No similarity results to add")
             return True
@@ -465,8 +365,7 @@ class DatabaseManager:
         if not self.clear_similarity_results():
             self.logger.warning("Failed to clear existing similarity results, proceeding with update")
         
-        session = self.Session()
-        try:
+        def db_add_similarity_results(session: Session) -> bool:
             for result in results:
                 # Log details for debugging
                 self.logger.debug(f"Processing similarity result: para1={result.paragraph1_id}, para2={result.paragraph2_id}, "
@@ -488,20 +387,23 @@ class DatabaseManager:
             
             self.logger.info(f"Successfully added {len(results)} similarity results")
             return True
-            
+        
+        try:
+            return self._with_session(db_add_similarity_results)
         except Exception as e:
-            session.rollback()
-            self.logger.error(f"Error adding similarity results: {str(e)}", exc_info=True)
+            self.logger.error(f"Error adding similarity results: {str(e)}")
             return False
-        finally:
-            session.close()
     
-    def get_documents(self) -> List[Dict]:
-        """Get all documents."""
+    def get_documents(self) -> List[Dict[str, Any]]:
+        """
+        Get all documents.
+        
+        Returns:
+            List of document dictionaries
+        """
         self.logger.info("Retrieving all documents")
         
-        session = self.Session()
-        try:
+        def db_get_documents(session: Session) -> List[Dict[str, Any]]:
             # Query all documents ordered by upload date descending
             documents = session.query(Document).order_by(Document.upload_date.desc()).all()
             
@@ -519,20 +421,26 @@ class DatabaseManager:
             
             self.logger.info(f"Retrieved {len(document_dicts)} documents")
             return document_dicts
-            
+        
+        try:
+            return self._with_session(db_get_documents)
         except Exception as e:
-            self.logger.error(f"Error retrieving documents: {str(e)}", exc_info=True)
+            self.logger.error(f"Error retrieving documents: {str(e)}")
             return []
-        finally:
-            session.close()
     
-    def get_paragraphs(self, document_id: Optional[int] = None, collapse_duplicates: bool = True) -> List[Dict]:
+    def get_paragraphs(self, document_id: Optional[int] = None, collapse_duplicates: bool = True) -> List[Dict[str, Any]]:
         """
         Get paragraphs, optionally filtered by document.
-        If collapse_duplicates is True, exact matching paragraphs are displayed only once with document references.
+        
+        Args:
+            document_id: If provided, filter paragraphs by this document ID
+            collapse_duplicates: If True, identical paragraphs across documents will be collapsed
+                                into a single entry with document references
+                                
+        Returns:
+            List of paragraph dictionaries with associated metadata
         """
-        session = self.Session()
-        try:
+        def db_get_paragraphs(session: Session) -> List[Dict[str, Any]]:
             # Base query for paragraphs and their document data
             query = session.query(
                 Paragraph, 
@@ -573,6 +481,10 @@ class DatabaseManager:
                     'filename': filename,
                     'tags': tags
                 }
+                
+                # Add column information if available
+                if para.column is not None:
+                    para_dict['column'] = para.column
                 
                 paragraphs.append(para_dict)
             
@@ -646,97 +558,108 @@ class DatabaseManager:
             
             self.logger.info(f"Retrieved {len(paragraphs)} paragraphs")
             return paragraphs
-            
-        except Exception as e:
-            self.logger.error(f"Error retrieving paragraphs: {str(e)}", exc_info=True)
-            return []
-        finally:
-            session.close()
-    
-    def get_similar_paragraphs(self, threshold: Optional[float] = None) -> List[Dict]:
-        """Get similar paragraphs above the threshold."""
+        
         try:
-            session = self.Session()
+            return self._with_session(db_get_paragraphs)
+        except Exception as e:
+            self.logger.error(f"Error retrieving paragraphs: {str(e)}")
+            return []
+    
+    def get_similar_paragraphs(self, threshold: Optional[float] = None) -> List[Dict[str, Any]]:
+        """
+        Get similar paragraphs above the threshold.
+        
+        Args:
+            threshold: Minimum similarity score to include (0.0 to 1.0)
             
-            self.logger.info(f"Starting similarity query with threshold: {threshold}")
-            
-            # First, get all similarity results with paragraph1 data
-            query = session.query(
-                SimilarityResult,
-                Paragraph.content.label('para1_content'),
-                Paragraph.document_id.label('para1_doc_id'),
-                Document.filename.label('para1_filename')
-            ).join(
-                Paragraph,
-                SimilarityResult.paragraph1_id == Paragraph.id
-            ).join(
-                Document,
-                Paragraph.document_id == Document.id
-            )
-            
-            # Apply threshold filter if provided - using content_similarity_score (primary metric)
-            if threshold is not None:
-                self.logger.info(f"Filtering by threshold: {threshold}")
-                query = query.filter(SimilarityResult.content_similarity_score >= threshold)
-            
-            # Execute query to get base results
-            results = query.all()
-            self.logger.info(f"Found {len(results)} similarity results")
-            
-            # Process results and fetch paragraph2 data separately
-            similarities = []
-            for sim_result, para1_content, para1_doc_id, para1_filename in results:
-                # Get paragraph2 data with a separate query
-                para2_query = session.query(
-                    Paragraph.content,
-                    Paragraph.document_id,
-                    Document.filename
+        Returns:
+            List of similarity result dictionaries with paragraph content
+        """
+        try:
+            def db_get_similar_paragraphs(session: Session) -> List[Dict[str, Any]]:
+                self.logger.info(f"Starting similarity query with threshold: {threshold}")
+                
+                # First, get all similarity results with paragraph1 data
+                query = session.query(
+                    SimilarityResult,
+                    Paragraph.content.label('para1_content'),
+                    Paragraph.document_id.label('para1_doc_id'),
+                    Document.filename.label('para1_filename')
+                ).join(
+                    Paragraph,
+                    SimilarityResult.paragraph1_id == Paragraph.id
                 ).join(
                     Document,
                     Paragraph.document_id == Document.id
-                ).filter(
-                    Paragraph.id == sim_result.paragraph2_id
                 )
                 
-                # Execute paragraph2 query
-                para2_result = para2_query.first()
+                # Apply threshold filter if provided - using content_similarity_score (primary metric)
+                if threshold is not None:
+                    self.logger.info(f"Filtering by threshold: {threshold}")
+                    query = query.filter(SimilarityResult.content_similarity_score >= threshold)
                 
-                if para2_result:
-                    para2_content, para2_doc_id, para2_filename = para2_result
+                # Execute query to get base results
+                results = query.all()
+                self.logger.info(f"Found {len(results)} similarity results")
+                
+                # Process results and fetch paragraph2 data separately
+                similarities = []
+                for sim_result, para1_content, para1_doc_id, para1_filename in results:
+                    # Get paragraph2 data with a separate query
+                    para2_query = session.query(
+                        Paragraph.content,
+                        Paragraph.document_id,
+                        Document.filename
+                    ).join(
+                        Document,
+                        Paragraph.document_id == Document.id
+                    ).filter(
+                        Paragraph.id == sim_result.paragraph2_id
+                    )
                     
-                    # Build the complete similarity dictionary with both similarity scores
-                    similarity_dict = {
-                        'id': sim_result.id,
-                        'paragraph1_id': sim_result.paragraph1_id,
-                        'paragraph2_id': sim_result.paragraph2_id,
-                        'content_similarity_score': sim_result.content_similarity_score,  # Renamed field
-                        'text_similarity_score': sim_result.text_similarity_score,        # New field
-                        'similarity_type': sim_result.similarity_type,
-                        'para1_content': para1_content,
-                        'para1_doc_id': para1_doc_id,
-                        'para1_filename': para1_filename,
-                        'para2_content': para2_content,
-                        'para2_doc_id': para2_doc_id,
-                        'para2_filename': para2_filename
-                    }
+                    # Execute paragraph2 query
+                    para2_result = para2_query.first()
                     
-                    similarities.append(similarity_dict)
+                    if para2_result:
+                        para2_content, para2_doc_id, para2_filename = para2_result
+                        
+                        # Build the complete similarity dictionary with both similarity scores
+                        similarity_dict = {
+                            'id': sim_result.id,
+                            'paragraph1_id': sim_result.paragraph1_id,
+                            'paragraph2_id': sim_result.paragraph2_id,
+                            'content_similarity_score': sim_result.content_similarity_score,  # Renamed field
+                            'text_similarity_score': sim_result.text_similarity_score,        # New field
+                            'similarity_type': sim_result.similarity_type,
+                            'para1_content': para1_content,
+                            'para1_doc_id': para1_doc_id,
+                            'para1_filename': para1_filename,
+                            'para2_content': para2_content,
+                            'para2_doc_id': para2_doc_id,
+                            'para2_filename': para2_filename
+                        }
+                        
+                        similarities.append(similarity_dict)
+                
+                self.logger.info(f"Processed {len(similarities)} complete similarity records")
+                return similarities
             
-            self.logger.info(f"Processed {len(similarities)} complete similarity records")
-            return similarities
+            return self._with_session(db_get_similar_paragraphs)
             
         except Exception as e:
-            self.logger.error(f"Error retrieving similarity results: {str(e)}", exc_info=True)
+            self.logger.error(f"Error retrieving similarity results: {str(e)}")
             return []
-        finally:
-            session.close()
     
-    def get_tags(self) -> List[Dict]:
-        """Get all tags."""
+    def get_tags(self) -> List[Dict[str, Any]]:
+        """
+        Get all tags.
+        
+        Returns:
+            List of tag dictionaries
+        """
         self.logger.info("Retrieving all tags")
         
-        session = self.Session()
-        try:
+        def db_get_tags(session: Session) -> List[Dict[str, Any]]:
             # Query all tags
             tags = session.query(Tag).all()
             
@@ -752,19 +675,27 @@ class DatabaseManager:
             
             self.logger.info(f"Retrieved {len(tag_dicts)} tags")
             return tag_dicts
-            
+        
+        try:
+            return self._with_session(db_get_tags)
         except Exception as e:
-            self.logger.error(f"Error retrieving tags: {str(e)}", exc_info=True)
+            self.logger.error(f"Error retrieving tags: {str(e)}")
             return []
-        finally:
-            session.close()
     
     def add_tag(self, name: str, color: str) -> int:
-        """Add a new tag and return its ID."""
+        """
+        Add a new tag and return its ID.
+        
+        Args:
+            name: Tag name (must be unique)
+            color: Color code (e.g., '#FF0000' for red)
+            
+        Returns:
+            Tag ID if successful, -1 otherwise
+        """
         self.logger.info(f"Adding new tag: {name} with color {color}")
         
-        session = self.Session()
-        try:
+        def db_add_tag(session: Session) -> int:
             # Create new tag
             tag = Tag(name=name, color=color)
             session.add(tag)
@@ -773,20 +704,26 @@ class DatabaseManager:
             tag_id = tag.id
             self.logger.info(f"Added tag with ID: {tag_id}")
             return tag_id
-            
+        
+        try:
+            return self._with_session(db_add_tag)
         except Exception as e:
-            session.rollback()
-            self.logger.error(f"Error adding tag: {str(e)}", exc_info=True)
+            self.logger.error(f"Error adding tag: {str(e)}")
             return -1
-        finally:
-            session.close()
     
     def delete_tag(self, tag_id: int) -> bool:
-        """Delete a tag and all its associations."""
+        """
+        Delete a tag and all its associations.
+        
+        Args:
+            tag_id: ID of the tag to delete
+            
+        Returns:
+            True if successful, False otherwise
+        """
         self.logger.info(f"Deleting tag with ID: {tag_id}")
         
-        session = self.Session()
-        try:
+        def db_delete_tag(session: Session) -> bool:
             # Get the tag
             tag = session.query(Tag).get(tag_id)
             
@@ -800,13 +737,12 @@ class DatabaseManager:
             
             self.logger.info(f"Deleted tag with ID: {tag_id}")
             return True
-            
+        
+        try:
+            return self._with_session(db_delete_tag)
         except Exception as e:
-            session.rollback()
-            self.logger.error(f"Error deleting tag: {str(e)}", exc_info=True)
+            self.logger.error(f"Error deleting tag: {str(e)}")
             return False
-        finally:
-            session.close()
     
     def _find_duplicate_paragraphs(self, paragraph_id: int) -> List[int]:
         """
@@ -820,8 +756,7 @@ class DatabaseManager:
         """
         self.logger.info(f"Finding duplicate paragraphs for paragraph ID: {paragraph_id}")
         
-        session = self.Session()
-        try:
+        def db_find_duplicates(session: Session) -> List[int]:
             # Get the content of the paragraph
             paragraph = session.query(Paragraph).get(paragraph_id)
             if not paragraph:
@@ -839,11 +774,12 @@ class DatabaseManager:
             
             self.logger.info(f"Found {len(duplicate_ids)} duplicate paragraphs for paragraph ID {paragraph_id}")
             return duplicate_ids
+        
+        try:
+            return self._with_session(db_find_duplicates)
         except Exception as e:
-            self.logger.error(f"Error finding duplicate paragraphs: {str(e)}", exc_info=True)
+            self.logger.error(f"Error finding duplicate paragraphs: {str(e)}")
             return []
-        finally:
-            session.close()
     
     def tag_paragraph(self, paragraph_id: int, tag_id: int, tag_all_duplicates: bool = False) -> bool:
         """
@@ -859,8 +795,7 @@ class DatabaseManager:
         """
         self.logger.info(f"Tagging paragraph {paragraph_id} with tag {tag_id}")
         
-        session = self.Session()
-        try:
+        def db_tag_paragraph(session: Session) -> bool:
             # Get paragraph and tag
             paragraph = session.query(Paragraph).get(paragraph_id)
             tag = session.query(Tag).get(tag_id)
@@ -896,13 +831,12 @@ class DatabaseManager:
             
             self.logger.info(f"Tagged {len(paragraphs_to_tag)} paragraphs with tag {tag_id}")
             return True
-            
+        
+        try:
+            return self._with_session(db_tag_paragraph)
         except Exception as e:
-            session.rollback()
-            self.logger.error(f"Error tagging paragraph: {str(e)}", exc_info=True)
+            self.logger.error(f"Error tagging paragraph: {str(e)}")
             return False
-        finally:
-            session.close()
     
     def untag_paragraph(self, paragraph_id: int, tag_id: int, untag_all_duplicates: bool = False) -> bool:
         """
@@ -918,8 +852,7 @@ class DatabaseManager:
         """
         self.logger.info(f"Removing tag {tag_id} from paragraph {paragraph_id}")
         
-        session = self.Session()
-        try:
+        def db_untag_paragraph(session: Session) -> bool:
             # Get paragraph and tag
             paragraph = session.query(Paragraph).get(paragraph_id)
             tag = session.query(Tag).get(tag_id)
@@ -951,21 +884,30 @@ class DatabaseManager:
             
             self.logger.info(f"Removed tag {tag_id} from {len(paragraphs_to_untag)} paragraphs")
             return True
-            
+        
+        try:
+            return self._with_session(db_untag_paragraph)
         except Exception as e:
-            session.rollback()
-            self.logger.error(f"Error removing tag from paragraph: {str(e)}", exc_info=True)
+            self.logger.error(f"Error removing tag from paragraph: {str(e)}")
             return False
-        finally:
-            session.close()
     
     def create_cluster(self, name: str, description: str, similarity_threshold: float, 
-                      similarity_type: str = 'content') -> int:
-        """Create a new cluster and return its ID."""
+                       similarity_type: str = 'content') -> int:
+        """
+        Create a new cluster and return its ID.
+        
+        Args:
+            name: Cluster name
+            description: Cluster description
+            similarity_threshold: Threshold used for similarity clustering
+            similarity_type: Type of similarity measure used ('content' or 'text')
+            
+        Returns:
+            Cluster ID if successful, -1 otherwise
+        """
         self.logger.info(f"Creating new cluster: {name}")
         
-        session = self.Session()
-        try:
+        def db_create_cluster(session: Session) -> int:
             # Create new cluster
             cluster = Cluster(
                 name=name,
@@ -980,20 +922,27 @@ class DatabaseManager:
             cluster_id = cluster.id
             self.logger.info(f"Created cluster with ID: {cluster_id}")
             return cluster_id
-            
+        
+        try:
+            return self._with_session(db_create_cluster)
         except Exception as e:
-            session.rollback()
-            self.logger.error(f"Error creating cluster: {str(e)}", exc_info=True)
+            self.logger.error(f"Error creating cluster: {str(e)}")
             return -1
-        finally:
-            session.close()
     
     def add_paragraphs_to_cluster(self, cluster_id: int, paragraph_ids: List[int]) -> bool:
-        """Add paragraphs to a cluster."""
+        """
+        Add paragraphs to a cluster.
+        
+        Args:
+            cluster_id: ID of the cluster
+            paragraph_ids: List of paragraph IDs to add to the cluster
+            
+        Returns:
+            Boolean indicating success
+        """
         self.logger.info(f"Adding {len(paragraph_ids)} paragraphs to cluster {cluster_id}")
         
-        session = self.Session()
-        try:
+        def db_add_to_cluster(session: Session) -> bool:
             # Get cluster
             cluster = session.query(Cluster).get(cluster_id)
             
@@ -1013,20 +962,23 @@ class DatabaseManager:
             
             self.logger.info(f"Added {len(paragraphs)} paragraphs to cluster {cluster_id}")
             return True
-            
+        
+        try:
+            return self._with_session(db_add_to_cluster)
         except Exception as e:
-            session.rollback()
-            self.logger.error(f"Error adding paragraphs to cluster: {str(e)}", exc_info=True)
+            self.logger.error(f"Error adding paragraphs to cluster: {str(e)}")
             return False
-        finally:
-            session.close()
     
-    def get_clusters(self) -> List[Dict]:
-        """Get all clusters."""
+    def get_clusters(self) -> List[Dict[str, Any]]:
+        """
+        Get all clusters.
+        
+        Returns:
+            List of cluster dictionaries
+        """
         self.logger.info("Retrieving all clusters")
         
-        session = self.Session()
-        try:
+        def db_get_clusters(session: Session) -> List[Dict[str, Any]]:
             # Query all clusters
             clusters = session.query(Cluster).all()
             
@@ -1045,19 +997,26 @@ class DatabaseManager:
             
             self.logger.info(f"Retrieved {len(cluster_dicts)} clusters")
             return cluster_dicts
-            
+        
+        try:
+            return self._with_session(db_get_clusters)
         except Exception as e:
-            self.logger.error(f"Error retrieving clusters: {str(e)}", exc_info=True)
+            self.logger.error(f"Error retrieving clusters: {str(e)}")
             return []
-        finally:
-            session.close()
     
-    def get_cluster_paragraphs(self, cluster_id: int) -> List[Dict]:
-        """Get paragraphs in a specific cluster."""
+    def get_cluster_paragraphs(self, cluster_id: int) -> List[Dict[str, Any]]:
+        """
+        Get paragraphs in a specific cluster.
+        
+        Args:
+            cluster_id: ID of the cluster
+            
+        Returns:
+            List of paragraph dictionaries in the cluster
+        """
         self.logger.info(f"Retrieving paragraphs for cluster {cluster_id}")
         
-        session = self.Session()
-        try:
+        def db_get_cluster_paragraphs(session: Session) -> List[Dict[str, Any]]:
             # Get cluster
             cluster = session.query(Cluster).get(cluster_id)
             
@@ -1084,25 +1043,32 @@ class DatabaseManager:
                     'paragraph_type': paragraph.paragraph_type,
                     'position': paragraph.position,
                     'header_content': paragraph.header_content,
-                    'filename': document.filename,
+                    'filename': document.filename if document else 'Unknown',
                     'tags': tags
                 })
             
             self.logger.info(f"Retrieved {len(paragraphs)} paragraphs for cluster {cluster_id}")
             return paragraphs
-            
+        
+        try:
+            return self._with_session(db_get_cluster_paragraphs)
         except Exception as e:
-            self.logger.error(f"Error retrieving cluster paragraphs: {str(e)}", exc_info=True)
+            self.logger.error(f"Error retrieving cluster paragraphs: {str(e)}")
             return []
-        finally:
-            session.close()
     
     def delete_cluster(self, cluster_id: int) -> bool:
-        """Delete a cluster."""
+        """
+        Delete a cluster.
+        
+        Args:
+            cluster_id: ID of the cluster to delete
+            
+        Returns:
+            Boolean indicating success
+        """
         self.logger.info(f"Deleting cluster with ID: {cluster_id}")
         
-        session = self.Session()
-        try:
+        def db_delete_cluster(session: Session) -> bool:
             # Get the cluster
             cluster = session.query(Cluster).get(cluster_id)
             
@@ -1116,114 +1082,130 @@ class DatabaseManager:
             
             self.logger.info(f"Deleted cluster with ID: {cluster_id}")
             return True
-            
+        
+        try:
+            return self._with_session(db_delete_cluster)
         except Exception as e:
-            session.rollback()
-            self.logger.error(f"Error deleting cluster: {str(e)}", exc_info=True)
+            self.logger.error(f"Error deleting cluster: {str(e)}")
             return False
-        finally:
-            session.close()
 
     def clear_all_clusters(self) -> bool:
-        """Delete all clusters in the database."""
+        """
+        Delete all clusters in the database.
+        
+        Returns:
+            Boolean indicating success
+        """
         self.logger.info("Clearing all clusters")
         
-        session = self.Session()
-        try:
+        def db_clear_clusters(session: Session) -> int:
             # Clear cluster_paragraphs associations
             session.execute(cluster_paragraphs.delete())
             
             # Delete all clusters
             count = session.query(Cluster).delete()
             session.commit()
-            
+            return count
+        
+        try:
+            count = self._with_session(db_clear_clusters)
             self.logger.info(f"Deleted {count} clusters")
             return True
-            
         except Exception as e:
-            session.rollback()
-            self.logger.error(f"Error clearing clusters: {str(e)}", exc_info=True)
+            self.logger.error(f"Error clearing clusters: {str(e)}")
             return False
-        finally:
-            session.close()
     
     def export_to_excel(self, output_path: str) -> bool:
-        """Export database contents to Excel with updated similarity fields."""
+        """
+        Export database contents to Excel with updated similarity fields.
+        
+        Args:
+            output_path: Path where the Excel file will be saved
+            
+        Returns:
+            Boolean indicating success
+        """
         self.logger.info(f"Exporting data to Excel: {output_path}")
         
         try:
-            # Get paragraphs with document info and tags
-            paragraphs_data = []
+            # Ensure the directory exists
+            output_dir = os.path.dirname(output_path)
+            if output_dir and not os.path.exists(output_dir):
+                os.makedirs(output_dir)
+                self.logger.info(f"Created directory: {output_dir}")
             
-            session = self.Session()
-            
-            # Query paragraphs with document info
-            results = session.query(
-                Paragraph, 
-                Document.filename, 
-                Document.upload_date
-            ).join(
-                Document
-            ).order_by(
-                Document.filename, 
-                Paragraph.position
-            ).all()
-            
-            # Process paragraphs and include tags
-            for para, filename, upload_date in results:
-                # Get tags as comma-separated string
-                tags_str = ', '.join([tag.name for tag in para.tags]) if para.tags else None
+            def db_export_to_excel(session: Session) -> tuple:
+                # Get paragraphs with document info and tags
+                paragraphs_data = []
                 
-                paragraphs_data.append({
-                    'id': para.id,
-                    'content': para.content,
-                    'paragraph_type': para.paragraph_type,
-                    'header_content': para.header_content,
-                    'filename': filename,
-                    'upload_date': upload_date,
-                    'tags': tags_str
-                })
+                # Query paragraphs with document info
+                results = session.query(
+                    Paragraph, 
+                    Document.filename, 
+                    Document.upload_date
+                ).join(
+                    Document
+                ).order_by(
+                    Document.filename, 
+                    Paragraph.position
+                ).all()
+                
+                # Process paragraphs and include tags
+                for para, filename, upload_date in results:
+                    # Get tags as comma-separated string
+                    tags_str = ', '.join([tag.name for tag in para.tags]) if para.tags else None
+                    
+                    paragraphs_data.append({
+                        'id': para.id,
+                        'content': para.content,
+                        'paragraph_type': para.paragraph_type,
+                        'header_content': para.header_content,
+                        'filename': filename,
+                        'upload_date': upload_date,
+                        'tags': tags_str
+                    })
+                
+                # Get similarity data with both similarity scores
+                similarity_data = []
+                
+                # Query similarity results with paragraph content and document names
+                similarity_results = session.query(
+                    SimilarityResult,
+                    Paragraph.content.label('paragraph1_content'),
+                    Document.filename.label('document1')
+                ).join(
+                    Paragraph,
+                    SimilarityResult.paragraph1_id == Paragraph.id
+                ).join(
+                    Document,
+                    Paragraph.document_id == Document.id
+                ).filter(
+                    SimilarityResult.content_similarity_score >= 0.8
+                ).all()
+                
+                # Get paragraph2 and document2 data
+                for sim, para1_content, doc1_filename in similarity_results:
+                    para2 = session.query(Paragraph).get(sim.paragraph2_id)
+                    if para2:
+                        doc2 = session.query(Document).get(para2.document_id)
+                        
+                        similarity_data.append({
+                            'content_similarity_score': sim.content_similarity_score,  # Renamed field
+                            'text_similarity_score': sim.text_similarity_score,        # New field
+                            'similarity_type': sim.similarity_type,
+                            'paragraph1_content': para1_content,
+                            'document1': doc1_filename,
+                            'paragraph2_content': para2.content,
+                            'document2': doc2.filename if doc2 else 'Unknown'
+                        })
+                
+                return paragraphs_data, similarity_data
             
-            # Convert to DataFrame
+            paragraphs_data, similarity_data = self._with_session(db_export_to_excel)
+            
+            # Convert to DataFrames
             paragraphs_df = pd.DataFrame(paragraphs_data)
-            
-            # Get similarity data with both similarity scores
-            similarity_data = []
-            
-            # Query similarity results with paragraph content and document names
-            similarity_results = session.query(
-                SimilarityResult,
-                Paragraph.content.label('paragraph1_content'),
-                Document.filename.label('document1')
-            ).join(
-                Paragraph,
-                SimilarityResult.paragraph1_id == Paragraph.id
-            ).join(
-                Document,
-                Paragraph.document_id == Document.id
-            ).filter(
-                SimilarityResult.content_similarity_score >= 0.8
-            ).all()
-            
-            # Get paragraph2 and document2 data
-            for sim, para1_content, doc1_filename in similarity_results:
-                para2 = session.query(Paragraph).get(sim.paragraph2_id)
-                doc2 = session.query(Document).get(para2.document_id)
-                
-                similarity_data.append({
-                    'content_similarity_score': sim.content_similarity_score,  # Renamed field
-                    'text_similarity_score': sim.text_similarity_score,        # New field
-                    'similarity_type': sim.similarity_type,
-                    'paragraph1_content': para1_content,
-                    'document1': doc1_filename,
-                    'paragraph2_content': para2.content,
-                    'document2': doc2.filename
-                })
-            
-            # Convert to DataFrame
             similarity_df = pd.DataFrame(similarity_data)
-            
-            session.close()
             
             # Write to Excel file
             with pd.ExcelWriter(output_path, engine='xlsxwriter') as writer:
@@ -1258,16 +1240,20 @@ class DatabaseManager:
         except Exception as e:
             self.logger.error(f"Error exporting to Excel: {str(e)}", exc_info=True)
             return False
-        finally:
-            if 'session' in locals():
-                session.close()
     
     def delete_document(self, document_id: int) -> bool:
-        """Delete a document and its paragraphs."""
+        """
+        Delete a document and its paragraphs.
+        
+        Args:
+            document_id: ID of the document to delete
+            
+        Returns:
+            Boolean indicating success
+        """
         self.logger.info(f"Deleting document with ID: {document_id}")
         
-        session = self.Session()
-        try:
+        def db_delete_document(session: Session) -> Union[bool, str]:
             # Get the document
             document = session.query(Document).get(document_id)
             
@@ -1278,30 +1264,41 @@ class DatabaseManager:
                 session.delete(document)
                 session.commit()
                 
-                # Try to delete the file if it exists
-                if os.path.exists(file_path):
-                    os.remove(file_path)
-                    self.logger.info(f"Deleted file: {file_path}")
-                
-                self.logger.info(f"Deleted document with ID: {document_id}")
-                return True
+                return file_path
             else:
                 self.logger.warning(f"Document with ID {document_id} not found")
                 return False
+        
+        try:
+            file_path = self._with_session(db_delete_document)
+            
+            if file_path and isinstance(file_path, str):
+                # Try to delete the file if it exists
+                if os.path.exists(file_path):
+                    try:
+                        os.remove(file_path)
+                        self.logger.info(f"Deleted file: {file_path}")
+                    except (OSError, PermissionError) as e:
+                        self.logger.warning(f"Could not delete file {file_path}: {str(e)}")
+                
+                self.logger.info(f"Deleted document with ID: {document_id}")
+                return True
+            return False
                 
         except Exception as e:
-            session.rollback()
-            self.logger.error(f"Error deleting document: {str(e)}", exc_info=True)
+            self.logger.error(f"Error deleting document: {str(e)}")
             return False
-        finally:
-            session.close()
     
     def clear_database(self) -> bool:
-        """Clear all data from the database."""
+        """
+        Clear all data from the database.
+        
+        Returns:
+            Boolean indicating success
+        """
         self.logger.info("Clearing all data from database")
         
-        session = self.Session()
-        try:
+        def db_clear_database(session: Session) -> List[str]:
             # Get all file paths to delete files as well
             documents = session.query(Document).all()
             file_paths = [doc.file_path for doc in documents]
@@ -1328,22 +1325,26 @@ class DatabaseManager:
             # Don't delete tags
             
             session.commit()
+            return file_paths
+        
+        try:
+            file_paths = self._with_session(db_clear_database)
             
             # Delete all files
             for file_path in file_paths:
                 if os.path.exists(file_path):
-                    os.remove(file_path)
-                    self.logger.info(f"Deleted file: {file_path}")
+                    try:
+                        os.remove(file_path)
+                        self.logger.info(f"Deleted file: {file_path}")
+                    except (OSError, PermissionError) as e:
+                        self.logger.warning(f"Could not delete file {file_path}: {str(e)}")
             
             self.logger.info("Database cleared successfully")
             return True
             
         except Exception as e:
-            session.rollback()
-            self.logger.error(f"Error clearing database: {str(e)}", exc_info=True)
+            self.logger.error(f"Error clearing database: {str(e)}")
             return False
-        finally:
-            session.close()
     
     def add_document_file_metadata(self, document_id: int, metadata: Dict[str, Any]) -> bool:
         """
@@ -1358,8 +1359,7 @@ class DatabaseManager:
         """
         self.logger.info(f"Adding file metadata for document ID: {document_id}")
         
-        session = self.Session()
-        try:
+        def db_add_metadata(session: Session) -> bool:
             # Process metadata - convert lists/dicts to JSON strings
             metadata_to_store = {}
             for key, value in metadata.items():
@@ -1385,13 +1385,12 @@ class DatabaseManager:
             session.commit()
             self.logger.info(f"Successfully added file metadata for document ID: {document_id}")
             return True
-            
+        
+        try:
+            return self._with_session(db_add_metadata)
         except Exception as e:
-            session.rollback()
-            self.logger.error(f"Error adding file metadata: {str(e)}", exc_info=True)
+            self.logger.error(f"Error adding file metadata: {str(e)}")
             return False
-        finally:
-            session.close()
 
     def get_document_file_metadata(self, document_id: int) -> Optional[Dict[str, Any]]:
         """
@@ -1405,8 +1404,7 @@ class DatabaseManager:
         """
         self.logger.info(f"Retrieving file metadata for document ID: {document_id}")
         
-        session = self.Session()
-        try:
+        def db_get_metadata(session: Session) -> Optional[Dict[str, Any]]:
             metadata_obj = session.query(DocumentFileMetadata).filter_by(document_id=document_id).first()
             
             if not metadata_obj:
@@ -1428,12 +1426,12 @@ class DatabaseManager:
                         metadata[column_name] = value
             
             return metadata
-            
+        
+        try:
+            return self._with_session(db_get_metadata)
         except Exception as e:
-            self.logger.error(f"Error retrieving file metadata: {str(e)}", exc_info=True)
+            self.logger.error(f"Error retrieving file metadata: {str(e)}")
             return None
-        finally:
-            session.close()
 
     def delete_document_file_metadata(self, document_id: int) -> bool:
         """
@@ -1447,8 +1445,7 @@ class DatabaseManager:
         """
         self.logger.info(f"Deleting file metadata for document ID: {document_id}")
         
-        session = self.Session()
-        try:
+        def db_delete_metadata(session: Session) -> bool:
             # Find and delete metadata
             metadata = session.query(DocumentFileMetadata).filter_by(document_id=document_id).first()
             if metadata:
@@ -1459,16 +1456,23 @@ class DatabaseManager:
                 self.logger.info(f"No metadata found to delete for document ID: {document_id}")
             
             return True
-            
+        
+        try:
+            return self._with_session(db_delete_metadata)
         except Exception as e:
-            session.rollback()
-            self.logger.error(f"Error deleting file metadata: {str(e)}", exc_info=True)
+            self.logger.error(f"Error deleting file metadata: {str(e)}")
             return False
-        finally:
-            session.close()
     
     def _setup_logger(self, level: str) -> logging.Logger:
-        """Set up a logger instance."""
+        """
+        Set up a logger instance.
+        
+        Args:
+            level: Logging level (DEBUG, INFO, WARNING, ERROR)
+            
+        Returns:
+            Configured logger instance
+        """
         logger = logging.getLogger(f'{__name__}.DatabaseManager')
         
         if level.upper() == 'DEBUG':
@@ -1481,5 +1485,12 @@ class DatabaseManager:
             logger.setLevel(logging.ERROR)
         else:
             logger.setLevel(logging.INFO)
+        
+        # Add console handler if not already added
+        if not logger.handlers:
+            console_handler = logging.StreamHandler()
+            formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+            console_handler.setFormatter(formatter)
+            logger.addHandler(console_handler)
         
         return logger
