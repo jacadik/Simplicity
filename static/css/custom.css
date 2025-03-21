@@ -26,11 +26,11 @@
 
 .nav-link {
     font-weight: 500;
-    color: #333;
+    color: #4a4a49;
 }
 
 .nav-link.active {
-    color: #2470dc;
+    color: #5787eb;
 }
 
 .main-content {
@@ -154,7 +154,7 @@
 /* ------- Paragraph Card Styles ------- */
 .paragraph-card {
     margin-bottom: 1rem;
-    border-left: 5px solid #6c757d;
+    border-left: 5px solid #757575;
     transition: transform 0.1s ease-in-out, box-shadow 0.2s ease-in-out;
 }
 
@@ -164,15 +164,15 @@
 }
 
 .paragraph-card.header {
-    border-left-color: #007bff;
+    border-left-color: #5787eb;
 }
 
 .paragraph-card.list {
-    border-left-color: #28a745;
+    border-left-color: #4fccc4;
 }
 
 .paragraph-card.table {
-    border-left-color: #dc3545;
+    border-left-color: #fd565c;
 }
 
 .paragraph-card.boilerplate {
@@ -192,7 +192,7 @@ pre.table-content {
     background-color: #f8f9fa;
     padding: 10px;
     border-radius: 5px;
-    border-left: 3px solid #17a2b8;
+    border-left: 3px solid #5787eb;
     margin-bottom: 15px;
 }
 
@@ -296,20 +296,20 @@ pre.table-content {
 
 /* Diff highlighting */
 .diff-added {
-    background-color: rgba(40, 167, 69, 0.2);
+    background-color: rgba(79, 204, 196, 0.2);
     padding: 2px 0;
     border-radius: 2px;
 }
 
 .diff-removed {
-    background-color: rgba(220, 53, 69, 0.2);
+    background-color: rgba(253, 86, 92, 0.2);
     text-decoration: line-through;
     padding: 2px 0;
     border-radius: 2px;
 }
 
 .diff-unchanged {
-    color: #495057;
+    color: #4a4a49;
 }
 
 /* ------- Forms ------- */
@@ -322,8 +322,8 @@ pre.table-content {
 }
 
 .form-select:focus {
-    border-color: #80bdff;
-    box-shadow: 0 0 0 0.25rem rgba(0, 123, 255, 0.25);
+    border-color: #5787eb;
+    box-shadow: 0 0 0 0.25rem rgba(87, 135, 235, 0.25);
 }
 
 /* ------- Progress Bars ------- */
@@ -353,7 +353,7 @@ pre.table-content {
     left: 0;
     right: 0;
     bottom: 0;
-    background-color: rgba(40, 167, 69, 0.05);
+    background-color: rgba(79, 204, 196, 0.05);
     pointer-events: none;
     border-radius: 0.25rem;
 }
@@ -446,13 +446,13 @@ pre.table-content {
 
 @keyframes pulse-success {
     0% {
-        box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.7);
+        box-shadow: 0 0 0 0 rgba(79, 204, 196, 0.7);
     }
     70% {
-        box-shadow: 0 0 0 5px rgba(40, 167, 69, 0);
+        box-shadow: 0 0 0 5px rgba(79, 204, 196, 0);
     }
     100% {
-        box-shadow: 0 0 0 0 rgba(40, 167, 69, 0);
+        box-shadow: 0 0 0 0 rgba(79, 204, 196, 0);
     }
 }
 
@@ -490,3 +490,108 @@ pre.table-content {
         font-size: 0.85rem;
     }
 }
+
+/* Folder Upload Button Styles */
+.btn-outline-secondary[data-bs-toggle="modal"][data-bs-target="#folderModal"] {
+    background-color: #fbdb30;
+    border-color: #fbdb30;
+    color: #4a4a49;
+}
+
+.btn-outline-secondary[data-bs-toggle="modal"][data-bs-target="#folderModal"]:hover {
+    background-color: #f5d418; /* Slightly darker shade for hover */
+    border-color: #f5d418;
+    color: #4a4a49;
+}
+
+/* Update folder icon color to match */
+.btn-outline-secondary[data-bs-toggle="modal"][data-bs-target="#folderModal"] .bi-folder {
+    color: #4a4a49;
+}
+
+/* Update the import button inside the folder modal */
+#importButton {
+    background-color: #fbdb30;
+    border-color: #fbdb30;
+    color: #4a4a49;
+}
+
+#importButton:hover {
+    background-color: #f5d418;
+    border-color: #f5d418;
+    color: #4a4a49;
+}
+
+#importButton .bi-folder-check {
+    color: #4a4a49;
+}
+
+/* Pagination styles with correct blue #5787eb */
+.pagination {
+    display: flex;
+    padding-left: 0;
+    list-style: none;
+    border-radius: 0.5rem;
+}
+
+.page-item:first-child .page-link {
+    border-top-left-radius: 0.5rem;
+    border-bottom-left-radius: 0.5rem;
+}
+
+.page-item:last-child .page-link {
+    border-top-right-radius: 0.5rem;
+    border-bottom-right-radius: 0.5rem;
+}
+
+.page-item.active .page-link {
+    background-color: #5787eb !important;
+    border-color: #5787eb !important;
+    color: white;
+}
+
+.page-item.disabled .page-link {
+    color: #e0e0e0;
+    pointer-events: none;
+    background-color: #fff;
+    border-color: #dee2e6;
+}
+
+.page-link {
+    position: relative;
+    display: block;
+    padding: 0.5rem 0.75rem;
+    margin-left: -1px;
+    line-height: 1.25;
+    color: #5787eb;
+    background-color: #fff;
+    border: 1px solid #dee2e6;
+    transition: all 0.2s ease;
+}
+
+.page-link:hover {
+    z-index: 2;
+    color: #5787eb;
+    text-decoration: none;
+    background-color: #e9ecef;
+    border-color: #dee2e6;
+}
+
+.page-link:focus {
+    z-index: 3;
+    outline: 0;
+    box-shadow: 0 0 0 0.2rem rgba(87, 135, 235, 0.25);
+}
+
+/* Update all :root references to use the exact same blue */
+:root {
+    --primary-color: #5787eb;
+    --secondary-color: #5787eb;
+}
+
+/* Fix any inline styles in the HTML */
+.pagination .page-item.active .page-link {
+    background-color: #5787eb !important;
+    border-color: #5787eb !important;
+}
+

@@ -91,6 +91,7 @@ document.addEventListener('DOMContentLoaded', function() {
             socket.on('folder_upload_complete', function(data) {
                 console.log('Received folder_upload_complete event:', data);
                 showCompletionMessage(data, 'folder');
+                // Ensure counter is reset to zero on completion
                 updateUploadCounter(0);
             });
             
@@ -98,9 +99,8 @@ document.addEventListener('DOMContentLoaded', function() {
             socket.on('folder_scan_progress', function(data) {
                 console.log('Received folder_scan_progress event:', data);
                 updateFolderScanProgress(data);
-                if (data.file_count > 0) {
-                    updateUploadCounter(data.file_count);
-                }
+                // Always update the counter with file count during scanning
+                updateUploadCounter(data.file_count);
             });
         } else {
             console.warn('Socket.IO library not found. Real-time progress updates will not be available.');
@@ -128,9 +128,11 @@ document.addEventListener('DOMContentLoaded', function() {
     function updateUploadCounter(remainingFiles) {
         if (uploadCounterElement) {
             if (remainingFiles > 0) {
+                // Update counter text
                 uploadCounterElement.textContent = remainingFiles;
                 
                 if (uploadCounterContainer) {
+                    // Make sure counter is visible
                     uploadCounterContainer.style.display = 'inline-flex';
                     
                     // Add pulse animation
@@ -138,13 +140,18 @@ document.addEventListener('DOMContentLoaded', function() {
                     setTimeout(() => {
                         uploadCounterContainer.classList.remove('counter-pulse');
                     }, 1000);
+                    
+                    console.log('Upload counter updated to:', remainingFiles);
                 }
             } else {
                 // Hide counter when no files remain
                 if (uploadCounterContainer) {
                     uploadCounterContainer.style.display = 'none';
+                    console.log('Upload counter hidden (zero files)');
                 }
             }
+        } else {
+            console.warn('Upload counter element not found');
         }
     }
     
@@ -468,6 +475,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 // Reset upload counter
                 updateUploadCounter(0);
+                console.log('Upload counter reset due to file upload error');
             });
         });
     }
@@ -485,6 +493,9 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             console.log(`Processing folder: ${folderPath}`);
+            
+            // Initialize the upload counter to show we're starting a process
+            updateUploadCounter(1); // Set to at least 1 to show the counter
             
             // Create FormData object
             const formData = new FormData(this);
@@ -532,6 +543,9 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             console.log('Sending AJAX request to /upload-folder');
+            
+            // Initialize upload counter with placeholder value until we get real data
+            updateUploadCounter(1);  // Start with at least 1 to show counter
             
             // Send AJAX request
             fetch('/upload-folder', {
@@ -585,6 +599,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 // Reset upload counter
                 updateUploadCounter(0);
+                console.log('Upload counter reset due to folder processing error');
             });
         });
     }

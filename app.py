@@ -155,7 +155,6 @@ def handle_echo(data):
     socketio.emit('echo_response', {'received': data, 'time': time.time()})
 
 # Thread-safe progress callback
-# In app.py, modify the progress_callback function:
 
 def progress_callback(completed, total, result):
     """Send progress updates via Socket.IO."""

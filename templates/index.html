@@ -223,28 +223,28 @@
         </div>
         <!-- Pagination -->
         {% if documents and total_pages > 1 %}
-        <div class="card-footer">
-            <nav aria-label="Document pagination">
-                <ul class="pagination justify-content-center mb-0">
-                    <li class="page-item {% if page == 1 %}disabled{% endif %}">
-                        <a class="page-link" href="?page={{ page - 1 }}" aria-label="Previous" style="color: #4361ee;">
-                            <span aria-hidden="true">&laquo;</span>
-                        </a>
-                    </li>
-                    {% for p in range(1, total_pages + 1) %}
-                        <li class="page-item {% if p == page %}active{% endif %}">
-                            <a class="page-link {% if p == page %}bg-primary border-primary{% endif %}" href="?page={{ p }}" style="{% if p == page %}background: linear-gradient(to right, #4361ee, #3a0ca3) !important; border-color: #3a0ca3 !important;{% endif %}">{{ p }}</a>
-                        </li>
-                    {% endfor %}
-                    <li class="page-item {% if page == total_pages %}disabled{% endif %}">
-                        <a class="page-link" href="?page={{ page + 1 }}" aria-label="Next" style="color: #4361ee;">
-                            <span aria-hidden="true">&raquo;</span>
-                        </a>
-                    </li>
-                </ul>
-            </nav>
-        </div>
-        {% endif %}
+<div class="card-footer">
+    <nav aria-label="Document pagination">
+        <ul class="pagination justify-content-center mb-0">
+            <li class="page-item {% if page == 1 %}disabled{% endif %}">
+                <a class="page-link" href="?page={{ page - 1 }}" aria-label="Previous">
+                    <span aria-hidden="true">&laquo;</span>
+                </a>
+            </li>
+            {% for p in range(1, total_pages + 1) %}
+                <li class="page-item {% if p == page %}active{% endif %}">
+                    <a class="page-link" href="?page={{ p }}">{{ p }}</a>
+                </li>
+            {% endfor %}
+            <li class="page-item {% if page == total_pages %}disabled{% endif %}">
+                <a class="page-link" href="?page={{ page + 1 }}" aria-label="Next">
+                    <span aria-hidden="true">&raquo;</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+</div>
+{% endif %}
     </div>
 
     <!-- Enhanced Upload Modal with Drag & Drop and Better Progress Tracking -->
@@ -516,6 +516,26 @@
                 this.classList.remove('bg-light');
             });
         });
+        
+        // Reset upload counter when modal is closed
+        const uploadModal = document.getElementById('uploadModal');
+        const folderModal = document.getElementById('folderModal');
+        
+        if (uploadModal) {
+            uploadModal.addEventListener('hidden.bs.modal', function() {
+                if (typeof updateUploadCounter === 'function') {
+                    updateUploadCounter(0);
+                }
+            });
+        }
+        
+        if (folderModal) {
+            folderModal.addEventListener('hidden.bs.modal', function() {
+                if (typeof updateUploadCounter === 'function') {
+                    updateUploadCounter(0);
+                }
+            });
+        }
         
         // Add animation to counter cards
         const counterCards = document.querySelectorAll('.counter-card');
