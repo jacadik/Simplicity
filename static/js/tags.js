@@ -1,21 +1,46 @@
-// Preview tag name while typing
+// Tags management script
 document.addEventListener('DOMContentLoaded', function() {
+    // Color picker functionality
+    const colorOptions = document.querySelectorAll('.color-option');
+    const tagColorInput = document.getElementById('tagColor');
+    const colorPreviewContainer = document.querySelector('.color-preview-container');
     const tagNameInput = document.getElementById('tagName');
     const previewTagName = document.getElementById('previewTagName');
-    const tagColorInput = document.getElementById('tagColor');
-    const colorPreview = document.querySelector('.color-preview');
     
+    // Add active class to the first color option by default
+    if (colorOptions.length > 0) {
+        colorOptions[0].classList.add('active');
+    }
+    
+    // Update tag name preview when typing
     if (tagNameInput && previewTagName) {
         tagNameInput.addEventListener('input', function() {
             previewTagName.textContent = this.value || 'Sample Tag';
         });
     }
     
-    if (tagColorInput && colorPreview) {
-        tagColorInput.addEventListener('input', function() {
-            colorPreview.style.backgroundColor = this.value;
+    // Handle color selection
+    colorOptions.forEach(option => {
+        option.addEventListener('click', function() {
+            const color = this.getAttribute('data-color');
+            
+            // Remove active class from all options
+            colorOptions.forEach(opt => opt.classList.remove('active'));
+            
+            // Add active class to the clicked option
+            this.classList.add('active');
+            
+            // Update the hidden input value
+            if (tagColorInput) {
+                tagColorInput.value = color;
+            }
+            
+            // Update the preview
+            if (colorPreviewContainer) {
+                colorPreviewContainer.style.backgroundColor = color;
+            }
         });
-    }
+    });
     
     // Search functionality for tags
     const tagSearchInput = document.getElementById('tagSearch');
@@ -50,6 +75,25 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Add event listeners to delete buttons
     setupDeleteButtons();
+    
+    // Initialize counter cards animation
+    const counterCards = document.querySelectorAll('.counter-card');
+    counterCards.forEach((card, index) => {
+        // Stagger animation delay
+        setTimeout(() => {
+            card.style.opacity = '0';
+            card.style.transform = 'translateY(20px)';
+            
+            // Add animation
+            card.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+            
+            // Trigger animation
+            setTimeout(() => {
+                card.style.opacity = '1';
+                card.style.transform = 'translateY(0)';
+            }, 50);
+        }, index * 100);
+    });
 });
 
 function setupDeleteButtons() {

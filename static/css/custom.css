@@ -595,3 +595,28 @@ pre.table-content {
     border-color: #5787eb !important;
 }
 
+
+/* Auto text color for tags based on background brightness */
+.tag-badge,
+.badge[style*="background-color"],
+[class*="tag-"] {
+    /* Default to white text */
+    color: white !important;
+}
+
+/* Light colors that need dark text */
+.tag-badge[style*="background-color: #ffc107"],
+.tag-badge[style*="background-color: #fdcb6e"],
+.tag-badge[style*="background-color: #74b9ff"],
+.tag-badge[style*="background-color: #55efc4"],
+.badge[style*="background-color: #ffc107"],
+.badge[style*="background-color: #fdcb6e"],
+.badge[style*="background-color: #74b9ff"],
+.badge[style*="background-color: #55efc4"],
+[class*="tag-"][style*="background-color: #ffc107"],
+[class*="tag-"][style*="background-color: #fdcb6e"],
+[class*="tag-"][style*="background-color: #74b9ff"],
+[class*="tag-"][style*="background-color: #55efc4"] {
+    color: #4a4a49 !important;
+}
+

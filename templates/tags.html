@@ -10,41 +10,49 @@
         </div>
     </div>
 
-    <!-- Tag Statistics -->
+    <!-- Statistics Counter Tiles (Similar to index.html) -->
     <div class="row mb-4">
-        <div class="col-md-3">
-            <div class="card h-100">
-                <div class="card-body text-center">
-                    <i class="bi bi-tags text-primary mb-2" style="font-size: 2rem;"></i>
-                    <h2 class="mb-0">{{ tags|length }}</h2>
-                    <p class="text-muted mb-0">Total Tags</p>
+        <div class="col-md-3 mb-3">
+            <div class="card counter-card counter-documents h-100">
+                <div class="card-body p-3 position-relative">
+                    <div>
+                        <h6 class="text-muted mb-1">Total Tags</h6>
+                        <div class="counter-value">{{ tags|length }}</div>
+                    </div>
+                    <i class="bi bi-tags counter-icon"></i>
                 </div>
             </div>
         </div>
-        <div class="col-md-3">
-            <div class="card h-100">
-                <div class="card-body text-center">
-                    <i class="bi bi-palette text-success mb-2" style="font-size: 2rem;"></i>
-                    <h2 class="mb-0">{{ tags|selectattr('color', 'defined')|list|length }}</h2>
-                    <p class="text-muted mb-0">Custom Colors</p>
+        <div class="col-md-3 mb-3">
+            <div class="card counter-card counter-paragraphs h-100">
+                <div class="card-body p-3 position-relative">
+                    <div>
+                        <h6 class="text-muted mb-1">Custom Colors</h6>
+                        <div class="counter-value">{{ tags|selectattr('color', 'defined')|list|length }}</div>
+                    </div>
+                    <i class="bi bi-palette counter-icon"></i>
                 </div>
             </div>
         </div>
-        <div class="col-md-3">
-            <div class="card h-100">
-                <div class="card-body text-center">
-                    <i class="bi bi-paragraph text-info mb-2" style="font-size: 2rem;"></i>
-                    <h2 class="mb-0">{{ tagged_paragraphs|default(0) }}</h2>
-                    <p class="text-muted mb-0">Tagged Paragraphs</p>
+        <div class="col-md-3 mb-3">
+            <div class="card counter-card counter-duplicates h-100">
+                <div class="card-body p-3 position-relative">
+                    <div>
+                        <h6 class="text-muted mb-1">Tagged Paragraphs</h6>
+                        <div class="counter-value">{{ tagged_paragraphs|default(0) }}</div>
+                    </div>
+                    <i class="bi bi-paragraph counter-icon"></i>
                 </div>
             </div>
         </div>
-        <div class="col-md-3">
-            <div class="card h-100">
-                <div class="card-body text-center">
-                    <i class="bi bi-bar-chart text-warning mb-2" style="font-size: 2rem;"></i>
-                    <h2 class="mb-0">{{ most_used_tag_count|default(0) }}</h2>
-                    <p class="text-muted mb-0">Most Used Tag</p>
+        <div class="col-md-3 mb-3">
+            <div class="card counter-card counter-tags h-100">
+                <div class="card-body p-3 position-relative">
+                    <div>
+                        <h6 class="text-muted mb-1">Most Used Tag</h6>
+                        <div class="counter-value">{{ most_used_tag_count|default(0) }}</div>
+                    </div>
+                    <i class="bi bi-bar-chart counter-icon"></i>
                 </div>
             </div>
         </div>
@@ -71,15 +79,63 @@
                         </div>
                         
                         <div class="mb-4">
-                            <label for="tagColor" class="form-label">Tag Color</label>
-                            <div class="d-flex align-items-center gap-3">
-                                <input type="color" class="form-control form-control-color" id="tagColor" name="color" value="#563d7c" title="Choose tag color">
-                                <div class="color-preview flex-grow-1 py-2 px-3 rounded text-white" style="background-color: #563d7c;">
-                                    <i class="bi bi-tag me-2"></i><span id="previewTagName">Sample Tag</span>
+                            <label class="form-label">Tag Color</label>
+                            <div class="predefined-colors mb-3">
+                                <div class="d-flex flex-wrap gap-2">
+                                    <!-- Primary Colors -->
+                                    <div class="color-option" data-color="#5787eb" data-is-light="false">
+                                        <div class="color-preview rounded" style="background-color: #5787eb;"></div>
+                                    </div>
+                                    <div class="color-option" data-color="#4fccc4" data-is-light="false">
+                                        <div class="color-preview rounded" style="background-color: #4fccc4;"></div>
+                                    </div>
+                                    <div class="color-option" data-color="#fd565c" data-is-light="false">
+                                        <div class="color-preview rounded" style="background-color: #fd565c;"></div>
+                                    </div>
+                                    <div class="color-option" data-color="#ffc107" data-is-light="true">
+                                        <div class="color-preview rounded" style="background-color: #ffc107;"></div>
+                                    </div>
+                                    
+                                    <!-- Complementary Colors -->
+                                    <div class="color-option" data-color="#6c5ce7" data-is-light="false">
+                                        <div class="color-preview rounded" style="background-color: #6c5ce7;"></div>
+                                    </div>
+                                    <div class="color-option" data-color="#00b894" data-is-light="false">
+                                        <div class="color-preview rounded" style="background-color: #00b894;"></div>
+                                    </div>
+                                    <div class="color-option" data-color="#ff7675" data-is-light="false">
+                                        <div class="color-preview rounded" style="background-color: #ff7675;"></div>
+                                    </div>
+                                    <div class="color-option" data-color="#fdcb6e" data-is-light="true">
+                                        <div class="color-preview rounded" style="background-color: #fdcb6e;"></div>
+                                    </div>
+                                    
+                                    <!-- More Options -->
+                                    <div class="color-option" data-color="#e84393" data-is-light="false">
+                                        <div class="color-preview rounded" style="background-color: #e84393;"></div>
+                                    </div>
+                                    <div class="color-option" data-color="#74b9ff" data-is-light="true">
+                                        <div class="color-preview rounded" style="background-color: #74b9ff;"></div>
+                                    </div>
+                                    <div class="color-option" data-color="#a29bfe" data-is-light="false">
+                                        <div class="color-preview rounded" style="background-color: #a29bfe;"></div>
+                                    </div>
+                                    <div class="color-option" data-color="#55efc4" data-is-light="true">
+                                        <div class="color-preview rounded" style="background-color: #55efc4;"></div>
+                                    </div>
                                 </div>
                             </div>
-                            <div class="form-text">
-                                Choose a color that helps visually categorize your tags
+                            
+                            <input type="hidden" id="tagColor" name="color" value="#5787eb">
+                            <input type="hidden" id="tagTextColor" name="text_color" value="white">
+                            
+                            <div class="color-preview-container p-2 rounded text-white d-flex align-items-center" style="background-color: #5787eb;">
+                                <i class="bi bi-tag me-2"></i>
+                                <span id="previewTagName">Sample Tag</span>
+                            </div>
+                            
+                            <div class="form-text mt-2">
+                                Select a predefined color that suits your tag's purpose
                             </div>
                         </div>
                         
@@ -106,9 +162,11 @@
                     {% if tags %}
                         <div class="row g-3 tag-container">
                             {% for tag in tags %}
+                                {% set is_light_color = tag.color in ['#ffc107', '#fdcb6e', '#74b9ff', '#55efc4'] %}
                                 <div class="col-md-6 tag-item-container">
                                     <div class="card tag-item h-100 border-0" id="tag-{{ tag.id }}" data-tag-name="{{ tag.name }}">
-                                        <div class="card-body d-flex justify-content-between align-items-center p-3" style="background-color: {{ tag.color }}; color: white; border-radius: 0.5rem;">
+                                        <div class="card-body d-flex justify-content-between align-items-center p-3" 
+                                             style="background-color: {{ tag.color }}; color: {% if is_light_color %}#4a4a49{% else %}white{% endif %}; border-radius: 0.5rem;">
                                             <div>
                                                 <i class="bi bi-tag me-2"></i>
                                                 <span class="tag-name">{{ tag.name }}</span>
@@ -145,10 +203,310 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', filename='js/tags.js') }}"></script>
+<script>
+// Tag management script
+document.addEventListener('DOMContentLoaded', function() {
+    // Color picker functionality
+    const colorOptions = document.querySelectorAll('.color-option');
+    const tagColorInput = document.getElementById('tagColor');
+    const tagTextColorInput = document.getElementById('tagTextColor');
+    const colorPreviewContainer = document.querySelector('.color-preview-container');
+    const tagNameInput = document.getElementById('tagName');
+    const previewTagName = document.getElementById('previewTagName');
+    
+    // Add active class to the first color option by default
+    if (colorOptions.length > 0) {
+        colorOptions[0].classList.add('active');
+    }
+    
+    // Update tag name preview when typing
+    if (tagNameInput && previewTagName) {
+        tagNameInput.addEventListener('input', function() {
+            previewTagName.textContent = this.value || 'Sample Tag';
+        });
+    }
+    
+    // Handle color selection
+    colorOptions.forEach(option => {
+        option.addEventListener('click', function() {
+            const color = this.getAttribute('data-color');
+            const isLight = this.getAttribute('data-is-light') === 'true';
+            const textColor = isLight ? '#4a4a49' : 'white';
+            
+            // Remove active class from all options
+            colorOptions.forEach(opt => opt.classList.remove('active'));
+            
+            // Add active class to the clicked option
+            this.classList.add('active');
+            
+            // Update the hidden input values
+            if (tagColorInput) {
+                tagColorInput.value = color;
+            }
+            
+            if (tagTextColorInput) {
+                tagTextColorInput.value = textColor;
+            }
+            
+            // Update the preview
+            if (colorPreviewContainer) {
+                colorPreviewContainer.style.backgroundColor = color;
+                colorPreviewContainer.style.color = textColor;
+            }
+        });
+    });
+    
+    // Search functionality for tags
+    const tagSearchInput = document.getElementById('tagSearch');
+    if (tagSearchInput) {
+        tagSearchInput.addEventListener('input', function() {
+            const searchTerm = this.value.toLowerCase();
+            const tagContainers = document.querySelectorAll('.tag-item-container');
+            
+            tagContainers.forEach(container => {
+                const tagName = container.querySelector('.tag-name').textContent.toLowerCase();
+                if (tagName.includes(searchTerm)) {
+                    container.style.display = '';
+                } else {
+                    container.style.display = 'none';
+                }
+            });
+        });
+    }
+    
+    // Add hover effects to tag items
+    const tagItems = document.querySelectorAll('.tag-item');
+    tagItems.forEach(item => {
+        item.addEventListener('mouseenter', function() {
+            this.classList.add('shadow');
+            this.style.transform = 'translateY(-2px)';
+        });
+        item.addEventListener('mouseleave', function() {
+            this.classList.remove('shadow');
+            this.style.transform = 'translateY(0)';
+        });
+    });
+    
+    // Setup delete buttons
+    const deleteButtons = document.querySelectorAll('.delete-tag-btn');
+    deleteButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const tagId = this.getAttribute('data-tag-id');
+            const tagName = this.getAttribute('data-tag-name');
+            deleteTag(tagId, tagName, this);
+        });
+    });
+    
+    // Delete tag function
+    function deleteTag(tagId, tagName, element) {
+        if (confirm(`Are you sure you want to delete the tag "${tagName}"? This will remove it from all paragraphs.`)) {
+            // Show deletion in progress
+            const tagItem = document.getElementById(`tag-${tagId}`);
+            if (tagItem) {
+                tagItem.style.opacity = '0.5';
+                tagItem.style.pointerEvents = 'none';
+            }
+            
+            // Ensure jQuery is available
+            if (typeof $ === 'undefined') {
+                console.error('jQuery is not available');
+                return;
+            }
+            
+            $.ajax({
+                url: '/delete-tag',
+                method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                data: {
+                    tag_id: tagId
+                },
+                success: function(response) {
+                    if (response && response.success) {
+                        // Create success toast notification
+                        const toast = document.createElement('div');
+                        toast.className = 'position-fixed bottom-0 end-0 p-3';
+                        toast.style.zIndex = '11';
+                        toast.innerHTML = `
+                            <div class="toast show" role="alert" aria-live="assertive" aria-atomic="true">
+                                <div class="toast-header bg-success text-white">
+                                    <i class="bi bi-check-circle me-2"></i>
+                                    <strong class="me-auto">Success</strong>
+                                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast" aria-label="Close"></button>
+                                </div>
+                                <div class="toast-body">
+                                    Tag "${tagName}" deleted successfully
+                                </div>
+                            </div>
+                        `;
+                        document.body.appendChild(toast);
+                        
+                        // Remove the tag element from DOM with animation
+                        const tagContainer = $(element).closest('.tag-item-container');
+                        tagContainer.fadeOut(300, function() { 
+                            $(this).remove(); 
+                            
+                            // Check if any tags are left after this removal
+                            const remainingTags = document.querySelectorAll('.tag-item');
+                            if (remainingTags.length === 0) {
+                                const cardBody = document.querySelector('.card-body');
+                                if (cardBody) {
+                                    cardBody.innerHTML = `
+                                        <div class="text-center py-5">
+                                            <div class="empty-state">
+                                                <i class="bi bi-tags text-muted mb-3" style="font-size: 4rem;"></i>
+                                                <h5>No tags created yet</h5>
+                                                <p class="text-muted">Create tags to organize and categorize your paragraphs</p>
+                                            </div>
+                                        </div>
+                                    `;
+                                }
+                            }
+                        });
+                        
+                        // Auto-dismiss the toast after 3 seconds
+                        setTimeout(function() {
+                            toast.remove();
+                        }, 3000);
+                    } else {
+                        alert('Failed to delete tag: ' + (response && response.message ? response.message : 'Unknown error'));
+                        
+                        // Restore the tag item
+                        if (tagItem) {
+                            tagItem.style.opacity = '1';
+                            tagItem.style.pointerEvents = 'auto';
+                        }
+                    }
+                },
+                error: function(xhr, status, error) {
+                    alert('An error occurred while deleting the tag: ' + error);
+                    
+                    // Restore the tag item
+                    if (tagItem) {
+                        tagItem.style.opacity = '1';
+                        tagItem.style.pointerEvents = 'auto';
+                    }
+                }
+            });
+        }
+    }
+    
+    // Initialize counter cards animation
+    const counterCards = document.querySelectorAll('.counter-card');
+    counterCards.forEach((card, index) => {
+        // Stagger animation delay
+        setTimeout(() => {
+            card.style.opacity = '0';
+            card.style.transform = 'translateY(20px)';
+            
+            // Add animation
+            card.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+            
+            // Trigger animation
+            setTimeout(() => {
+                card.style.opacity = '1';
+                card.style.transform = 'translateY(0)';
+            }, 50);
+        }, index * 100);
+    });
+});
+</script>
+
 <style>
+/* Custom styles for the tag page */
+.counter-card {
+    transition: all 0.3s ease;
+    border-radius: 0.75rem;
+    border-left: 4px solid;
+    overflow: hidden;
+}
+
+.counter-card:hover {
+    transform: translateY(-5px);
+}
+
+.counter-documents {
+    border-left-color: var(--primary-color);
+}
+
+.counter-paragraphs {
+    border-left-color: var(--success-color);
+}
+
+.counter-duplicates {
+    border-left-color: var(--warning-color);
+}
+
+.counter-tags {
+    border-left-color: var(--accent-color);
+}
+
+.counter-icon {
+    font-size: 2.5rem;
+    opacity: 0.15;
+    position: absolute;
+    right: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+.counter-value {
+    font-size: 1.75rem;
+    font-weight: 700;
+}
+
+/* Color picker styles */
+.predefined-colors {
+    padding: 10px;
+    background-color: #f8f9fa;
+    border-radius: 0.5rem;
+}
+
+.color-option {
+    position: relative;
+    cursor: pointer;
+    border-radius: 0.25rem;
+    padding: 2px;
+    border: 2px solid transparent;
+    transition: all 0.2s ease;
+}
+
+.color-option.active {
+    border-color: #4a4a49;
+    transform: scale(1.1);
+}
+
+.color-preview {
+    width: 30px;
+    height: 30px;
+    border-radius: 0.25rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.color-preview-container {
+    margin-top: 10px;
+    padding: 10px !important;
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
 .tag-item {
     transition: all 0.2s ease;
+}
+
+/* Hover effect for the color options */
+.color-option:hover {
+    transform: scale(1.1);
+}
+
+/* Ensure delete button is properly styled */
+.delete-tag-btn {
+    transition: all 0.2s ease;
+}
+
+.delete-tag-btn:hover {
+    background-color: #fd565c !important;
+    color: white !important;
 }
 </style>
 {% endblock %}
