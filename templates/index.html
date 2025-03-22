@@ -131,10 +131,10 @@
             <div class="card counter-card counter-duplicates h-100">
                 <div class="card-body p-3 position-relative">
                     <div>
-                        <h6 class="text-muted mb-1">Duplicates</h6>
+                        <h6 class="text-muted mb-1">Shared paragraphs</h6>
                         <div class="counter-value">{{ duplicates|default(0) }}</div>
                     </div>
-                    <i class="bi bi-copy counter-icon"></i>
+                    <i class="bi bi-files"></i>
                 </div>
             </div>
         </div>
@@ -142,8 +142,8 @@
             <div class="card counter-card counter-tags h-100">
                 <div class="card-body p-3 position-relative">
                     <div>
-                        <h6 class="text-muted mb-1">Tags</h6>
-                        <div class="counter-value">{{ tags|default(0) }}</div>
+                        <h6 class="text-muted mb-1">Unique paragraphs</h6>
+                        <div class="counter-value">{{ unique_paragraphs }}</div>
                     </div>
                     <i class="bi bi-tags counter-icon"></i>
                 </div>

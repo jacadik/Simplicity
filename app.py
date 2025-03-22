@@ -234,21 +234,34 @@ def index():
     paginated_documents = documents[start_idx:end_idx] if documents else []
     
     # Get additional statistics
-    # Here you could add queries to get total paragraphs, duplicates, tags etc.
-    total_paragraphs = 0  # Replace with actual query
-    duplicates = 0        # Replace with actual query
-    tags = 0              # Replace with actual query
+    # 1. Get all paragraphs (total count)
+    all_paragraphs = db_manager.get_paragraphs(collapse_duplicates=False)
+    total_paragraphs = len(all_paragraphs)
+    
+    # 2. Get paragraphs with duplicates collapsed (unique content)
+    unique_paragraphs = db_manager.get_paragraphs(collapse_duplicates=True)
+    unique_paragraph_count = len(unique_paragraphs)
+    
+    # 3. Count paragraphs that have at least one duplicate
+    paragraphs_with_duplicates = sum(1 for para in unique_paragraphs if para.get('appears_in_multiple', False))
     
     return render_template(
         'index.html',
-        documents=documents,            # All documents (for stats)
-        paginated_documents=paginated_documents,  # Documents for current page
+        documents=documents,
+        paginated_documents=paginated_documents,
         page=page,
         total_pages=total_pages,
         per_page=per_page,
         total_paragraphs=total_paragraphs,
-        duplicates=duplicates,
-        tags=tags
+        duplicates=paragraphs_with_duplicates,  # Number of paragraphs with at least one duplicate
+        unique_paragraphs=unique_paragraph_count,  # Number of unique content pieces
+        # Add icons for the tiles
+        icons={
+            'documents': 'bi-file-earmark-text',
+            'paragraphs': 'bi-paragraph',
+            'duplicates': 'bi-files',
+            'unique': 'bi-fingerprint'
+        }
     )
 
 @app.route('/upload', methods=['POST'])

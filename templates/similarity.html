@@ -127,7 +127,7 @@
                         <select class="form-select" id="similarityTypeFilter">
                             <option value="all">All Types</option>
                             <option value="exact">Exact Matches</option>
-                            <option value="similar">Similar Paragraphs</option>
+                            <option value="similar" selected>Similar Paragraphs</option>
                         </select>
                     </div>
                 </div>
@@ -162,6 +162,10 @@
     <h3>Similarity Results</h3>
     <div class="row">
         <div class="col-md-12">
+            <div id="visibleResults" class="mb-3">
+                <span id="visibleCount" class="badge bg-primary"></span>
+                <span id="filterDescription" class="text-muted ms-2">Showing similar paragraphs only by default</span>
+            </div>
             {% if similarities %}
                 <div id="similarityResults">
                     {% for sim in similarities %}
@@ -424,13 +428,64 @@
                 // Add transitions only after everything is loaded
                 card.style.transition = 'transform 0.3s ease, box-shadow 0.3s ease';
             });
+
+            // Count the container types to check what we actually have
+            const containers = document.querySelectorAll('.similarity-container');
+            const similarContainers = document.querySelectorAll('.similarity-container[data-type="similar"]');
+            const exactContainers = document.querySelectorAll('.similarity-container[data-type="exact"]');
+            
+            console.log("Found results - Total: " + containers.length + 
+                      ", Similar: " + similarContainers.length + 
+                      ", Exact: " + exactContainers.length);
+                      
+            // If we have no similar results but have exact ones, default to "all"
+            if (similarContainers.length === 0 && exactContainers.length > 0) {
+                document.getElementById('similarityTypeFilter').value = 'all';
+            }
+            
+            // Apply filtering based on the type filter selection
+            filterResults();
+            updateVisibleCount();
         }, 300); // Small delay to ensure DOM is fully ready
     });
     
     // Filtering functionality
-    document.getElementById('similarityTypeFilter').addEventListener('change', filterResults);
-    document.getElementById('documentFilter').addEventListener('change', filterResults);
+    document.getElementById('similarityTypeFilter').addEventListener('change', function() {
+        filterResults();
+        updateVisibleCount();
+    });
+    document.getElementById('documentFilter').addEventListener('change', function() {
+        filterResults();
+        updateVisibleCount();
+    });
     document.getElementById('sortOrder').addEventListener('change', sortResults);
+    
+    function updateVisibleCount() {
+        const visibleContainers = document.querySelectorAll('.similarity-container[style="display: block;"]');
+        const totalContainers = document.querySelectorAll('.similarity-container');
+        const visibleCountElement = document.getElementById('visibleCount');
+        const filterDescriptionElement = document.getElementById('filterDescription');
+        
+        // Update count badge
+        visibleCountElement.textContent = `${visibleContainers.length} of ${totalContainers.length} results`;
+        
+        // Update filter description
+        const typeFilter = document.getElementById('similarityTypeFilter').value;
+        const docFilter = document.getElementById('documentFilter').value;
+        
+        let description = "";
+        if (typeFilter !== 'all') {
+            description += `Showing ${typeFilter} matches`;
+        } else {
+            description += "Showing all similarity types";
+        }
+        
+        if (docFilter !== 'all') {
+            description += ` from document "${docFilter}"`;
+        }
+        
+        filterDescriptionElement.textContent = description;
+    }
     
     function filterResults() {
         const typeFilter = document.getElementById('similarityTypeFilter').value;
@@ -446,6 +501,22 @@
             
             container.style.display = (typeMatch && docMatch) ? 'block' : 'none';
         });
+        
+        // Check if any containers are visible after filtering
+        const visibleContainers = document.querySelectorAll('.similarity-container[style="display: block;"]');
+        if (visibleContainers.length === 0 && typeFilter !== 'all') {
+            // No results with current filter, switch to showing all
+            console.log("No results with filter '" + typeFilter + "', showing all results instead");
+            document.getElementById('similarityTypeFilter').value = 'all';
+            
+            // Re-apply the filter with "all" selected
+            containers.forEach(container => {
+                const docMatch = docFilter === 'all' || 
+                                container.dataset.doc1 === docFilter || 
+                                container.dataset.doc2 === docFilter;
+                container.style.display = docMatch ? 'block' : 'none';
+            });
+        }
     }
     
     function sortResults() {
