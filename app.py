@@ -13,11 +13,12 @@ from flask_socketio import SocketIO, emit
 
 from utils.document_parser import DocumentParser
 from utils.similarity_analyzer import SimilarityAnalyzer, SimilarityResult as AnalyzerSimilarityResult
-from utils.database_manager import DatabaseManager, Document, Paragraph, Tag, SimilarityResult, Cluster, cluster_paragraphs
 from utils.document_metadata_extractor import DocumentMetadataExtractor
 from utils.excel_exporter import export_to_excel
 from utils.thread_pool_manager import ThreadPoolManager
 from utils.document_batch_processor import DocumentBatchProcessor
+from utils.database.models import Document, Paragraph, Tag, SimilarityResult, Cluster, cluster_paragraphs
+from utils.database.manager import DatabaseManager
 
 # Initialize insert page extractor
 from utils.insert_page_extractor import InsertPageExtractor
@@ -973,6 +974,7 @@ def upload_insert():
         flash(f'Error processing insert: {str(e)}', 'danger')
     
     return redirect(url_for('view_inserts'))
+
 @app.route('/find-insert-matches/<int:insert_id>', methods=['GET'])
 def find_insert_matches(insert_id):
     """Find documents that contain the given insert."""
@@ -1039,6 +1041,39 @@ def find_insert_matches(insert_id):
     )
     
     return render_template('insert_matches.html', insert=insert, matches=matches)
+
+@app.route('/delete-insert/<int:insert_id>')
+def delete_insert(insert_id):
+    """Delete an insert and its pages."""
+    try:
+        # Get the insert to verify it exists
+        inserts = db_manager.get_inserts()
+        insert = next((i for i in inserts if i['id'] == insert_id), None)
+        
+        if not insert:
+            flash('Insert not found', 'danger')
+            return redirect(url_for('view_inserts'))
+        
+        # First, we need to implement the delete_insert method in DatabaseManager
+        if db_manager.delete_insert(insert_id):
+            # Try to delete the file from disk if it exists
+            if os.path.exists(insert['file_path']):
+                try:
+                    os.remove(insert['file_path'])
+                    flash(f'Insert "{insert["name"]}" and file deleted successfully', 'success')
+                except:
+                    # If file delete fails, just report the database record was deleted
+                    flash(f'Insert "{insert["name"]}" deleted from database (file may remain on disk)', 'success')
+            else:
+                flash(f'Insert "{insert["name"]}" deleted successfully', 'success')
+        else:
+            flash('Failed to delete insert', 'danger')
+            
+    except Exception as e:
+        logger.error(f"Error deleting insert: {str(e)}", exc_info=True)
+        flash(f'Error deleting insert: {str(e)}', 'danger')
+        
+    return redirect(url_for('view_inserts'))
 
 @app.errorhandler(413)
 def request_entity_too_large(error):

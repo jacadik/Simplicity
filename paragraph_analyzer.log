@@ -1537,3 +1537,22 @@
 2025-03-22 16:50:38,008 INFO: Finding similar paragraphs... [in C:\Simplicity\app.py:615]
 2025-03-22 16:50:39,453 INFO: Found 999 similar paragraphs [in C:\Simplicity\app.py:617]
 2025-03-22 16:50:39,454 INFO: Saving 1962 similarity results to database [in C:\Simplicity\app.py:624]
+2025-03-22 16:58:49,371 INFO: Paragraph Analyzer startup [in C:\Simplicity\app.py:104]
+2025-03-22 16:58:53,502 INFO: Paragraph Analyzer startup [in C:\Simplicity\app.py:104]
+2025-03-22 16:58:59,994 INFO: Socket.IO client connected from thread 15380 [in C:\Simplicity\app.py:134]
+2025-03-22 16:59:00,091 INFO: Starting progress queue processor in thread 16920 [in C:\Simplicity\app.py:141]
+2025-03-22 17:00:57,134 INFO: Paragraph Analyzer startup [in C:\Simplicity\app.py:104]
+2025-03-22 17:01:02,880 INFO: Paragraph Analyzer startup [in C:\Simplicity\app.py:104]
+2025-03-22 17:02:32,408 INFO: Paragraph Analyzer startup [in C:\Simplicity\app.py:104]
+2025-03-22 17:36:39,980 INFO: Paragraph Analyzer startup [in C:\Simplicity\app.py:105]
+2025-03-22 17:36:44,132 INFO: Paragraph Analyzer startup [in C:\Simplicity\app.py:105]
+2025-03-22 17:36:48,801 ERROR: Error deleting insert: 'DatabaseManager' object has no attribute 'delete_insert' [in C:\Simplicity\app.py:1073]
+Traceback (most recent call last):
+  File "C:\Simplicity\app.py", line 1058, in delete_insert
+    if db_manager.delete_insert(insert_id):
+       ^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'DatabaseManager' object has no attribute 'delete_insert'
+2025-03-22 17:37:42,260 INFO: Socket.IO client connected from thread 10748 [in C:\Simplicity\app.py:135]
+2025-03-22 17:37:42,272 INFO: Starting progress queue processor in thread 10192 [in C:\Simplicity\app.py:142]
+2025-03-22 17:37:46,414 INFO: Socket.IO client connected from thread 18556 [in C:\Simplicity\app.py:135]
+2025-03-22 17:37:46,421 INFO: Starting progress queue processor in thread 12740 [in C:\Simplicity\app.py:142]

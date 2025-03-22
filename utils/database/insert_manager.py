@@ -1,3 +1,4 @@
+import os
 from datetime import datetime
 from typing import List, Dict, Any
 
@@ -192,3 +193,84 @@ class InsertManager:
         except Exception as e:
             self.logger.error(f"Error retrieving insert pages: {str(e)}")
             return []
+            
+    def delete_insert(self, insert_id: int) -> bool:
+        """
+        Delete an insert and all its pages.
+        
+        Args:
+            insert_id: ID of the insert to delete
+            
+        Returns:
+            Boolean indicating success
+        """
+        self.logger.info(f"Deleting insert with ID: {insert_id}")
+        
+        def db_delete_insert(session: Session) -> str:
+            # Get the insert
+            insert = session.query(Insert).get(insert_id)
+            
+            if not insert:
+                self.logger.warning(f"Insert with ID {insert_id} not found")
+                return ""
+            
+            file_path = insert.file_path
+            
+            # Delete the insert (cascade will handle pages)
+            session.delete(insert)
+            session.commit()
+            
+            self.logger.info(f"Deleted insert with ID: {insert_id}")
+            return file_path
+        
+        try:
+            file_path = self.base_manager._with_session(db_delete_insert)
+            
+            if file_path:
+                # Try to delete the file if it exists
+                if os.path.exists(file_path):
+                    try:
+                        os.remove(file_path)
+                        self.logger.info(f"Deleted file: {file_path}")
+                    except (OSError, PermissionError) as e:
+                        self.logger.warning(f"Could not delete file {file_path}: {str(e)}")
+                
+                return True
+            return False
+                
+        except Exception as e:
+            self.logger.error(f"Error deleting insert: {str(e)}")
+            return False
+
+    def delete_insert_page(self, page_id: int) -> bool:
+        """
+        Delete a specific insert page.
+        
+        Args:
+            page_id: ID of the page to delete
+            
+        Returns:
+            Boolean indicating success
+        """
+        self.logger.info(f"Deleting insert page with ID: {page_id}")
+        
+        def db_delete_page(session: Session) -> bool:
+            # Get the page
+            page = session.query(InsertPage).get(page_id)
+            
+            if not page:
+                self.logger.warning(f"Insert page with ID {page_id} not found")
+                return False
+            
+            # Delete the page
+            session.delete(page)
+            session.commit()
+            
+            self.logger.info(f"Deleted insert page with ID: {page_id}")
+            return True
+        
+        try:
+            return self.base_manager._with_session(db_delete_page)
+        except Exception as e:
+            self.logger.error(f"Error deleting insert page: {str(e)}")
+            return False

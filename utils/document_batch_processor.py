@@ -12,7 +12,7 @@ from sqlalchemy import text
 from utils.thread_pool_manager import ThreadPoolManager
 from utils.document_parser import DocumentParser
 from utils.document_metadata_extractor import DocumentMetadataExtractor
-from utils.database_manager import DatabaseManager
+from utils.database.manager import DatabaseManager
 
 # Thread-local storage for database sessions
 local_sessions = threading.local()
