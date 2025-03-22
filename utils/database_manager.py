@@ -652,28 +652,33 @@ class DatabaseManager:
     
     def get_tags(self) -> List[Dict[str, Any]]:
         """
-        Get all tags.
+        Get all tags with accurate usage counts.
         
         Returns:
-            List of tag dictionaries
+            List of tag dictionaries with usage counts
         """
-        self.logger.info("Retrieving all tags")
+        self.logger.info("Retrieving all tags with usage counts")
         
         def db_get_tags(session: Session) -> List[Dict[str, Any]]:
-            # Query all tags
+            # First get all the tags
             tags = session.query(Tag).all()
             
-            # Convert ORM objects to dictionaries
-            tag_dicts = [
-                {
+            tag_dicts = []
+            # For each tag, count distinct paragraphs
+            for tag in tags:
+                # Count distinct paragraphs associated with this tag
+                count = session.query(paragraph_tags).filter(
+                    paragraph_tags.c.tag_id == tag.id
+                ).count()
+                
+                tag_dicts.append({
                     'id': tag.id,
                     'name': tag.name,
-                    'color': tag.color
-                }
-                for tag in tags
-            ]
+                    'color': tag.color,
+                    'usage_count': count
+                })
             
-            self.logger.info(f"Retrieved {len(tag_dicts)} tags")
+            self.logger.info(f"Retrieved {len(tag_dicts)} tags with usage counts")
             return tag_dicts
         
         try:

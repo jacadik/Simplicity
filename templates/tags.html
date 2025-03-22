@@ -50,7 +50,13 @@
                 <div class="card-body p-3 position-relative">
                     <div>
                         <h6 class="text-muted mb-1">Most Used Tag</h6>
-                        <div class="counter-value">{{ most_used_tag_count|default(0) }}</div>
+                        <div class="counter-value">
+                            {% if most_used_tag %}
+                                {{ most_used_tag.name }} ({{ most_used_tag.usage_count }})
+                            {% else %}
+                                None
+                            {% endif %}
+                        </div>
                     </div>
                     <i class="bi bi-bar-chart counter-icon"></i>
                 </div>

@@ -611,9 +611,30 @@ def analyze_similarity():
 
 @app.route('/tags')
 def manage_tags():
-    """Manage tags."""
+    """Manage tags with enhanced statistics."""
+    # Get tags with usage counts
     tags = db_manager.get_tags()
-    return render_template('tags.html', tags=tags)
+    
+    # Calculate additional statistics
+    tagged_paragraphs = 0
+    most_used_tag = None
+    most_used_tag_count = 0
+    
+    if tags:
+        # Find total tagged paragraphs (this might include duplicates if paragraphs have multiple tags)
+        tagged_paragraphs = sum(tag['usage_count'] for tag in tags)
+        
+        # Find the most used tag (both name and count)
+        most_used_tag = max(tags, key=lambda tag: tag['usage_count']) if tags else None
+        most_used_tag_count = most_used_tag['usage_count'] if most_used_tag else 0
+    
+    return render_template(
+        'tags.html', 
+        tags=tags,
+        tagged_paragraphs=tagged_paragraphs,
+        most_used_tag=most_used_tag,
+        most_used_tag_count=most_used_tag_count
+    )
 
 @app.route('/add-tag', methods=['POST'])
 def add_tag():

@@ -62,6 +62,15 @@
                             <option value="all" {% if show_all_duplicates %}selected{% endif %}>Show All Instances</option>
                         </select>
                     </div>
+                    <div class="col-md-3">
+                        <label for="minLengthFilter" class="form-label"><i class="bi bi-text-paragraph me-1"></i>Min Length</label>
+                        <div class="input-group">
+                            <input type="number" class="form-control" id="minLengthFilter" min="0" value="0" placeholder="Minimum characters">
+                            <button class="btn btn-outline-secondary" type="button" id="showLengthsBtn" title="Show character counts">
+                                <i class="bi bi-info-circle"></i>
+                            </button>
+                        </div>
+                    </div>
                 </div>
                 
                 <!-- Sorting Options -->
@@ -119,7 +128,8 @@
                      data-id="{{ para.id }}" 
                      data-occurrences="{{ para.document_references|length }}" 
                      data-document="{{ para.filename }}"
-                     data-tags="{{ para.tags|map(attribute='id')|join(',') }}">
+                     data-tags="{{ para.tags|map(attribute='id')|join(',') }}"
+                     data-content-length="{{ para.content|length }}">
                     <div class="card-header d-flex justify-content-between align-items-center">
                         <div class="d-flex align-items-center gap-2">
                             {% if para.paragraph_type == 'header' %}
@@ -385,6 +395,45 @@
         document.getElementById('paragraphCount').textContent = visibleCount + ' paragraphs';
     }
     
+    function filterByMinLength(minLength) {
+        // Get current filters to respect them
+        const typeFilter = document.getElementById('paragraphTypeFilter').value;
+        const tagFilter = document.getElementById('tagFilter').value;
+        
+        // Apply minimum length filter along with existing filters
+        const paragraphs = document.querySelectorAll('.paragraph-card');
+        let visibleCount = 0;
+        
+        paragraphs.forEach(p => {
+            // Use the content length from the database (stored in data attribute)
+            const contentLength = parseInt(p.dataset.contentLength) || 0;
+            
+            // Check type filter
+            const passesTypeFilter = !typeFilter || p.dataset.type === typeFilter;
+            
+            // Check tag filter
+            let passesTagFilter = true;
+            if (tagFilter) {
+                const tags = p.dataset.tags.split(',').filter(tag => tag !== '');
+                passesTagFilter = tags.includes(tagFilter);
+            }
+            
+            // Check length filter
+            const passesLengthFilter = contentLength >= minLength;
+            
+            // Only show if passes all filters
+            if (passesTypeFilter && passesTagFilter && passesLengthFilter) {
+                p.style.display = 'block';
+                visibleCount++;
+            } else {
+                p.style.display = 'none';
+            }
+        });
+        
+        // Update count
+        document.getElementById('paragraphCount').textContent = visibleCount + ' paragraphs';
+    }
+    
     // Sort paragraphs
     function sortParagraphs(sortOption) {
         const paragraphsList = document.getElementById('paragraphsList');
@@ -441,6 +490,7 @@
     function applySortingAndTagFilters() {
         const typeFilter = document.getElementById('paragraphTypeFilter').value;
         const tagFilter = document.getElementById('tagFilter').value;
+        const minLength = parseInt(document.getElementById('minLengthFilter').value) || 0;
         
         if (typeFilter) {
             filterByType(typeFilter);
@@ -448,6 +498,10 @@
         
         if (tagFilter) {
             filterByTag(tagFilter);
+        }
+        
+        if (minLength > 0) {
+            filterByMinLength(minLength);
         }
     }
     
@@ -579,6 +633,37 @@
                 this.classList.remove('shadow');
             });
         });
+        
+        // Add minimum length filter listener
+        const minLengthFilter = document.getElementById('minLengthFilter');
+        if (minLengthFilter) {
+            minLengthFilter.addEventListener('input', function() {
+                filterByMinLength(parseInt(this.value) || 0);
+            });
+        }
+        
+        // Add show lengths button handler
+        const showLengthsBtn = document.getElementById('showLengthsBtn');
+        if (showLengthsBtn) {
+            showLengthsBtn.addEventListener('click', function() {
+                // Add character count badges to each paragraph
+                document.querySelectorAll('.paragraph-card').forEach(card => {
+                    // Use database length from data attribute
+                    const contentLength = card.dataset.contentLength;
+                    const lengthBadge = document.createElement('span');
+                    lengthBadge.className = 'badge bg-secondary char-count-badge ms-2';
+                    lengthBadge.innerHTML = `<i class="bi bi-123"></i> ${contentLength} chars (DB)`;
+                    
+                    // Only add if not already present
+                    if (!card.querySelector('.char-count-badge')) {
+                        const badgeContainer = card.querySelector('.d-flex.align-items-center.gap-2');
+                        if (badgeContainer) {
+                            badgeContainer.appendChild(lengthBadge);
+                        }
+                    }
+                });
+            });
+        }
         
         // Toggle paragraph content
         const readMoreBtns = document.querySelectorAll('.read-more-btn');
