@@ -1,7 +1,7 @@
 import os
 import json
 from datetime import datetime
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Union
 
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -107,26 +107,27 @@ class DocumentManager:
         """
         self.logger.info(f"Deleting document with ID: {document_id}")
         
-        def db_delete_document(session: Session) -> str:
+        def db_delete_document(session: Session) -> Union[bool, str]:
             # Get the document
             document = session.query(Document).get(document_id)
             
-            if document:
-                file_path = document.file_path
-                
-                # Delete from database (SQLAlchemy will handle the cascade)
-                session.delete(document)
-                session.commit()
-                
-                return file_path
-            else:
+            if not document:
                 self.logger.warning(f"Document with ID {document_id} not found")
-                return ""
+                return False
+            
+            file_path = document.file_path
+            
+            # Delete from database (SQLAlchemy will handle the cascade)
+            session.delete(document)
+            session.commit()
+            
+            self.logger.info(f"Deleted document from database: {document_id}")
+            return file_path
         
         try:
             file_path = self.base_manager._with_session(db_delete_document)
             
-            if file_path:
+            if file_path and isinstance(file_path, str):
                 # Try to delete the file if it exists
                 if os.path.exists(file_path):
                     try:

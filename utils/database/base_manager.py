@@ -32,18 +32,14 @@ class BaseManager:
         self._init_db()
     
     def _with_session(self, func: Callable[[Session], T]) -> T:
-        """
-        Execute a function with a database session, handling session lifecycle.
-        
-        Args:
-            func: Function that takes a session as its argument
-            
-        Returns:
-            The result of the provided function
-        """
+        """Execute a function with a database session, handling session lifecycle."""
         session = self.Session()
         try:
             result = func(session)
+            # Check if the session has pending changes that need to be committed
+            # This is important for operations that modify data
+            if session.dirty or session.new or session.deleted:
+                session.commit()
             return result
         except Exception as e:
             session.rollback()

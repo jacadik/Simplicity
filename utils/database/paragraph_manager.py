@@ -1,7 +1,7 @@
 from typing import List, Dict, Any, Optional
 
 from sqlalchemy.orm import Session
-from sqlalchemy import func, and_
+from sqlalchemy import func, and_, String  
 
 from .models import Paragraph, Document
 from .base_manager import BaseManager
@@ -132,8 +132,8 @@ class ParagraphManager:
                 # Get exact matching paragraphs based on content
                 duplicate_content_query = session.query(
                     Paragraph.content,
-                    func.string_agg(func.cast(Paragraph.id, "String"), ',').label('para_ids'),
-                    func.string_agg(func.cast(Document.id, "String"), ',').label('doc_ids'),
+                    func.string_agg(func.cast(Paragraph.id, String), ',').label('para_ids'),
+                    func.string_agg(func.cast(Document.id, String), ',').label('doc_ids'),
                     func.string_agg(Document.filename, ',').label('filenames')
                 ).join(
                     Document, 
@@ -142,7 +142,7 @@ class ParagraphManager:
                     Paragraph.content
                 ).having(
                     func.count() > 1
-                )
+)
                 
                 duplicate_rows = duplicate_content_query.all()
                 

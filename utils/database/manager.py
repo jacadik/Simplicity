@@ -1,5 +1,7 @@
 import os
 from typing import List, Dict, Any, Optional
+from sqlalchemy.orm import Session
+from sqlalchemy import text
 
 from .base_manager import BaseManager
 from .document_manager import DocumentManager
@@ -13,6 +15,13 @@ from .models import Tag
 
 from utils.document_parser import Paragraph as ParserParagraph
 from utils.similarity_analyzer import SimilarityResult as AnalyzerSimilarityResult
+
+
+
+
+
+# Other imports...
+from .models import Document, Paragraph, Tag, SimilarityResult, Cluster, cluster_paragraphs, paragraph_tags
 
 class DatabaseManager:
     """
@@ -191,57 +200,50 @@ class DatabaseManager:
     
     # Database cleaning
     def clear_database(self) -> bool:
-        """
-        Clear all data from the database.
-        
-        Returns:
-            Boolean indicating success
-        """
         self.logger.info("Clearing all data from database")
-        
-        def db_clear_database(session):
+    
+        def db_clear_database(session: Session) -> List[str]:
             # Get all file paths to delete files as well
-            from .models import Document
             documents = session.query(Document).all()
             file_paths = [doc.file_path for doc in documents]
-            
-            # Delete all records through cascade
-            # Clear similarity results
-            session.execute("DELETE FROM similarity_results")
-            
-            # Clear paragraph_tags table
-            session.execute("DELETE FROM paragraph_tags")
-            
-            # Clear cluster_paragraphs table
-            session.execute("DELETE FROM cluster_paragraphs")
-            
+        
+            # Delete all records through cascade using direct SQL with text() wrapper
+            # This ensures a proper deletion order respecting foreign key constraints
+        
+            # Clear similarity results first
+            session.execute(text("DELETE FROM similarity_results"))
+        
+            # Clear association tables next
+            session.execute(text("DELETE FROM paragraph_tags"))
+            session.execute(text("DELETE FROM cluster_paragraphs"))
+        
             # Delete clusters
-            session.execute("DELETE FROM clusters")
-            
+            session.execute(text("DELETE FROM clusters"))
+        
             # Delete paragraphs
-            session.execute("DELETE FROM paragraphs")
-            
+            session.execute(text("DELETE FROM paragraphs"))
+        
             # Delete document metadata
-            session.execute("DELETE FROM document_file_metadata")
-            
+            session.execute(text("DELETE FROM document_file_metadata"))
+        
             # Delete documents
-            session.execute("DELETE FROM documents")
-            
+            session.execute(text("DELETE FROM documents"))
+        
             # Delete insert pages
-            session.execute("DELETE FROM insert_pages")
-            
+            session.execute(text("DELETE FROM insert_pages"))
+        
             # Delete inserts
-            session.execute("DELETE FROM inserts")
-            
-            # Don't delete tags
-            
+            session.execute(text("DELETE FROM inserts"))
+        
+            # Don't delete tags - this is intentional to preserve tag definitions
+        
             session.commit()
             return file_paths
-        
+    
         try:
             file_paths = self.base_manager._with_session(db_clear_database)
-            
-            # Delete all files
+        
+            # Delete all files from disk
             for file_path in file_paths:
                 if file_path and os.path.exists(file_path):
                     try:
@@ -249,10 +251,10 @@ class DatabaseManager:
                         self.logger.info(f"Deleted file: {file_path}")
                     except (OSError, PermissionError) as e:
                         self.logger.warning(f"Could not delete file {file_path}: {str(e)}")
-            
+        
             self.logger.info("Database cleared successfully")
             return True
             
         except Exception as e:
-            self.logger.error(f"Error clearing database: {str(e)}")
+            self.logger.error(f"Error clearing database: {str(e)}", exc_info=True)
             return False
