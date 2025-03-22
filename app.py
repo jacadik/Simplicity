@@ -19,6 +19,14 @@ from utils.excel_exporter import export_to_excel
 from utils.thread_pool_manager import ThreadPoolManager
 from utils.document_batch_processor import DocumentBatchProcessor
 
+# Initialize insert page extractor
+from utils.insert_page_extractor import InsertPageExtractor
+insert_page_extractor = InsertPageExtractor(logging_level='INFO')
+
+# Import insert matcher (will be instantiated when needed)
+from utils.insert_matcher import InsertMatcher, InsertMatchResult
+
+
 # Configuration
 UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads')
 ALLOWED_EXTENSIONS = {'pdf', 'doc', 'docx'}
@@ -897,6 +905,140 @@ def export_data():
         logger.error(f"Error exporting data: {str(e)}", exc_info=True)
         flash('An error occurred during export', 'danger')
         return redirect(url_for('index'))
+
+
+@app.route('/inserts', methods=['GET'])
+def view_inserts():
+    """View and manage inserts."""
+    inserts = db_manager.get_inserts()
+    return render_template('inserts.html', inserts=inserts)
+
+@app.route('/upload-insert', methods=['POST'])
+def upload_insert():
+    """Handle insert upload with custom name."""
+    if 'insert_file' not in request.files:
+        flash('No file selected', 'danger')
+        return redirect(url_for('view_inserts'))
+        
+    file = request.files['insert_file']
+    insert_name = request.form.get('insert_name', '').strip()
+    
+    if not file or file.filename == '':
+        flash('No file selected', 'danger')
+        return redirect(url_for('view_inserts'))
+        
+    if not insert_name:
+        flash('Insert name is required', 'danger')
+        return redirect(url_for('view_inserts'))
+    
+    if not allowed_file(file.filename):
+        flash('Invalid file type. Allowed types: PDF, DOC, DOCX', 'danger')
+        return redirect(url_for('view_inserts'))
+    
+    try:
+        # Process the insert
+        filename = secure_filename(file.filename)
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        
+        # Add timestamp to filename if it already exists
+        if os.path.exists(file_path):
+            name, ext = os.path.splitext(filename)
+            timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+            filename = f"{name}_{timestamp}{ext}"
+            file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        
+        # Save the file
+        file.save(file_path)
+        
+        # Extract pages from the insert
+        file_type = filename.rsplit('.', 1)[1].lower()
+        
+        # Add insert to database
+        insert_id = db_manager.add_insert(insert_name, filename, file_type, file_path)
+        
+        if insert_id > 0:
+            # Extract pages and store them
+            pages = insert_page_extractor.extract_pages(file_path, insert_id)
+            
+            if pages:
+                db_manager.add_insert_pages(pages)
+                flash(f'Insert "{insert_name}" added successfully with {len(pages)} pages', 'success')
+            else:
+                flash(f'Insert "{insert_name}" added but no pages could be extracted', 'warning')
+        else:
+            flash('Failed to add insert', 'danger')
+            
+    except Exception as e:
+        logger.error(f"Error processing insert: {str(e)}", exc_info=True)
+        flash(f'Error processing insert: {str(e)}', 'danger')
+    
+    return redirect(url_for('view_inserts'))
+@app.route('/find-insert-matches/<int:insert_id>', methods=['GET'])
+def find_insert_matches(insert_id):
+    """Find documents that contain the given insert."""
+    # Get the insert
+    inserts = db_manager.get_inserts()
+    insert = next((i for i in inserts if i['id'] == insert_id), None)
+    
+    if not insert:
+        flash('Insert not found', 'danger')
+        return redirect(url_for('view_inserts'))
+    
+    # Get the insert pages
+    insert_pages = db_manager.get_insert_pages(insert_id)
+    
+    if not insert_pages:
+        flash('No pages found for this insert', 'danger')
+        return redirect(url_for('view_inserts'))
+    
+    # Get all documents
+    documents = db_manager.get_documents()
+    
+    if not documents:
+        flash('No documents available for comparison', 'warning')
+        return render_template('insert_matches.html', insert=insert, matches=[])
+    
+    # For each document, get its pages
+    document_pages = {}
+    for doc in documents:
+        # Get the document's paragraphs and organize them by page
+        # This is a simplified approach - you may need to adapt this to your document structure
+        paragraphs = db_manager.get_paragraphs(doc['id'], collapse_duplicates=False)
+        
+        # Group paragraphs by page
+        pages = {}
+        for para in paragraphs:
+            page_num = para.get('page_number', 0)
+            if page_num not in pages:
+                pages[page_num] = []
+            pages[page_num].append(para)
+        
+        # Convert to page content by joining paragraphs
+        doc_pages = []
+        for page_num, page_paras in sorted(pages.items()):
+            content = '\n'.join(p['content'] for p in page_paras)
+            doc_pages.append({
+                'content': content,
+                'page_number': page_num,
+                'document_id': doc['id']
+            })
+        
+        document_pages[doc['id']] = doc_pages
+    
+    # Create an insert matcher and find matches
+    insert_matcher = InsertMatcher(
+        similarity_analyzer=similarity_analyzer,
+        similarity_threshold=0.7  # Adjust threshold as needed
+    )
+    
+    matches = insert_matcher.find_insert_matches(
+        insert_id=insert_id,
+        insert_pages=insert_pages,
+        documents=documents,
+        document_pages=document_pages
+    )
+    
+    return render_template('insert_matches.html', insert=insert, matches=matches)
 
 @app.errorhandler(413)
 def request_entity_too_large(error):
