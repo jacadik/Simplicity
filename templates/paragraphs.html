@@ -62,20 +62,11 @@
                             <option value="all" {% if show_all_duplicates %}selected{% endif %}>Show All Instances</option>
                         </select>
                     </div>
-                    <div class="col-md-3">
-                        <label for="minLengthFilter" class="form-label"><i class="bi bi-text-paragraph me-1"></i>Min Length</label>
-                        <div class="input-group">
-                            <input type="number" class="form-control" id="minLengthFilter" min="0" value="0" placeholder="Minimum characters">
-                            <button class="btn btn-outline-secondary" type="button" id="showLengthsBtn" title="Show character counts">
-                                <i class="bi bi-info-circle"></i>
-                            </button>
-                        </div>
-                    </div>
-                </div>
+
                 
                 <!-- Sorting Options -->
                 <div class="row mt-3">
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         <label for="sortOption" class="form-label"><i class="bi bi-sort-alpha-down me-1"></i>Sort By</label>
                         <select class="form-select" id="sortOption" onchange="sortParagraphs(this.value)">
                             <option value="position">Default Order</option>
@@ -84,11 +75,19 @@
                             <option value="document">Document Name</option>
                         </select>
                     </div>
-                    <div class="col-md-8">
+                    <div class="col-md-3">
+                        <label for="minLengthFilter" class="form-label"><i class="bi bi-text-paragraph me-1"></i>Min Length</label>
+                        <div class="input-group">
+                            <input type="number" class="form-control" id="minLengthFilter" min="0" value="0" placeholder="Min chars">
+                            <button class="btn btn-outline-secondary" type="button" id="showLengthsBtn" title="Show character counts">
+                                <i class="bi bi-info-circle"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
                         <label for="searchParagraphs" class="form-label"><i class="bi bi-search me-1"></i>Search Content</label>
                         <input type="text" class="form-control" id="searchParagraphs" placeholder="Search paragraph content...">
                     </div>
-                </div>
             </div>
         </div>
     </div>

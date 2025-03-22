@@ -1030,7 +1030,7 @@ def find_insert_matches(insert_id):
     # Create an insert matcher and find matches
     insert_matcher = InsertMatcher(
         similarity_analyzer=similarity_analyzer,
-        similarity_threshold=0.7  # Adjust threshold as needed
+        similarity_threshold=0.3  # Adjust threshold as needed
     )
     
     matches = insert_matcher.find_insert_matches(
@@ -1074,6 +1074,81 @@ def delete_insert(insert_id):
         flash(f'Error deleting insert: {str(e)}', 'danger')
         
     return redirect(url_for('view_inserts'))
+
+@app.route('/view-insert/<int:insert_id>')
+def view_insert(insert_id):
+    """View an insert with its extracted pages."""
+    # Get the insert
+    inserts = db_manager.get_inserts()
+    insert = next((i for i in inserts if i['id'] == insert_id), None)
+    
+    if not insert:
+        flash('Insert not found', 'danger')
+        return redirect(url_for('view_inserts'))
+    
+    # Get the insert pages
+    pages = db_manager.get_insert_pages(insert_id)
+    
+    # Determine file type for proper rendering
+    file_type = insert['filename'].split('.')[-1].lower()
+    
+    # Get file size in formatted string (e.g., "123 KB")
+    file_size_formatted = "Unknown"
+    try:
+        if os.path.exists(insert['file_path']):
+            file_size = os.path.getsize(insert['file_path'])
+            # Format file size
+            if file_size < 1024:
+                file_size_formatted = f"{file_size} B"
+            elif file_size < 1024 * 1024:
+                file_size_formatted = f"{file_size / 1024:.1f} KB"
+            else:
+                file_size_formatted = f"{file_size / (1024 * 1024):.1f} MB"
+    except Exception as e:
+        logger.error(f"Error getting file size for insert {insert_id}: {str(e)}")
+    
+    # Get usage statistics for this insert (if available)
+    usage_stats = None
+    try:
+        # This is a placeholder - you would implement this based on your data model
+        # For example, you might query the database for documents that match this insert
+        matches = []  # You would get this from your database
+        
+        if matches:
+            # Calculate usage statistics
+            usage_stats = {
+                'document_count': len(matches),
+                'avg_match_score': sum(match.get('match_score', 0) * 100 for match in matches) / len(matches),
+                'last_match_date': max(match.get('match_date', '') for match in matches if match.get('match_date'))
+            }
+    except Exception as e:
+        logger.error(f"Error getting usage statistics for insert {insert_id}: {str(e)}")
+    
+    return render_template(
+        'insert_view.html',
+        insert=insert,
+        pages=pages,
+        file_type=file_type,
+        file_size_formatted=file_size_formatted,
+        usage_stats=usage_stats
+    )
+
+@app.route('/serve-insert/<int:insert_id>')
+def serve_insert(insert_id):
+    """Serve the insert file for viewing."""
+    # Get the insert
+    inserts = db_manager.get_inserts()
+    insert = next((i for i in inserts if i['id'] == insert_id), None)
+    
+    if not insert or not os.path.exists(insert['file_path']):
+        flash('Insert file not found', 'danger')
+        return redirect(url_for('view_inserts'))
+    
+    return send_file(
+        insert['file_path'],
+        as_attachment=False,
+        download_name=insert['filename']
+    )
 
 @app.errorhandler(413)
 def request_entity_too_large(error):

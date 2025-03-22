@@ -1,0 +1,223 @@
+{% extends 'base.html' %}
+
+{% block title %}Insert View - {{ insert.name }}{% endblock %}
+
+{% block content %}
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-4">
+        <div>
+            <h1 class="h3 mb-0">Insert View</h1>
+            <p class="text-muted mb-0">{{ insert.name }}</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="/find-insert-matches/{{ insert.id }}" class="btn btn-outline-success">
+                <i class="bi bi-search me-1"></i> Find Matches
+            </a>
+            <a href="/inserts" class="btn btn-light">
+                <i class="bi bi-arrow-left me-1"></i> Back to Inserts
+            </a>
+        </div>
+    </div>
+
+    <!-- Insert Viewer and Metadata Side by Side -->
+    <div class="row mb-4">
+        <!-- Insert Viewer -->
+        <div class="col-lg-8 mb-4 mb-lg-0">
+            <div class="card h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-file-text me-2"></i>Insert Content</h5>
+                    <div class="dropdown">
+                        <button class="btn btn-sm btn-light dropdown-toggle" type="button" id="viewerOptionsDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="bi bi-gear-fill me-1"></i> Options
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end shadow-sm" aria-labelledby="viewerOptionsDropdown">
+                            <li><a class="dropdown-item" href="/serve-document/{{ insert.id }}"><i class="bi bi-download me-2"></i>Download Original</a></li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="card-body p-0 document-viewer-container">
+                    {% if file_type == 'pdf' %}
+                        <!-- PDF Viewer with direct file embedding -->
+                        <div class="pdf-container position-relative">
+                            <iframe id="pdfViewer" src="/serve-insert/{{ insert.id }}" type="application/pdf" width="100%" height="800" frameborder="0" class="pdf-viewer">
+                                <p>Your browser does not support embedded PDFs. <a href="/serve-insert/{{ insert.id }}">Click here to download the PDF</a>.</p>
+                            </iframe>
+                        </div>
+                    {% elif file_type in ['doc', 'docx'] %}
+                        <!-- DOCX Viewer (limited support) -->
+                        <div class="p-5 text-center">
+                            <div class="empty-state mb-4">
+                                <i class="bi bi-file-earmark-word text-primary mb-3" style="font-size: 4rem;"></i>
+                                <h5>Word Document Preview</h5>
+                                <p class="text-muted">Word documents cannot be rendered directly in the browser</p>
+                            </div>
+                            <a href="/serve-insert/{{ insert.id }}" class="btn btn-primary" target="_blank">
+                                <i class="bi bi-download me-1"></i> Download Document
+                            </a>
+                        </div>
+                    {% else %}
+                        <div class="p-5 text-center">
+                            <div class="empty-state">
+                                <i class="bi bi-exclamation-triangle text-warning mb-3" style="font-size: 4rem;"></i>
+                                <h5>Unsupported File Type</h5>
+                                <p class="text-muted">File type: {{ file_type }}</p>
+                            </div>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Insert Metadata Panel -->
+        <div class="col-lg-4">
+            <div class="card h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-info-circle me-2"></i>Insert Metadata</h5>
+                    <button class="btn btn-sm btn-light" type="button" data-bs-toggle="collapse" data-bs-target="#metadataCollapse" aria-expanded="true" aria-controls="metadataCollapse">
+                        <i class="bi bi-chevron-down"></i>
+                    </button>
+                </div>
+                <div class="collapse show" id="metadataCollapse">
+                    <div class="card-body">
+                        <!-- Basic Insert Information -->
+                        <div class="card mb-3 border-0 shadow-sm">
+                            <div class="card-header bg-light">
+                                <h6 class="mb-0"><i class="bi bi-file-earmark me-2"></i>Basic Information</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="list-group list-group-flush">
+                                    <div class="list-group-item d-flex justify-content-between align-items-center px-0">
+                                        <span><i class="bi bi-tag me-2 text-muted"></i>Name</span>
+                                        <span class="text-truncate ms-2" style="max-width: 200px;" title="{{ insert.name }}">{{ insert.name }}</span>
+                                    </div>
+                                    <div class="list-group-item d-flex justify-content-between align-items-center px-0">
+                                        <span><i class="bi bi-file-earmark-text me-2 text-muted"></i>Filename</span>
+                                        <span class="text-truncate ms-2" style="max-width: 200px;" title="{{ insert.filename }}">{{ insert.filename }}</span>
+                                    </div>
+                                    <div class="list-group-item d-flex justify-content-between align-items-center px-0">
+                                        <span><i class="bi bi-hdd me-2 text-muted"></i>File Size</span>
+                                        <span class="badge bg-primary rounded-pill">{{ file_size_formatted }}</span>
+                                    </div>
+                                    <div class="list-group-item d-flex justify-content-between align-items-center px-0">
+                                        <span><i class="bi bi-calendar-date me-2 text-muted"></i>Upload Date</span>
+                                        <span>{{ insert.upload_date.split('T')[0] }}</span>
+                                    </div>
+                                    <div class="list-group-item d-flex justify-content-between align-items-center px-0">
+                                        <span><i class="bi bi-layers me-2 text-muted"></i>Page Count</span>
+                                        <span class="badge bg-primary rounded-pill">{{ insert.page_count }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Usage Statistics Card -->
+                        <div class="card mb-3 border-0 shadow-sm">
+                            <div class="card-header bg-light">
+                                <h6 class="mb-0"><i class="bi bi-graph-up me-2"></i>Usage Statistics</h6>
+                            </div>
+                            <div class="card-body">
+                                {% if usage_stats %}
+                                    <div class="list-group list-group-flush">
+                                        <div class="list-group-item d-flex justify-content-between align-items-center px-0">
+                                            <span><i class="bi bi-files me-2 text-muted"></i>Documents with Insert</span>
+                                            <span class="badge bg-success rounded-pill">{{ usage_stats.document_count }}</span>
+                                        </div>
+                                        <div class="list-group-item d-flex justify-content-between align-items-center px-0">
+                                            <span><i class="bi bi-percent me-2 text-muted"></i>Average Match Score</span>
+                                            <span class="badge bg-info rounded-pill">{{ usage_stats.avg_match_score|round(2) }}%</span>
+                                        </div>
+                                        <div class="list-group-item d-flex justify-content-between align-items-center px-0">
+                                            <span><i class="bi bi-calendar-check me-2 text-muted"></i>Last Found In</span>
+                                            <span>{{ usage_stats.last_match_date|default('N/A') }}</span>
+                                        </div>
+                                    </div>
+                                {% else %}
+                                    <p class="text-muted mb-0 text-center">
+                                        <i class="bi bi-exclamation-circle me-1"></i>
+                                        No usage statistics available yet
+                                    </p>
+                                    <div class="text-center mt-2">
+                                        <a href="/find-insert-matches/{{ insert.id }}" class="btn btn-sm btn-outline-primary">
+                                            <i class="bi bi-search me-1"></i> Find Matches
+                                        </a>
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Insert Pages Panel -->
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0"><i class="bi bi-file-earmark-text me-2"></i>Insert Pages</h5>
+            <button class="btn btn-sm btn-light" type="button" data-bs-toggle="collapse" data-bs-target="#pagesCollapse" aria-expanded="true" aria-controls="pagesCollapse">
+                <i class="bi bi-chevron-down"></i>
+            </button>
+        </div>
+        <div class="collapse show" id="pagesCollapse">
+            <div class="card-body">
+                {% if pages %}
+                    <div class="row">
+                        {% for page in pages %}
+                            <div class="col-md-6 mb-4">
+                                <div class="card h-100">
+                                    <div class="card-header">
+                                        <h6 class="mb-0">Page {{ page.page_number + 1 }}</h6>
+                                    </div>
+                                    <div class="card-body bg-light">
+                                        <div class="page-content p-3 bg-white rounded shadow-sm" style="height: 300px; overflow-y: auto;">
+                                            <pre style="white-space: pre-wrap; word-break: break-word;">{{ page.content }}</pre>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center py-5">
+                        <div class="empty-state">
+                            <i class="bi bi-file-earmark-x text-muted mb-3" style="font-size: 3rem;"></i>
+                            <h5>No pages extracted</h5>
+                            <p class="text-muted">No text content was extracted from this insert</p>
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Add hover effects to cards
+        const cards = document.querySelectorAll('.card');
+        cards.forEach(card => {
+            card.addEventListener('mouseenter', function() {
+                this.classList.add('shadow-sm');
+            });
+            card.addEventListener('mouseleave', function() {
+                this.classList.remove('shadow-sm');
+            });
+        });
+        
+        // Toggle metadata and pages panels
+        const toggleButtons = document.querySelectorAll('[data-bs-toggle="collapse"]');
+        toggleButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const icon = this.querySelector('i');
+                if (icon.classList.contains('bi-chevron-down')) {
+                    icon.classList.remove('bi-chevron-down');
+                    icon.classList.add('bi-chevron-up');
+                } else {
+                    icon.classList.remove('bi-chevron-up');
+                    icon.classList.add('bi-chevron-down');
+                }
+            });
+        });
+    });
+</script>
+{% endblock %}
