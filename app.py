@@ -219,7 +219,12 @@ def allowed_file(filename):
 
 @app.route('/')
 def index():
-    """Main page with document management and pagination."""
+    """Main page with application overview and process explanation."""
+    return render_template('index.html')
+
+@app.route('/documents')
+def documents():
+    """Documents page with document management and pagination."""
     # Get pagination parameters
     page = request.args.get('page', 1, type=int)
     per_page = 10  # Number of documents per page
@@ -255,7 +260,7 @@ def index():
     paragraphs_with_duplicates = sum(1 for para in unique_paragraphs if para.get('appears_in_multiple', False))
     
     return render_template(
-        'index.html',
+        'documents.html',
         documents=documents,
         paginated_documents=paginated_documents,
         page=page,

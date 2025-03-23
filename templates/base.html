@@ -379,38 +379,44 @@
             <!-- Modern Sidebar -->
             <nav id="sidebarMenu" class="col-md-3 col-lg-2 d-md-block app-sidebar collapse">
                 <div class="sidebar-sticky">
-                    <ul class="nav flex-column">
-                        <li class="nav-item">
-                            <a class="nav-link {% if request.path == '/' %}active{% endif %}" href="/">
-                                <i class="bi bi-speedometer2"></i> Dashboard
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link {% if '/paragraphs' in request.path %}active{% endif %}" href="/paragraphs">
-                                <i class="bi bi-paragraph"></i> Paragraphs
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link {% if '/similarity' in request.path %}active{% endif %}" href="/similarity">
-                                <i class="bi bi-fingerprint"></i> Similarity Analysis
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link {% if '/clusters' in request.path %}active{% endif %}" href="/clusters">
-                                <i class="bi bi-diagram-3"></i> Paragraph Clusters
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link {% if '/inserts' in request.path %}active{% endif %}" href="/inserts">
-                                <i class="bi bi-file-earmark-plus"></i> Inserts
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link {% if '/tags' in request.path %}active{% endif %}" href="/tags">
-                                <i class="bi bi-tags"></i> Tag Management
-                            </a>
-                        </li>
-                    </ul>
+                    <!-- Updated sidebar navigation with fixed conditionals -->
+<ul class="nav flex-column">
+    <li class="nav-item">
+        <a class="nav-link {% if request.path == '/' %}active{% endif %}" href="/">
+            <i class="bi bi-house"></i> Home
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {% if request.path == '/documents' %}active{% endif %}" href="/documents">
+            <i class="bi bi-files"></i> Documents
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {% if request.path.startswith('/paragraphs') %}active{% endif %}" href="/paragraphs">
+            <i class="bi bi-paragraph"></i> Paragraphs
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {% if request.path.startswith('/similarity') %}active{% endif %}" href="/similarity">
+            <i class="bi bi-fingerprint"></i> Similarity Analysis
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {% if request.path.startswith('/clusters') %}active{% endif %}" href="/clusters">
+            <i class="bi bi-diagram-3"></i> Paragraph Clusters
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {% if request.path.startswith('/inserts') %}active{% endif %}" href="/inserts">
+            <i class="bi bi-file-earmark-plus"></i> Inserts
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {% if request.path.startswith('/tags') %}active{% endif %}" href="/tags">
+            <i class="bi bi-tags"></i> Tag Management
+        </a>
+    </li>
+</ul>
                 </div>
                 <!-- Logo at the bottom of sidebar (without top border, maintaining the blue line) -->
                 <div style="text-align: center; margin-top: auto; padding: 1rem; position: absolute; bottom: 0; width: 100%; background: white;">

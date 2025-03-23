@@ -1,560 +1,375 @@
 {% extends 'base.html' %}
 
-{% block title %}Dashboard{% endblock %}
-
-{% block head %}
-<!-- Socket.IO client library -->
-<script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
-<!-- Document upload script -->
-<script src="{{ url_for('static', filename='js/document_upload.js') }}"></script>
-
-<!-- Additional styles for batch uploader -->
-<style>
-.border-dashed {
-    border-style: dashed !important;
-    border-width: 2px !important;
-    border-color: #ced4da !important;
-}
-
-.drop-zone {
-    transition: all 0.3s ease;
-    background-color: #f8f9fa;
-    min-height: 200px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.drop-zone:hover, .drag-highlight {
-    background-color: #e9ecef;
-    border-color: #6c757d !important;
-    cursor: pointer;
-}
-
-.drop-zone-content {
-    width: 100%;
-}
-
-/* Counter tiles styles */
-.counter-card {
-    transition: all 0.3s ease;
-    border-radius: 0.75rem;
-    border-left: 4px solid;
-    overflow: hidden;
-}
-
-.counter-card:hover {
-    transform: translateY(-5px);
-}
-
-.counter-documents {
-    border-left-color: var(--primary-color);
-}
-
-.counter-paragraphs {
-    border-left-color: var(--success-color);
-}
-
-.counter-duplicates {
-    border-left-color: var(--warning-color);
-}
-
-.counter-tags {
-    border-left-color: var(--accent-color);
-}
-
-.counter-icon {
-    font-size: 2.5rem;
-    opacity: 0.15;
-    position: absolute;
-    right: 1rem;
-    top: 50%;
-    transform: translateY(-50%);
-}
-
-.counter-value {
-    font-size: 1.75rem;
-    font-weight: 700;
-}
-</style>
-{% endblock %}
+{% block title %}Document Analysis Platform{% endblock %}
 
 {% block content %}
-    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-4">
+    <div class="d-flex justify-content-between align-items-center pt-3 pb-2 mb-4">
         <div>
-            <h1 class="h3 mb-0">Dashboard</h1>
-            <p class="text-muted fs-6 mb-0">Manage your document collection</p>
+            <h1 class="h2 mb-0">Document Analysis Platform</h1>
+            <p class="text-muted mb-0">Extract, compare, and analyze content across your document collection</p>
         </div>
         <div class="d-flex gap-2">
-            {% if documents %}
-                <a href="/clear" class="btn btn-danger" onclick="return confirm('Are you sure you want to clear all data? This action cannot be undone.');">
-                    <i class="bi bi-trash me-1"></i> Clear All
-                </a>
-            {% endif %}
-            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#uploadModal">
+            <a href="/documents" class="btn btn-primary">
+                <i class="bi bi-files me-1"></i> View Documents
+            </a>
+            <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#uploadModal">
                 <i class="bi bi-upload me-1"></i> Upload Documents
             </button>
-            <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#folderModal">
-                <i class="bi bi-folder me-1"></i> Import from Folder
-            </button>
-            <a href="/export" class="btn btn-success">
-                <i class="bi bi-file-excel me-1"></i> Export
+        </div>
+    </div>
+
+        <!-- How It Works Section -->
+    <h2 class="mb-4"><i class="bi bi-lightbulb me-2"></i>How It Works</h2>
+    
+    <div class="row g-4 mb-5">
+        <!-- Step 1: Upload Documents -->
+        <div class="col-md-6 col-lg-4">
+            <div class="card h-100 border-0 shadow-sm step-card">
+                <div class="card-header bg-primary text-white py-3">
+                    <div class="d-flex align-items-center">
+                        <div class="rounded-circle bg-white text-primary d-flex align-items-center justify-content-center me-3" style="width: 36px; height: 36px;">
+                            <strong>1</strong>
+                        </div>
+                        <h3 class="h5 mb-0">Upload Documents</h3>
+                    </div>
+                </div>
+                <div class="card-body p-4">
+                    <div class="mb-3 text-center">
+                        <i class="bi bi-cloud-upload text-primary" style="font-size: 3rem;"></i>
+                    </div>
+                    <p>Upload PDF and Word documents for analysis. The system will parse and extract content, preserving structure and formatting.</p>
+                    <ul class="mb-0 ps-4">
+                        <li>Support for multiple file formats</li>
+                        <li>Batch upload capability</li>
+                        <li>Automatic content extraction</li>
+                    </ul>
+                    <div class="mt-4 text-center">
+                        <button class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#uploadModal">
+                            <i class="bi bi-upload me-1"></i> Upload Documents
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Step 2: View Paragraphs -->
+        <div class="col-md-6 col-lg-4">
+            <div class="card h-100 border-0 shadow-sm step-card">
+                <div class="card-header bg-primary text-white py-3">
+                    <div class="d-flex align-items-center">
+                        <div class="rounded-circle bg-white text-primary d-flex align-items-center justify-content-center me-3" style="width: 36px; height: 36px;">
+                            <strong>2</strong>
+                        </div>
+                        <h3 class="h5 mb-0">View Paragraphs</h3>
+                    </div>
+                </div>
+                <div class="card-body p-4">
+                    <div class="mb-3 text-center">
+                        <i class="bi bi-paragraph text-primary" style="font-size: 3rem;"></i>
+                    </div>
+                    <p>Explore paragraphs extracted from your documents. Apply filters, search content, and organize with tags.</p>
+                    <ul class="mb-0 ps-4">
+                        <li>Intelligently extracted paragraphs</li>
+                        <li>Filter by document, type, or tags</li>
+                        <li>Tag and categorize important content</li>
+                    </ul>
+                    <div class="mt-4 text-center">
+                        <a href="/paragraphs" class="btn btn-outline-primary">
+                            <i class="bi bi-paragraph me-1"></i> View Paragraphs
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Step 3: Similarity Analysis -->
+        <div class="col-md-6 col-lg-4">
+            <div class="card h-100 border-0 shadow-sm step-card">
+                <div class="card-header bg-primary text-white py-3">
+                    <div class="d-flex align-items-center">
+                        <div class="rounded-circle bg-white text-primary d-flex align-items-center justify-content-center me-3" style="width: 36px; height: 36px;">
+                            <strong>3</strong>
+                        </div>
+                        <h3 class="h5 mb-0">Similarity Analysis</h3>
+                    </div>
+                </div>
+                <div class="card-body p-4">
+                    <div class="mb-3 text-center">
+                        <i class="bi bi-fingerprint text-primary" style="font-size: 3rem;"></i>
+                    </div>
+                    <p>Detect similar and duplicate content across your document collection with advanced similarity metrics.</p>
+                    <ul class="mb-0 ps-4">
+                        <li>Identify exact duplicates</li>
+                        <li>Find semantically similar content</li>
+                        <li>Adjust similarity threshold</li>
+                    </ul>
+                    <div class="mt-4 text-center">
+                        <a href="/similarity" class="btn btn-outline-primary">
+                            <i class="bi bi-fingerprint me-1"></i> Analyze Similarity
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Step 4: Clusters -->
+        <div class="col-md-6 col-lg-4">
+            <div class="card h-100 border-0 shadow-sm step-card">
+                <div class="card-header bg-primary text-white py-3">
+                    <div class="d-flex align-items-center">
+                        <div class="rounded-circle bg-white text-primary d-flex align-items-center justify-content-center me-3" style="width: 36px; height: 36px;">
+                            <strong>4</strong>
+                        </div>
+                        <h3 class="h5 mb-0">Paragraph Clusters</h3>
+                    </div>
+                </div>
+                <div class="card-body p-4">
+                    <div class="mb-3 text-center">
+                        <i class="bi bi-diagram-3 text-primary" style="font-size: 3rem;"></i>
+                    </div>
+                    <p>Group similar paragraphs into clusters to identify patterns and content reuse across documents.</p>
+                    <ul class="mb-0 ps-4">
+                        <li>Automatic clustering algorithms</li>
+                        <li>Adjustable clustering parameters</li>
+                        <li>Compare and analyze content groups</li>
+                    </ul>
+                    <div class="mt-4 text-center">
+                        <a href="/clusters" class="btn btn-outline-primary">
+                            <i class="bi bi-diagram-3 me-1"></i> View Clusters
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Step 5: Inserts -->
+        <div class="col-md-6 col-lg-4">
+            <div class="card h-100 border-0 shadow-sm step-card">
+                <div class="card-header bg-primary text-white py-3">
+                    <div class="d-flex align-items-center">
+                        <div class="rounded-circle bg-white text-primary d-flex align-items-center justify-content-center me-3" style="width: 36px; height: 36px;">
+                            <strong>5</strong>
+                        </div>
+                        <h3 class="h5 mb-0">Document Inserts</h3>
+                    </div>
+                </div>
+                <div class="card-body p-4">
+                    <div class="mb-3 text-center">
+                        <i class="bi bi-file-earmark-plus text-primary" style="font-size: 3rem;"></i>
+                    </div>
+                    <p>Upload and track standard document inserts to find where they've been used across your documents.</p>
+                    <ul class="mb-0 ps-4">
+                        <li>Track standard inserts (disclaimers, policies)</li>
+                        <li>Find matches in your document collection</li>
+                        <li>Identify documents missing required inserts</li>
+                    </ul>
+                    <div class="mt-4 text-center">
+                        <a href="/inserts" class="btn btn-outline-primary">
+                            <i class="bi bi-file-earmark-plus me-1"></i> Manage Inserts
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Step 6: Tag Management -->
+        <div class="col-md-6 col-lg-4">
+            <div class="card h-100 border-0 shadow-sm step-card">
+                <div class="card-header bg-primary text-white py-3">
+                    <div class="d-flex align-items-center">
+                        <div class="rounded-circle bg-white text-primary d-flex align-items-center justify-content-center me-3" style="width: 36px; height: 36px;">
+                            <strong>6</strong>
+                        </div>
+                        <h3 class="h5 mb-0">Tag Management</h3>
+                    </div>
+                </div>
+                <div class="card-body p-4">
+                    <div class="mb-3 text-center">
+                        <i class="bi bi-tags text-primary" style="font-size: 3rem;"></i>
+                    </div>
+                    <p>Create and manage tags to categorize paragraphs and improve organization and searchability.</p>
+                    <ul class="mb-0 ps-4">
+                        <li>Create custom tags with colors</li>
+                        <li>Apply tags across document collections</li>
+                        <li>Filter and organize content by tags</li>
+                    </ul>
+                    <div class="mt-4 text-center">
+                        <a href="/tags" class="btn btn-outline-primary">
+                            <i class="bi bi-tags me-1"></i> Manage Tags
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Use Cases Section -->
+    <h2 class="mb-4"><i class="bi bi-briefcase me-2"></i>Use Cases</h2>
+    
+    <div class="row g-4 mb-5">
+        <!-- Use Case 1 -->
+        <div class="col-md-6 col-lg-3">
+            <div class="card h-100 border-0 shadow-sm">
+                <div class="card-body p-4">
+                    <div class="mb-3 text-center">
+                        <div class="rounded-circle bg-primary bg-opacity-10 d-inline-flex align-items-center justify-content-center p-3">
+                            <i class="bi bi-file-earmark-text text-primary" style="font-size: 1.5rem;"></i>
+                        </div>
+                    </div>
+                    <h4 class="h5 mb-3 text-center">Contract Analysis</h4>
+                    <p class="mb-0">Identify standard clauses, inconsistencies, and variations across your contract documents.</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Use Case 2 -->
+        <div class="col-md-6 col-lg-3">
+            <div class="card h-100 border-0 shadow-sm">
+                <div class="card-body p-4">
+                    <div class="mb-3 text-center">
+                        <div class="rounded-circle bg-success bg-opacity-10 d-inline-flex align-items-center justify-content-center p-3">
+                            <i class="bi bi-shield-check text-success" style="font-size: 1.5rem;"></i>
+                        </div>
+                    </div>
+                    <h4 class="h5 mb-3 text-center">Compliance Verification</h4>
+                    <p class="mb-0">Ensure required disclaimers, notices, and clauses are consistently applied across documentation.</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Use Case 3 -->
+        <div class="col-md-6 col-lg-3">
+            <div class="card h-100 border-0 shadow-sm">
+                <div class="card-body p-4">
+                    <div class="mb-3 text-center">
+                        <div class="rounded-circle bg-warning bg-opacity-10 d-inline-flex align-items-center justify-content-center p-3">
+                            <i class="bi bi-pie-chart text-warning" style="font-size: 1.5rem;"></i>
+                        </div>
+                    </div>
+                    <h4 class="h5 mb-3 text-center">Content Auditing</h4>
+                    <p class="mb-0">Analyze content reuse and duplication to identify opportunities for standardization.</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Use Case 4 -->
+        <div class="col-md-6 col-lg-3">
+            <div class="card h-100 border-0 shadow-sm">
+                <div class="card-body p-4">
+                    <div class="mb-3 text-center">
+                        <div class="rounded-circle bg-danger bg-opacity-10 d-inline-flex align-items-center justify-content-center p-3">
+                            <i class="bi bi-search text-danger" style="font-size: 1.5rem;"></i>
+                        </div>
+                    </div>
+                    <h4 class="h5 mb-3 text-center">Knowledge Discovery</h4>
+                    <p class="mb-0">Extract and organize knowledge from large document collections to improve accessibility.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Quick Start Guide -->
+    <div class="card mb-5">
+        <div class="card-header">
+            <h2 class="h4 mb-0"><i class="bi bi-lightning-charge me-2"></i>Quick Start Guide</h2>
+        </div>
+        <div class="card-body p-4">
+            <div class="row">
+                <div class="col-lg-6">
+                    <ol class="mb-0">
+                        <li class="mb-3">
+                            <strong>Upload Documents</strong>
+                            <p class="mb-0">Start by uploading your documents using the upload button in the top right corner.</p>
+                        </li>
+                        <li class="mb-3">
+                            <strong>Explore Paragraphs</strong>
+                            <p class="mb-0">Navigate to the Paragraphs section to view and organize extracted content.</p>
+                        </li>
+                        <li class="mb-3">
+                            <strong>Run Similarity Analysis</strong>
+                            <p class="mb-0">Go to Similarity Analysis to identify duplicate and similar content.</p>
+                        </li>
+                        <li class="mb-3">
+                            <strong>Create Clusters</strong>
+                            <p class="mb-0">Group similar paragraphs into clusters for better organization.</p>
+                        </li>
+                    </ol>
+                </div>
+                <div class="col-lg-6">
+                    <div class="alert alert-info mb-0">
+                        <div class="d-flex">
+                            <div class="me-3 fs-4">
+                                <i class="bi bi-info-circle-fill"></i>
+                            </div>
+                            <div>
+                                <h5>Pro Tip</h5>
+                                <p class="mb-0">For best results, analyze documents in batches of related content. This helps identify patterns within specific document categories.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Get Started CTA -->
+    <div class="text-center mb-5">
+        <div class="mb-4">
+            <i class="bi bi-arrow-right-circle text-primary" style="font-size: 3rem;"></i>
+        </div>
+        <h2 class="h3 mb-4">Ready to Analyze Your Documents?</h2>
+        <div class="d-flex justify-content-center gap-3">
+            <a href="/documents" class="btn btn-primary btn-lg">
+                <i class="bi bi-files me-1"></i> View Documents
             </a>
-        </div>
-    </div>
-
-    <!-- Statistics Counter Tiles -->
-    <div class="row mb-4">
-        <div class="col-md-3 mb-3">
-            <div class="card counter-card counter-documents h-100">
-                <div class="card-body p-3 position-relative">
-                    <div>
-                        <h6 class="text-muted mb-1">Documents</h6>
-                        <div class="counter-value">{{ documents|length }}</div>
-                    </div>
-                    <i class="bi bi-file-earmark-text counter-icon"></i>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3 mb-3">
-            <div class="card counter-card counter-paragraphs h-100">
-                <div class="card-body p-3 position-relative">
-                    <div>
-                        <h6 class="text-muted mb-1">Total Paragraphs</h6>
-                        <div class="counter-value">{{ total_paragraphs|default(0) }}</div>
-                    </div>
-                    <i class="bi bi-paragraph counter-icon"></i>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3 mb-3">
-            <div class="card counter-card counter-duplicates h-100">
-                <div class="card-body p-3 position-relative">
-                    <div>
-                        <h6 class="text-muted mb-1">Duplicates</h6>
-                        <div class="counter-value">{{ duplicates|default(0) }}</div>
-                    </div>
-                    <i class="bi bi-copy counter-icon"></i>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3 mb-3">
-            <div class="card counter-card counter-tags h-100">
-                <div class="card-body p-3 position-relative">
-                    <div>
-                        <h6 class="text-muted mb-1">Unique paragraphs</h6>
-                        <div class="counter-value">{{ unique_paragraphs }}</div>
-                    </div>
-                    <i class="bi bi-tags counter-icon"></i>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="card mb-4">
-        <div class="card-header d-flex justify-content-between align-items-center">
-            <h5 class="mb-0"><i class="bi bi-files me-2"></i>Document Collection</h5>
-            <div>
-                <input type="text" class="form-control form-control-sm" id="documentSearch" placeholder="Search documents..." style="min-width: 200px;">
-            </div>
-        </div>
-        <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0">
-                    <thead class="table-light">
-                        <tr>
-                            <th class="ps-3"><i class="bi bi-file-earmark me-1"></i>Document</th>
-                            <th><i class="bi bi-hash me-1"></i>ID</th>
-                            <th><i class="bi bi-type me-1"></i>Type</th>
-                            <th><i class="bi bi-calendar-date me-1"></i>Upload Date</th>
-                            <th class="text-end pe-3"><i class="bi bi-gear me-1"></i>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% if documents %}
-                            {% for doc in paginated_documents %}
-                                <tr class="document-row">
-                                    <td class="ps-3 fw-medium">{{ doc.filename }}</td>
-                                    <td>{{ doc.id }}</td>
-                                    <td>
-                                        {% if doc.file_type.upper() == 'PDF' %}
-                                            <span class="badge bg-danger">{{ doc.file_type.upper() }}</span>
-                                        {% elif doc.file_type.upper() == 'DOCX' %}
-                                            <span class="badge bg-primary">{{ doc.file_type.upper() }}</span>
-                                        {% elif doc.file_type.upper() == 'DOC' %}
-                                            <span class="badge bg-info">{{ doc.file_type.upper() }}</span>
-                                        {% else %}
-                                            <span class="badge bg-secondary">{{ doc.file_type.upper() }}</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>{{ doc.upload_date.split('T')[0].split('-')[2] }}-{{ doc.upload_date.split('T')[0].split('-')[1] }}-{{ doc.upload_date.split('T')[0].split('-')[0] }} {{ doc.upload_date.split('T')[1].split('.')[0][:5] }}</td>
-                                    <td class="text-end pe-3">
-                                        <div class="btn-group">
-                                            <a href="/delete/{{ doc.id }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Are you sure you want to delete this document?');">
-                                                <i class="bi bi-trash"></i>
-                                            </a>
-                                            <a href="/paragraphs?document_id={{ doc.id }}" class="btn btn-sm btn-outline-success">
-                                                <i class="bi bi-paragraph"></i>
-                                            </a>
-                                            <a href="/document/{{ doc.id }}" class="btn btn-sm btn-outline-primary">
-                                                <i class="bi bi-eye"></i>
-                                            </a>
-                                        </div>
-                                    </td>
-                                </tr>
-                            {% endfor %}
-                        {% else %}
-                            <tr>
-                                <td colspan="5" class="text-center py-5">
-                                    <div class="empty-state">
-                                        <i class="bi bi-file-earmark-x text-muted mb-3" style="font-size: 3rem;"></i>
-                                        <h5>No documents yet</h5>
-                                        <p class="text-muted">Upload documents to start analyzing paragraphs</p>
-                                        <button type="button" class="btn btn-primary mt-2" data-bs-toggle="modal" data-bs-target="#uploadModal">
-                                            <i class="bi bi-upload me-1"></i> Upload Documents
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                        {% endif %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-        <!-- Pagination -->
-        {% if documents and total_pages > 1 %}
-<div class="card-footer">
-    <nav aria-label="Document pagination">
-        <ul class="pagination justify-content-center mb-0">
-            <li class="page-item {% if page == 1 %}disabled{% endif %}">
-                <a class="page-link" href="?page={{ page - 1 }}" aria-label="Previous">
-                    <span aria-hidden="true">&laquo;</span>
-                </a>
-            </li>
-            {% for p in range(1, total_pages + 1) %}
-                <li class="page-item {% if p == page %}active{% endif %}">
-                    <a class="page-link" href="?page={{ p }}">{{ p }}</a>
-                </li>
-            {% endfor %}
-            <li class="page-item {% if page == total_pages %}disabled{% endif %}">
-                <a class="page-link" href="?page={{ page + 1 }}" aria-label="Next">
-                    <span aria-hidden="true">&raquo;</span>
-                </a>
-            </li>
-        </ul>
-    </nav>
-</div>
-{% endif %}
-    </div>
-
-    <!-- Enhanced Upload Modal with Drag & Drop and Better Progress Tracking -->
-    <div class="modal fade" id="uploadModal" tabindex="-1" aria-labelledby="uploadModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered modal-lg">
-            <div class="modal-content border-0 shadow">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="uploadModalLabel"><i class="bi bi-cloud-upload me-2"></i>Upload Documents</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <form id="uploadForm" action="/upload" method="post" enctype="multipart/form-data">
-                    <div class="modal-body">
-                        <!-- File Upload with Drag & Drop -->
-                        <div id="dropZone" class="drop-zone mb-3 p-4 border border-dashed rounded text-center">
-                            <div class="drop-zone-content">
-                                <i class="bi bi-cloud-arrow-up display-4 mb-2 text-primary"></i>
-                                <h5>Drag & drop files here</h5>
-                                <p class="text-muted">or</p>
-                                <label for="files" class="btn btn-primary">
-                                    <i class="bi bi-file-earmark-plus me-1"></i>Browse Files
-                                </label>
-                                <input class="d-none" type="file" id="files" name="files[]" multiple accept=".pdf,.doc,.docx" required>
-                                <div id="fileCount" class="mt-2 text-muted"></div>
-                            </div>
-                        </div>
-                        
-                        <div class="alert alert-info mb-3">
-                            <div class="d-flex">
-                                <div class="me-3"><i class="bi bi-info-circle-fill fs-4"></i></div>
-                                <div>
-                                    <strong>Bulk Upload Support:</strong> You can select hundreds of documents at once.
-                                    <ul class="mb-0 mt-1">
-                                        <li>Supported formats: PDF, DOC, DOCX</li>
-                                        <li>Each file must be under 16MB</li>
-                                        <li>Processing happens in parallel for maximum speed</li>
-                                    </ul>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- Enhanced progress indicators -->
-                        <div id="uploadProgress" style="display:none;">
-                            <div class="card border-0 shadow-sm mb-3">
-                                <div class="card-body">
-                                    <h6 class="mb-3"><i class="bi bi-arrow-repeat me-2"></i>Processing Status</h6>
-                                    
-                                    <div class="progress mb-3" style="height: 20px;">
-                                        <div class="progress-bar progress-bar-striped progress-bar-animated" 
-                                             role="progressbar" aria-valuenow="0" aria-valuemin="0" 
-                                             aria-valuemax="100" style="width: 0%">0%</div>
-                                    </div>
-                                    
-                                    <div class="d-flex justify-content-between align-items-center mb-3">
-                                        <div>
-                                            <strong>Current file:</strong>
-                                            <span id="currentFileUploading" class="ms-2 text-muted">Preparing...</span>
-                                        </div>
-                                        <div>
-                                            <span class="badge bg-primary">
-                                                <i class="bi bi-file-earmark-text me-1"></i>
-                                                <span id="completedFiles">0</span> / <span id="totalFiles">0</span>
-                                            </span>
-                                        </div>
-                                    </div>
-                                    
-                                    <div class="row">
-                                        <div class="col-md-6">
-                                            <div class="d-flex align-items-center mb-2">
-                                                <i class="bi bi-check-circle-fill text-success me-2"></i>
-                                                <div>
-                                                    <small class="text-muted">Completed:</small>
-                                                    <div id="completedFilesCount" class="fw-bold">0</div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-6">
-                                            <div class="d-flex align-items-center mb-2">
-                                                <i class="bi bi-hourglass-split text-warning me-2"></i>
-                                                <div>
-                                                    <small class="text-muted">Remaining:</small>
-                                                    <div id="remainingFilesCount" class="fw-bold">0</div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    
-                                    <div class="row mt-2">
-                                        <div class="col-md-6">
-                                            <div class="d-flex align-items-center">
-                                                <i class="bi bi-clock-history text-info me-2"></i>
-                                                <div>
-                                                    <small class="text-muted">Average time per file:</small>
-                                                    <div id="avgProcessingTime" class="fw-bold">0s</div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-6">
-                                            <div class="d-flex align-items-center">
-                                                <i class="bi bi-alarm text-primary me-2"></i>
-                                                <div>
-                                                    <small class="text-muted">Estimated time remaining:</small>
-                                                    <div id="estimatedTimeRemaining" class="fw-bold">Calculating...</div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                        
-                                    <div id="uploadStats" class="small text-muted mt-3 pt-2 border-top"></div>
-                                </div>
-                            </div>
-                            
-                            <div class="alert alert-info mb-0">
-                                <i class="bi bi-info-circle me-2"></i>
-                                Processing large batches may take some time. You can close this window and the upload will continue in the background.
-                            </div>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">
-                            <i class="bi bi-x me-1"></i>Cancel
-                        </button>
-                        <button type="submit" class="btn btn-primary" id="uploadButton">
-                            <i class="bi bi-cloud-upload me-1"></i>Upload
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-
-    <!-- Folder Modal -->
-    <div class="modal fade" id="folderModal" tabindex="-1" aria-labelledby="folderModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content border-0 shadow">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="folderModalLabel"><i class="bi bi-folder me-2"></i>Import from Folder</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <form id="folderForm" action="/upload-folder" method="post">
-                    <div class="modal-body">
-                        <div class="mb-3">
-                            <label for="folderPath" class="form-label">Enter folder path</label>
-                            <div class="input-group">
-                                <span class="input-group-text bg-light">
-                                    <i class="bi bi-folder2-open"></i>
-                                </span>
-                                <input type="text" class="form-control" id="folderPath" name="folder_path" placeholder="/path/to/documents" required>
-                            </div>
-                            <div class="form-text"><i class="bi bi-info-circle me-1"></i>Enter the full path to a folder containing PDF or Word documents.</div>
-                        </div>
-                        
-                        <!-- Folder progress indicators -->
-                        <div id="folderProgress" style="display:none;">
-                            <div class="card border-0 shadow-sm mb-3">
-                                <div class="card-body">
-                                    <h6 class="mb-3"><i class="bi bi-arrow-repeat me-2"></i>Processing Status</h6>
-                                    
-                                    <div class="progress mb-3" style="height: 20px;">
-                                        <div class="progress-bar progress-bar-striped progress-bar-animated" 
-                                             role="progressbar" aria-valuenow="0" aria-valuemin="0" 
-                                             aria-valuemax="100" style="width: 0%">0%</div>
-                                    </div>
-                                    
-                                    <div class="d-flex justify-content-between align-items-center mb-3">
-                                        <div>
-                                            <strong>Current file:</strong>
-                                            <span id="currentFolderFileUploading" class="ms-2 text-muted">Scanning folder...</span>
-                                        </div>
-                                        <div>
-                                            <span class="badge bg-primary">
-                                                <i class="bi bi-file-earmark-text me-1"></i>
-                                                <span id="completedFolderFiles">0</span> / <span id="totalFolderFiles">0</span>
-                                            </span>
-                                        </div>
-                                    </div>
-                                    
-                                    <div class="row">
-                                        <div class="col-md-6">
-                                            <div class="d-flex align-items-center mb-2">
-                                                <i class="bi bi-check-circle-fill text-success me-2"></i>
-                                                <div>
-                                                    <small class="text-muted">Completed:</small>
-                                                    <div id="completedFolderFilesCount" class="fw-bold">0</div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-6">
-                                            <div class="d-flex align-items-center mb-2">
-                                                <i class="bi bi-hourglass-split text-warning me-2"></i>
-                                                <div>
-                                                    <small class="text-muted">Remaining:</small>
-                                                    <div id="remainingFolderFilesCount" class="fw-bold">0</div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    
-                                    <div class="row mt-2">
-                                        <div class="col-md-6">
-                                            <div class="d-flex align-items-center">
-                                                <i class="bi bi-clock-history text-info me-2"></i>
-                                                <div>
-                                                    <small class="text-muted">Average time per file:</small>
-                                                    <div id="avgFolderProcessingTime" class="fw-bold">0s</div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-6">
-                                            <div class="d-flex align-items-center">
-                                                <i class="bi bi-alarm text-primary me-2"></i>
-                                                <div>
-                                                    <small class="text-muted">Estimated time remaining:</small>
-                                                    <div id="estimatedFolderTimeRemaining" class="fw-bold">Calculating...</div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                        
-                                    <div id="folderStats" class="small text-muted mt-3 pt-2 border-top"></div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">
-                            <i class="bi bi-x me-1"></i>Cancel
-                        </button>
-                        <button type="submit" class="btn btn-primary" id="importButton">
-                            <i class="bi bi-folder-check me-1"></i>Import
-                        </button>
-                    </div>
-                </form>
-            </div>
+            <button type="button" class="btn btn-success btn-lg" data-bs-toggle="modal" data-bs-target="#uploadModal">
+                <i class="bi bi-upload me-1"></i> Upload Documents
+            </button>
         </div>
     </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-    // Mark that document_upload.js is active
-    window.documentUploadInitialized = true;
-    
     document.addEventListener('DOMContentLoaded', function() {
-        // Document search functionality
-        const searchInput = document.getElementById('documentSearch');
-        if (searchInput) {
-            searchInput.addEventListener('input', function() {
-                const searchTerm = this.value.toLowerCase();
-                const rows = document.querySelectorAll('.document-row');
-                
-                rows.forEach(row => {
-                    const filename = row.cells[0].textContent.toLowerCase();
-                    if (filename.includes(searchTerm)) {
-                        row.style.display = '';
-                    } else {
-                        row.style.display = 'none';
-                    }
-                });
+        // Add hover effect for step cards
+        const stepCards = document.querySelectorAll('.step-card');
+        stepCards.forEach(card => {
+            card.addEventListener('mouseenter', function() {
+                this.classList.add('shadow');
+                this.style.transform = 'translateY(-5px)';
             });
-        }
-        
-        // Add hover effect for document rows
-        const documentRows = document.querySelectorAll('.document-row');
-        documentRows.forEach(row => {
-            row.addEventListener('mouseenter', function() {
-                this.classList.add('bg-light');
-            });
-            row.addEventListener('mouseleave', function() {
-                this.classList.remove('bg-light');
+            card.addEventListener('mouseleave', function() {
+                this.classList.remove('shadow');
+                this.style.transform = 'translateY(0)';
             });
         });
         
-        // Reset upload counter when modal is closed
-        const uploadModal = document.getElementById('uploadModal');
-        const folderModal = document.getElementById('folderModal');
-        
-        if (uploadModal) {
-            uploadModal.addEventListener('hidden.bs.modal', function() {
-                if (typeof updateUploadCounter === 'function') {
-                    updateUploadCounter(0);
-                }
-            });
-        }
-        
-        if (folderModal) {
-            folderModal.addEventListener('hidden.bs.modal', function() {
-                if (typeof updateUploadCounter === 'function') {
-                    updateUploadCounter(0);
-                }
-            });
-        }
-        
-        // Add animation to counter cards
-        const counterCards = document.querySelectorAll('.counter-card');
-        counterCards.forEach((card, index) => {
-            // Stagger animation delay
-            setTimeout(() => {
-                card.style.opacity = '0';
-                card.style.transform = 'translateY(20px)';
-                
-                // Add animation
-                card.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
-                
-                // Trigger animation
-                setTimeout(() => {
-                    card.style.opacity = '1';
-                    card.style.transform = 'translateY(0)';
-                }, 50);
-            }, index * 100);
+        // Initialize any tooltips
+        const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl);
         });
     });
 </script>
+
+<style>
+    /* Additional styles for the landing page */
+    .step-card {
+        transition: all 0.3s ease;
+    }
+    
+    .step-card:hover {
+        transform: translateY(-5px);
+    }
+    
+    /* Animation for icon hover */
+    .step-card i {
+        transition: transform 0.3s ease;
+    }
+    
+    .step-card:hover i {
+        transform: scale(1.1);
+    }
+</style>
 {% endblock %}
