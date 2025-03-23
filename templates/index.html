@@ -25,9 +25,9 @@
         <!-- Step 1: Upload Documents -->
         <div class="col-md-6 col-lg-4">
             <div class="card h-100 border-0 shadow-sm step-card">
-                <div class="card-header bg-primary text-white py-3">
+                <div class="card-header bg-success text-white py-3">
                     <div class="d-flex align-items-center">
-                        <div class="rounded-circle bg-white text-primary d-flex align-items-center justify-content-center me-3" style="width: 36px; height: 36px;">
+                        <div class="rounded-circle bg-white d-flex align-items-center justify-content-center me-3" style="width: 36px; height: 36px; color: var(--success-color);">
                             <strong>1</strong>
                         </div>
                         <h3 class="h5 mb-0">Upload Documents</h3>
@@ -35,7 +35,7 @@
                 </div>
                 <div class="card-body p-4">
                     <div class="mb-3 text-center">
-                        <i class="bi bi-cloud-upload text-primary" style="font-size: 3rem;"></i>
+                        <i class="bi bi-cloud-upload" style="font-size: 3rem; color: var(--success-color);"></i>
                     </div>
                     <p>Upload PDF and Word documents for analysis. The system will parse and extract content, preserving structure and formatting.</p>
                     <ul class="mb-0 ps-4">
@@ -44,7 +44,7 @@
                         <li>Automatic content extraction</li>
                     </ul>
                     <div class="mt-4 text-center">
-                        <button class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#uploadModal">
+                        <button class="btn btn-outline-success" data-bs-toggle="modal" data-bs-target="#uploadModal">
                             <i class="bi bi-upload me-1"></i> Upload Documents
                         </button>
                     </div>
@@ -65,7 +65,7 @@
                 </div>
                 <div class="card-body p-4">
                     <div class="mb-3 text-center">
-                        <i class="bi bi-paragraph text-primary" style="font-size: 3rem;"></i>
+                        <i class="bi bi-paragraph" style="font-size: 3rem; color: var(--primary-color);"></i>
                     </div>
                     <p>Explore paragraphs extracted from your documents. Apply filters, search content, and organize with tags.</p>
                     <ul class="mb-0 ps-4">
@@ -85,9 +85,9 @@
         <!-- Step 3: Similarity Analysis -->
         <div class="col-md-6 col-lg-4">
             <div class="card h-100 border-0 shadow-sm step-card">
-                <div class="card-header bg-primary text-white py-3">
+                <div class="card-header bg-danger text-white py-3">
                     <div class="d-flex align-items-center">
-                        <div class="rounded-circle bg-white text-primary d-flex align-items-center justify-content-center me-3" style="width: 36px; height: 36px;">
+                        <div class="rounded-circle bg-white text-danger d-flex align-items-center justify-content-center me-3" style="width: 36px; height: 36px;">
                             <strong>3</strong>
                         </div>
                         <h3 class="h5 mb-0">Similarity Analysis</h3>
@@ -95,7 +95,7 @@
                 </div>
                 <div class="card-body p-4">
                     <div class="mb-3 text-center">
-                        <i class="bi bi-fingerprint text-primary" style="font-size: 3rem;"></i>
+                        <i class="bi bi-fingerprint text-danger" style="font-size: 3rem;"></i>
                     </div>
                     <p>Detect similar and duplicate content across your document collection with advanced similarity metrics.</p>
                     <ul class="mb-0 ps-4">
@@ -104,7 +104,7 @@
                         <li>Adjust similarity threshold</li>
                     </ul>
                     <div class="mt-4 text-center">
-                        <a href="/similarity" class="btn btn-outline-primary">
+                        <a href="/similarity" class="btn btn-outline-danger">
                             <i class="bi bi-fingerprint me-1"></i> Analyze Similarity
                         </a>
                     </div>
@@ -115,9 +115,9 @@
         <!-- Step 4: Clusters -->
         <div class="col-md-6 col-lg-4">
             <div class="card h-100 border-0 shadow-sm step-card">
-                <div class="card-header bg-primary text-white py-3">
+                <div class="card-header bg-warning text-dark py-3">
                     <div class="d-flex align-items-center">
-                        <div class="rounded-circle bg-white text-primary d-flex align-items-center justify-content-center me-3" style="width: 36px; height: 36px;">
+                        <div class="rounded-circle bg-white text-warning d-flex align-items-center justify-content-center me-3" style="width: 36px; height: 36px;">
                             <strong>4</strong>
                         </div>
                         <h3 class="h5 mb-0">Paragraph Clusters</h3>
@@ -125,7 +125,7 @@
                 </div>
                 <div class="card-body p-4">
                     <div class="mb-3 text-center">
-                        <i class="bi bi-diagram-3 text-primary" style="font-size: 3rem;"></i>
+                        <i class="bi bi-diagram-3 text-warning" style="font-size: 3rem;"></i>
                     </div>
                     <p>Group similar paragraphs into clusters to identify patterns and content reuse across documents.</p>
                     <ul class="mb-0 ps-4">
@@ -134,7 +134,7 @@
                         <li>Compare and analyze content groups</li>
                     </ul>
                     <div class="mt-4 text-center">
-                        <a href="/clusters" class="btn btn-outline-primary">
+                        <a href="/clusters" class="btn btn-outline-warning">
                             <i class="bi bi-diagram-3 me-1"></i> View Clusters
                         </a>
                     </div>
@@ -145,9 +145,9 @@
         <!-- Step 5: Inserts -->
         <div class="col-md-6 col-lg-4">
             <div class="card h-100 border-0 shadow-sm step-card">
-                <div class="card-header bg-primary text-white py-3">
+                <div class="card-header bg-info text-white py-3">
                     <div class="d-flex align-items-center">
-                        <div class="rounded-circle bg-white text-primary d-flex align-items-center justify-content-center me-3" style="width: 36px; height: 36px;">
+                        <div class="rounded-circle bg-white text-info d-flex align-items-center justify-content-center me-3" style="width: 36px; height: 36px;">
                             <strong>5</strong>
                         </div>
                         <h3 class="h5 mb-0">Document Inserts</h3>
@@ -155,7 +155,7 @@
                 </div>
                 <div class="card-body p-4">
                     <div class="mb-3 text-center">
-                        <i class="bi bi-file-earmark-plus text-primary" style="font-size: 3rem;"></i>
+                        <i class="bi bi-file-earmark-plus text-info" style="font-size: 3rem;"></i>
                     </div>
                     <p>Upload and track standard document inserts to find where they've been used across your documents.</p>
                     <ul class="mb-0 ps-4">
@@ -164,7 +164,7 @@
                         <li>Identify documents missing required inserts</li>
                     </ul>
                     <div class="mt-4 text-center">
-                        <a href="/inserts" class="btn btn-outline-primary">
+                        <a href="/inserts" class="btn btn-outline-info">
                             <i class="bi bi-file-earmark-plus me-1"></i> Manage Inserts
                         </a>
                     </div>
@@ -175,9 +175,9 @@
         <!-- Step 6: Tag Management -->
         <div class="col-md-6 col-lg-4">
             <div class="card h-100 border-0 shadow-sm step-card">
-                <div class="card-header bg-primary text-white py-3">
+                <div class="card-header bg-secondary text-white py-3">
                     <div class="d-flex align-items-center">
-                        <div class="rounded-circle bg-white text-primary d-flex align-items-center justify-content-center me-3" style="width: 36px; height: 36px;">
+                        <div class="rounded-circle bg-white text-secondary d-flex align-items-center justify-content-center me-3" style="width: 36px; height: 36px;">
                             <strong>6</strong>
                         </div>
                         <h3 class="h5 mb-0">Tag Management</h3>
@@ -185,7 +185,7 @@
                 </div>
                 <div class="card-body p-4">
                     <div class="mb-3 text-center">
-                        <i class="bi bi-tags text-primary" style="font-size: 3rem;"></i>
+                        <i class="bi bi-tags text-secondary" style="font-size: 3rem;"></i>
                     </div>
                     <p>Create and manage tags to categorize paragraphs and improve organization and searchability.</p>
                     <ul class="mb-0 ps-4">
@@ -194,7 +194,7 @@
                         <li>Filter and organize content by tags</li>
                     </ul>
                     <div class="mt-4 text-center">
-                        <a href="/tags" class="btn btn-outline-primary">
+                        <a href="/tags" class="btn btn-outline-secondary">
                             <i class="bi bi-tags me-1"></i> Manage Tags
                         </a>
                     </div>
@@ -315,7 +315,7 @@
     <!-- Get Started CTA -->
     <div class="text-center mb-5">
         <div class="mb-4">
-            <i class="bi bi-arrow-right-circle text-primary" style="font-size: 3rem;"></i>
+            <i class="bi bi-arrow-right-circle text-success" style="font-size: 3rem;"></i>
         </div>
         <h2 class="h3 mb-4">Ready to Analyze Your Documents?</h2>
         <div class="d-flex justify-content-center gap-3">
