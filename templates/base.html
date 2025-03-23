@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Documents analyzer - {% block title %}{% endblock %}</title>
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/logo.png') }}">
     <!-- Bootstrap 5.3 and Icons -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
@@ -92,6 +94,8 @@
         z-index: 100;
         padding: 1.5rem 0;
         transition: all 0.3s ease;
+        display: flex;
+        flex-direction: column;
     }
     
     .sidebar-sticky {
@@ -100,6 +104,7 @@
         height: 100%;
         overflow-y: auto;
         padding-top: 0.5rem;
+        flex-grow: 1;
     }
     
     .nav-item {
@@ -131,6 +136,24 @@
     .nav-link i {
         font-size: 1.1rem;
         margin-right: 0.75rem;
+    }
+    
+    /* Logo in sidebar */
+    .sidebar-logo {
+        text-align: center;
+        margin-top: auto;
+        padding: 1.5rem 0;
+    }
+    
+    .sidebar-logo img {
+        max-width: 120px;
+        height: auto;
+        opacity: 0.8;
+        transition: opacity 0.2s ease;
+    }
+    
+    .sidebar-logo img:hover {
+        opacity: 1;
     }
     
     /* Content area */
@@ -352,6 +375,7 @@
 
     <div class="container-fluid">
         <div class="row">
+
             <!-- Modern Sidebar -->
             <nav id="sidebarMenu" class="col-md-3 col-lg-2 d-md-block app-sidebar collapse">
                 <div class="sidebar-sticky">
@@ -372,11 +396,6 @@
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link {% if '/tags' in request.path %}active{% endif %}" href="/tags">
-                                <i class="bi bi-tags"></i> Tag Management
-                            </a>
-                        </li>
-                        <li class="nav-item">
                             <a class="nav-link {% if '/clusters' in request.path %}active{% endif %}" href="/clusters">
                                 <i class="bi bi-diagram-3"></i> Paragraph Clusters
                             </a>
@@ -386,7 +405,18 @@
                                 <i class="bi bi-file-earmark-plus"></i> Inserts
                             </a>
                         </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if '/tags' in request.path %}active{% endif %}" href="/tags">
+                                <i class="bi bi-tags"></i> Tag Management
+                            </a>
+                        </li>
                     </ul>
+                </div>
+                <!-- Logo at the bottom of sidebar (without top border, maintaining the blue line) -->
+                <div style="text-align: center; margin-top: auto; padding: 1rem; position: absolute; bottom: 0; width: 100%; background: white;">
+                    <img src="{{ url_for('static', filename='images/logo.png') }}" 
+                         alt="Paragraph Analyzer Logo" 
+                         style="max-width: 150px; height: auto;">
                 </div>
             </nav>
 

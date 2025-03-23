@@ -4,24 +4,62 @@
    Version: 2.0
 */
 
-/* ------- Base Layout Styles ------- */
-.sidebar {
+/* Modern Sidebar - Keep the blue line including by logo */
+/* Modern Sidebar - No blue line */
+.app-sidebar {
+    background-color: white;
+    box-shadow: 0 0 15px rgba(0, 0, 0, 0.05);
+    height: calc(100vh - var(--header-height));
     position: fixed;
-    top: 0;
-    bottom: 0;
+    top: var(--header-height);
     left: 0;
     z-index: 100;
-    padding: 48px 0 0;
-    box-shadow: inset -1px 0 0 rgba(0, 0, 0, .1);
+    padding: 1.5rem 0 100px 0;
+    transition: all 0.3s ease;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    border-right: none; /* Remove any border */
 }
 
 .sidebar-sticky {
     position: relative;
-    top: 0;
-    height: calc(100vh - 48px);
-    padding-top: .5rem;
-    overflow-x: hidden;
+    flex-grow: 1;
     overflow-y: auto;
+    padding-top: 0.5rem;
+    padding-bottom: 1rem;
+}
+
+/* Make sure the navigation doesn't get hidden behind the logo */
+.sidebar-sticky .nav {
+    margin-bottom: 100px;
+}
+
+/* Style for active nav item - keep the left blue accent only */
+.nav-link.active {
+    position: relative;
+}
+
+.nav-link.active::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    background-color: var(--primary-color);
+    border-radius: 0 4px 4px 0;
+}
+
+/* Logo container */
+.sidebar-logo {
+    text-align: center;
+    margin-top: auto;
+    padding: 1rem;
+    position: absolute;
+    bottom: 0;
+    width: 100%;
+    background: white;
 }
 
 .nav-link {
@@ -595,5 +633,21 @@ pre.table-content {
     border-color: #5787eb !important;
 }
 
+/* Logo in sidebar */
+.sidebar-logo {
+    text-align: center;
+    margin-top: auto;
+    padding: 1.5rem 0;
+}
 
+.sidebar-logo img {
+    max-width: 120px;
+    height: auto;
+    opacity: 0.8;
+    transition: opacity 0.2s ease;
+}
+
+.sidebar-logo img:hover {
+    opacity: 1;
+}
 
