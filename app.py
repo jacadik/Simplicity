@@ -229,11 +229,10 @@ def documents():
     page = request.args.get('page', 1, type=int)
     per_page = 10  # Number of documents per page
     
-    # Get all documents first
-    documents = db_manager.get_documents()
+    # Get paginated documents directly from the database
+    paginated_documents, total_documents = db_manager.get_paginated_documents(page, per_page)
     
     # Calculate total pages
-    total_documents = len(documents)
     total_pages = (total_documents + per_page - 1) // per_page  # Ceiling division
     
     # Ensure page is within valid range
@@ -242,33 +241,15 @@ def documents():
     elif page > total_pages and total_pages > 0:
         page = total_pages
     
-    # Get slice of documents for current page
-    start_idx = (page - 1) * per_page
-    end_idx = start_idx + per_page
-    paginated_documents = documents[start_idx:end_idx] if documents else []
-    
-    # Get additional statistics
-    # 1. Get all paragraphs (total count)
-    all_paragraphs = db_manager.get_paragraphs(collapse_duplicates=False)
-    total_paragraphs = len(all_paragraphs)
-    
-    # 2. Get paragraphs with duplicates collapsed (unique content)
-    unique_paragraphs = db_manager.get_paragraphs(collapse_duplicates=True)
-    unique_paragraph_count = len(unique_paragraphs)
-    
-    # 3. Count paragraphs that have at least one duplicate
-    paragraphs_with_duplicates = sum(1 for para in unique_paragraphs if para.get('appears_in_multiple', False))
-    
     return render_template(
         'documents.html',
-        documents=documents,
+        documents=paginated_documents,  # Only pass the paginated documents
         paginated_documents=paginated_documents,
         page=page,
         total_pages=total_pages,
         per_page=per_page,
-        total_paragraphs=total_paragraphs,
-        duplicates=paragraphs_with_duplicates,  # Number of paragraphs with at least one duplicate
-        unique_paragraphs=unique_paragraph_count,  # Number of unique content pieces
+        total_documents=total_documents,
+        # Remove statistics from here - they'll be loaded asynchronously
         # Add icons for the tiles
         icons={
             'documents': 'bi-file-earmark-text',
@@ -1154,6 +1135,23 @@ def serve_insert(insert_id):
         as_attachment=False,
         download_name=insert['filename']
     )
+
+@app.route('/api/document-statistics')
+def api_document_statistics():
+    """API endpoint for document statistics."""
+    try:
+        stats = db_manager.get_document_statistics()
+        return jsonify(stats)
+    except Exception as e:
+        app.logger.error(f"Error in document statistics API: {str(e)}")
+        # Return a minimal response with error info
+        return jsonify({
+            'error': str(e),
+            'total_documents': 0,
+            'total_paragraphs': 0,
+            'duplicates': 0,
+            'unique_paragraphs': 0
+        })
 
 @app.errorhandler(413)
 def request_entity_too_large(error):

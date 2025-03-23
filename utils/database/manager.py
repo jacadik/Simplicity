@@ -1,7 +1,10 @@
 import os
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 from sqlalchemy.orm import Session
 from sqlalchemy import text
+from sqlalchemy import func, distinct
+import time
+from sqlalchemy.orm import Session
 
 from .base_manager import BaseManager
 from .document_manager import DocumentManager
@@ -197,6 +200,105 @@ class DatabaseManager:
     def get_insert_pages(self, insert_id: int) -> List[Dict[str, Any]]:
         """Get pages for a specific insert."""
         return self.insert_manager.get_insert_pages(insert_id)
+    
+    def get_paginated_documents(self, page: int = 1, per_page: int = 10) -> Tuple[List[Dict[str, Any]], int]:
+        self.logger.info(f"Retrieving paginated documents (page {page}, {per_page} per page)")
+    
+        def db_get_paginated_documents(session: Session) -> Tuple[List[Dict[str, Any]], int]:
+            # Get total count first
+            total_count = session.query(func.count(Document.id)).scalar()
+        
+            # Then get only the documents for the requested page
+            offset = (page - 1) * per_page
+        
+            documents = session.query(Document)\
+                .order_by(Document.upload_date.desc())\
+                .offset(offset)\
+                .limit(per_page)\
+                .all()
+        
+            # Convert ORM objects to dictionaries
+            document_dicts = [
+                {
+                    'id': doc.id,
+                    'filename': doc.filename,
+                    'file_type': doc.file_type,
+                    'file_path': doc.file_path,
+                    'upload_date': doc.upload_date
+                }
+                for doc in documents
+            ]
+        
+            self.logger.info(f"Retrieved {len(document_dicts)} documents (page {page} of {(total_count + per_page - 1) // per_page})")
+            return document_dicts, total_count
+    
+        try:
+            return self.base_manager._with_session(db_get_paginated_documents)
+        except Exception as e:
+            self.logger.error(f"Error retrieving paginated documents: {str(e)}")
+            return [], 0
+    
+    import time  # Add this at the top of your file
+
+    def get_document_statistics(self) -> Dict[str, int]:
+        self.logger.info("Retrieving document statistics with direct queries")
+    
+        def db_get_statistics(session: Session) -> Dict[str, int]:
+            stats = {}
+        
+            # Get document count
+            stats['total_documents'] = session.query(func.count(Document.id)).scalar() or 0
+        
+            # Get total paragraph count
+            stats['total_paragraphs'] = session.query(func.count(Paragraph.id)).scalar() or 0
+        
+            # Count distinct paragraph contents (unique paragraphs)
+            stats['unique_paragraphs'] = session.query(func.count(func.distinct(Paragraph.content))).scalar() or 0
+        
+            # Count paragraphs with duplicates
+            # First find content that appears more than once
+            duplicates_subquery = session.query(
+                Paragraph.content, 
+                func.count(Paragraph.id).label('content_count')
+            ).group_by(
+                Paragraph.content
+            ).having(
+                func.count(Paragraph.id) > 1
+            ).subquery()
+        
+            # Count the number of duplicate content items
+            stats['duplicates'] = session.query(func.count()).select_from(duplicates_subquery).scalar() or 0
+        
+            self.logger.info(f"Calculated statistics: {stats}")
+            return stats
+    
+        try:
+            return self.base_manager._with_session(db_get_statistics)
+        except Exception as e:
+            self.logger.error(f"Error getting document statistics: {str(e)}", exc_info=True)
+            return {
+                'total_documents': 0,
+                'total_paragraphs': 0,
+                'duplicates': 0,
+                'unique_paragraphs': 0
+            }
+
+    def _get_cached_statistics(self) -> Optional[Dict[str, int]]:
+        """Get cached statistics if available and not expired."""
+        # Simple implementation using a class attribute with timestamp
+        current_time = time.time()
+    
+        # Cache valid for 5 minutes (300 seconds)
+        if hasattr(self, '_stats_cache') and hasattr(self, '_stats_cache_time'):
+            if current_time - self._stats_cache_time < 300:  # 5 minutes
+                return self._stats_cache
+    
+        return None
+    
+    def _cache_statistics(self, stats: Dict[str, int]) -> None:
+        """Cache statistics with current timestamp."""
+        self._stats_cache = stats
+        self._stats_cache_time = time.time()
     
     # Database cleaning
     def clear_database(self) -> bool:

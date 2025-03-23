@@ -33,7 +33,7 @@
             <div class="card-body p-3 position-relative">
                 <div>
                     <h6 class="text-muted mb-1">Documents</h6>
-                    <div class="stat-value">{{ documents|length }}</div>
+                    <div class="stat-value">{{ total_documents }}</div>
                 </div>
                 <i class="bi bi-file-earmark-text stat-icon text-primary"></i>
             </div>
@@ -325,78 +325,120 @@
 {% endblock %}
 
 {% block scripts %}
+{{ super() }}
 <script>
-    // Mark that document_upload.js is active
-    window.documentUploadInitialized = true;
+    // Document search functionality
+    const searchInput = document.getElementById('documentSearch');
+    if (searchInput) {
+        searchInput.addEventListener('input', function() {
+            const searchTerm = this.value.toLowerCase();
+            const rows = document.querySelectorAll('.document-row');
+            
+            rows.forEach(row => {
+                const filename = row.cells[0].textContent.toLowerCase();
+                if (filename.includes(searchTerm)) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        });
+    }
     
+    // Add hover effect for document rows
+    const documentRows = document.querySelectorAll('.document-row');
+    documentRows.forEach(row => {
+        row.addEventListener('mouseenter', function() {
+            this.classList.add('bg-light');
+        });
+        row.addEventListener('mouseleave', function() {
+            this.classList.remove('bg-light');
+        });
+    });
+    
+    // Reset upload counter when modal is closed
+    const uploadModal = document.getElementById('uploadModal');
+    const folderModal = document.getElementById('folderModal');
+    
+    if (uploadModal) {
+        uploadModal.addEventListener('hidden.bs.modal', function() {
+            if (typeof updateUploadCounter === 'function') {
+                updateUploadCounter(0);
+            }
+        });
+    }
+    
+    if (folderModal) {
+        folderModal.addEventListener('hidden.bs.modal', function() {
+            if (typeof updateUploadCounter === 'function') {
+                updateUploadCounter(0);
+            }
+        });
+    }
+    
+    // Add animation to counter cards
+    const counterCards = document.querySelectorAll('.counter-card');
+    counterCards.forEach((card, index) => {
+        // Stagger animation delay
+        setTimeout(() => {
+            card.style.opacity = '0';
+            card.style.transform = 'translateY(20px)';
+            
+            // Add animation
+            card.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+            
+            // Trigger animation
+            setTimeout(() => {
+                card.style.opacity = '1';
+                card.style.transform = 'translateY(0)';
+            }, 50);
+        }, index * 100);
+    });
+
+    // JavaScript to load statistics asynchronously
     document.addEventListener('DOMContentLoaded', function() {
-        // Document search functionality
-        const searchInput = document.getElementById('documentSearch');
-        if (searchInput) {
-            searchInput.addEventListener('input', function() {
-                const searchTerm = this.value.toLowerCase();
-                const rows = document.querySelectorAll('.document-row');
+        // First, render the page with loading indicators
+        const statCards = document.querySelectorAll('.stat-card .stat-value');
+        
+        // Show loading indicators
+        statCards.forEach(card => {
+            card.innerHTML = '<div class="spinner-border spinner-border-sm text-muted" role="status"><span class="visually-hidden">Loading...</span></div>';
+        });
+        
+        // Then load the statistics asynchronously
+        fetch('/api/document-statistics')
+            .then(response => response.json())
+            .then(data => {
+                // Update the statistics
+                const statsMap = {
+                    'documents': 'total_documents',
+                    'paragraphs': 'total_paragraphs',
+                    'duplicates': 'duplicates',
+                    'unique': 'unique_paragraphs'
+                };
                 
-                rows.forEach(row => {
-                    const filename = row.cells[0].textContent.toLowerCase();
-                    if (filename.includes(searchTerm)) {
-                        row.style.display = '';
-                    } else {
-                        row.style.display = 'none';
+                // Update each statistic
+                statCards.forEach(card => {
+                    const type = card.closest('.stat-card').dataset.type;
+                    const statKey = statsMap[type];
+                    if (data[statKey] !== undefined) {
+                        card.textContent = data[statKey];
+                        
+                        // Add a fade-in animation
+                        card.style.opacity = '0';
+                        card.style.transition = 'opacity 0.5s ease';
+                        setTimeout(() => {
+                            card.style.opacity = '1';
+                        }, 100);
                     }
                 });
+            })
+            .catch(error => {
+                console.error('Error loading statistics:', error);
+                statCards.forEach(card => {
+                    card.textContent = 'N/A';
+                });
             });
-        }
-        
-        // Add hover effect for document rows
-        const documentRows = document.querySelectorAll('.document-row');
-        documentRows.forEach(row => {
-            row.addEventListener('mouseenter', function() {
-                this.classList.add('bg-light');
-            });
-            row.addEventListener('mouseleave', function() {
-                this.classList.remove('bg-light');
-            });
-        });
-        
-        // Reset upload counter when modal is closed
-        const uploadModal = document.getElementById('uploadModal');
-        const folderModal = document.getElementById('folderModal');
-        
-        if (uploadModal) {
-            uploadModal.addEventListener('hidden.bs.modal', function() {
-                if (typeof updateUploadCounter === 'function') {
-                    updateUploadCounter(0);
-                }
-            });
-        }
-        
-        if (folderModal) {
-            folderModal.addEventListener('hidden.bs.modal', function() {
-                if (typeof updateUploadCounter === 'function') {
-                    updateUploadCounter(0);
-                }
-            });
-        }
-        
-        // Add animation to counter cards
-        const counterCards = document.querySelectorAll('.counter-card');
-        counterCards.forEach((card, index) => {
-            // Stagger animation delay
-            setTimeout(() => {
-                card.style.opacity = '0';
-                card.style.transform = 'translateY(20px)';
-                
-                // Add animation
-                card.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
-                
-                // Trigger animation
-                setTimeout(() => {
-                    card.style.opacity = '1';
-                    card.style.transform = 'translateY(0)';
-                }, 50);
-            }, index * 100);
-        });
     });
 </script>
 {% endblock %}
