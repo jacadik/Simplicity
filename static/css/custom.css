@@ -1,3 +1,32 @@
+.paragraph-card .card-header {
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+}/* Compact mode styling */
+.compact-mode .paragraph-preview {
+    font-size: 0.85rem;
+    -webkit-line-clamp: 1; /* Show only 1 line in compact mode */
+}
+
+.compact-mode .badge {
+    font-size: 70%;
+    padding: 0.2em 0.4em;
+}
+
+.compact-mode .btn-sm {
+    padding: 0.1rem 0.3rem;
+    font-size: 0.7rem;
+}
+
+/* Hide certain elements in compact mode */
+.compact-mode .show-stats-btn,
+.compact-mode .content-stats {
+    display: none !important;
+}
+
+/* Make content immediately below header in compact mode */
+.compact-mode .card-body {
+    padding-top: 0.25rem !important;
+}```css
 /* 
    Document Analyzer Application
    Main CSS Stylesheet
@@ -651,3 +680,226 @@ pre.table-content {
     opacity: 1;
 }
 
+/* ======= COMPACT MODE STYLING ======= */
+.compact-mode .card {
+    margin-bottom: 0.5rem !important;
+}
+
+.compact-mode .card-header {
+    padding: 0.35rem 0.5rem;
+}
+
+.compact-mode .card-body {
+    padding: 0.4rem 0.5rem;
+}
+
+.compact-mode h1, .compact-mode h2, .compact-mode h3, 
+.compact-mode h4, .compact-mode h5, .compact-mode h6 {
+    margin-bottom: 0.2rem;
+    font-size: 95%;
+}
+
+.compact-mode .paragraph-preview {
+    font-size: 0.85rem;
+    -webkit-line-clamp: 1; /* Show only 1 line in compact mode */
+}
+
+.compact-mode .badge {
+    font-size: 70%;
+    padding: 0.2em 0.4em;
+}
+
+.compact-mode .btn-sm {
+    padding: 0.1rem 0.3rem;
+    font-size: 0.7rem;
+}
+
+/* Hide certain elements in compact mode */
+.compact-mode .show-stats-btn,
+.compact-mode .content-stats {
+    display: none !important;
+}
+
+.compact-mode .action-buttons {
+    margin-top: 0.25rem !important;
+}
+
+.compact-mode .paragraph-full-content {
+    max-height: 150px; /* Shorter height in compact mode */
+    padding: 0.5rem !important;
+}
+
+/* Optimize spacing in filter panel */
+.compact-mode .filter-panel-toggle {
+    padding: 0.25rem 0.5rem !important;
+}
+
+.compact-mode .card-body {
+    padding-top: 0.5rem !important;
+    padding-bottom: 0.5rem !important;
+}
+
+.compact-mode .form-label {
+    margin-bottom: 0.1rem;
+}
+
+.compact-mode .form-select,
+.compact-mode .form-control {
+    padding-top: 0.2rem;
+    padding-bottom: 0.2rem;
+}
+
+/* Improve compact header */
+.compact-mode .compact-header {
+    padding-top: 0.25rem;
+    padding-bottom: 0.25rem;
+    margin-bottom: 0.25rem;
+}
+
+.compact-mode .compact-header h5 {
+    font-size: 1rem;
+}
+
+.compact-mode .compact-header p {
+    font-size: 0.7rem;
+}
+
+/* Make sticky pagination more compact */
+.compact-mode .sticky-pagination {
+    padding: 3px 8px;
+}
+
+.compact-mode .sticky-pagination .btn-sm {
+    padding: 0.1rem 0.25rem;
+    font-size: 0.7rem;
+}
+
+.compact-mode .sticky-pagination select {
+    height: 1.5rem;
+    padding: 0 0.5rem;
+    font-size: 0.7rem;
+}
+
+/* Make paragraph card content more compact */
+.compact-mode .document-references {
+    max-height: 70px;
+    padding: 5px;
+    margin-bottom: 0.5rem;
+}
+
+.compact-mode .paragraph-preview {
+    margin-bottom: 0.25rem;
+}
+
+.compact-mode .paragraph-preview button {
+    font-size: 0.7rem;
+}
+
+/* Improve virtual scroll container height in compact mode */
+.compact-mode .virtual-scroll-container {
+    height: calc(100vh - 140px);
+}
+
+/* Enhanced appearance for tag badges in compact mode */
+.compact-mode .tag-badge {
+    font-size: 65%;
+    padding: 0.15em 0.35em;
+}
+
+.compact-mode .tag-badge i {
+    font-size: 0.7em;
+}
+
+/* Enhance visibility of buttons in compact mode */
+.compact-mode .btn-light {
+    padding: 0.1rem 0.25rem;
+}
+
+.compact-mode .btn-light i {
+    font-size: 0.7rem;
+}
+
+/* View toggle button animation */
+.view-toggle {
+    transition: all 0.3s ease;
+}
+
+.view-toggle:hover {
+    transform: rotate(90deg);
+}
+
+/* Sticky pagination enhancements */
+.sticky-pagination {
+    transition: all 0.3s ease;
+}
+
+.sticky-pagination:hover {
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+}
+
+/* Improve batch action bar in compact mode */
+.compact-mode .batch-action-bar {
+    padding: 0.5rem;
+}
+
+.compact-mode .batch-action-bar .btn {
+    padding: 0.2rem 0.5rem;
+    font-size: 0.8rem;
+}
+
+/* Optimize for mobile screens */
+@media (max-width: 768px) {
+    .compact-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .compact-header > div:last-child {
+        align-self: flex-end;
+        margin-top: -2rem;
+    }
+    
+    .sticky-pagination {
+        padding: 3px;
+    }
+    
+    .sticky-pagination .btn-sm {
+        padding: 0.1rem 0.2rem;
+    }
+    
+    .sticky-pagination select {
+        width: 60px !important;
+        font-size: 0.7rem;
+    }
+    
+    .virtual-scroll-container {
+        height: calc(100vh - 160px);
+    }
+}
+
+/* Enhanced animations for better user experience */
+.card-header {
+    transition: padding 0.3s ease;
+}
+
+.card-body {
+    transition: padding 0.3s ease, max-height 0.3s ease;
+}
+
+.badge {
+    transition: all 0.2s ease;
+}
+
+/* Add infinite scroll styling */
+.infinite-scroll-trigger {
+    height: 50px;
+    text-align: center;
+    padding: 15px;
+    margin-bottom: 20px;
+}
+
+.infinite-scroll-trigger .spinner-border {
+    width: 1.5rem;
+    height: 1.5rem;
+}
+```

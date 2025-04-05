@@ -1,825 +1,1728 @@
+```html
 {% extends 'base.html' %}
 
-{% block title %}Paragraphs{% endblock %}
+{% block title %}Paragraphs{% endblock title %}
+
+{% block head %}
+<style>
+  /* Custom styles for optimized paragraph display */
+  .paragraph-card {
+    transition: all 0.2s ease;
+    margin-bottom: 1rem;
+  }
+  
+  .paragraph-card.highlight-sort {
+    animation: highlight-card 1.5s ease;
+  }
+  
+  @keyframes highlight-card {
+    0% { background-color: rgba(87, 135, 235, 0.1); }
+    100% { background-color: transparent; }
+  }
+  
+  .document-references {
+    max-height: 100px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    display: none; /* Hide document references by default */
+  }
+  
+  .document-references.show {
+    display: block; /* Show when explicitly toggled */
+  }
+  
+  .paragraph-preview {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  
+  .paragraph-full-content {
+    max-height: 300px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+  }
+  
+  .paragraph-full-content pre.table-content {
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  
+  .pagination-controls {
+    margin: 1rem 0;
+  }
+  
+  .occurrence-badge {
+    cursor: pointer; /* Make it clear this is clickable */
+    transition: background-color 0.2s ease;
+  }
+  
+  .occurrence-badge:hover {
+    background-color: #0dcaf0 !important; /* Slightly brighter on hover */
+  }
+  
+  .occurrence-badge.active {
+    background-color: #0dcaf0 !important; /* Highlight when active */
+  }
+  
+  .filter-panel-toggle {
+    cursor: pointer;
+  }
+  
+  /* Fade effect for documents list expansion */
+  .documents-fade {
+    position: relative;
+  }
+  
+  /* Virtual scroll container */
+  .virtual-scroll-container {
+    position: relative;
+    overflow: auto;
+    height: calc(100vh - 180px); /* Increased height by reducing offset */
+    min-height: 400px;
+  }
+  
+  /* Loading indicator */
+  .loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(255,255,255,0.7);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+  }
+  
+  .loading-spinner {
+    width: 3rem;
+    height: 3rem;
+  }
+  
+  /* Batch selection */
+  .batch-action-bar {
+    position: sticky;
+    bottom: 0;
+    background: white;
+    border-top: 1px solid #dee2e6;
+    padding: 0.75rem;
+    z-index: 10;
+    box-shadow: 0 -5px 15px rgba(0,0,0,0.05);
+    display: none;
+  }
+  
+  .batch-action-bar.visible {
+    display: block;
+    animation: slideUp 0.3s ease;
+  }
+  
+  @keyframes slideUp {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+  }
+  
+  /* Selection checkbox */
+  .paragraph-select {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.75rem;
+    z-index: 5;
+  }
+  
+  /* Highlight found text */
+  mark.search-highlight {
+    background-color: #fff3cd;
+    padding: 0.1em 0.2em;
+    border-radius: 2px;
+  }
+  
+  /* Sticky pagination controls */
+  .sticky-pagination {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: white;
+    border-radius: 6px;
+    padding: 5px 10px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    opacity: 0.95;
+  }
+  
+  .sticky-pagination:hover {
+    opacity: 1;
+  }
+  
+  /* Compact header */
+  .compact-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 0.5rem;
+    margin-bottom: 0.5rem;
+  }
+  
+  .compact-header h5 {
+    margin-bottom: 0;
+  }
+  
+  /* View toggle button */
+  .view-toggle {
+    position: fixed;
+    bottom: 80px;
+    right: 20px;
+    z-index: 1000;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #5787eb;
+    color: white;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  }
+  
+  .view-toggle:hover {
+    background: #3d6ed4;
+  }
+
+  /* Filter toggle icon */
+  .filter-toggle-icon {
+    transition: transform 0.3s ease;
+  }
+  
+  .filter-panel-toggle[aria-expanded="true"] .filter-toggle-icon {
+    transform: rotate(180deg);
+  }
+</style>
+{% endblock head %}
 
 {% block content %}
-    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-4">
-        <div>
-            <h1 class="h3 mb-0">Paragraphs</h1>
-            <p class="text-muted mb-0">View and analyze paragraph content across documents</p>
-        </div>
-        <div class="d-flex gap-2">
-            <a href="/export" class="btn btn-success">
-                <i class="bi bi-file-excel me-1"></i> Export to Excel
-            </a>
-        </div>
-    </div>
+<!-- Compact Header Area -->
+<div class="compact-header pt-2">
+  <div>
+    <h5 class="mb-0">Paragraphs</h5>
+    <p class="text-muted small mb-0">View and analyze paragraph content across documents</p>
+  </div>
+  <div class="dropdown">
+    <button class="btn btn-sm btn-primary dropdown-toggle" type="button" id="headerActionsDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+      <i class="bi bi-gear"></i> Actions
+    </button>
+    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="headerActionsDropdown">
+      <li><a href="/export" class="dropdown-item"><i class="bi bi-file-excel me-1"></i> Export to Excel</a></li>
+      <li><hr class="dropdown-divider"></li>
+      <li><a class="dropdown-item" href="#" id="selectAllBtn"><i class="bi bi-check-all me-2"></i>Select All on Page</a></li>
+      <li><a class="dropdown-item" href="#" id="deselectAllBtn"><i class="bi bi-x-circle me-2"></i>Deselect All</a></li>
+      <li><hr class="dropdown-divider"></li>
+      <li><a class="dropdown-item" href="#" id="showStatsBtn"><i class="bi bi-bar-chart me-2"></i>Paragraph Statistics</a></li>
+    </ul>
+  </div>
+</div>
 
-    <!-- Filter Panel -->
-    <div class="card mb-4">
-        <div class="card-header d-flex justify-content-between align-items-center">
-            <h5 class="mb-0"><i class="bi bi-funnel me-2"></i>Filter & Sort Options</h5>
-            <button class="btn btn-sm btn-light" type="button" data-bs-toggle="collapse" data-bs-target="#filterCollapse" aria-expanded="true">
-                <i class="bi bi-chevron-down"></i>
-            </button>
-        </div>
-        <div class="collapse show" id="filterCollapse">
-            <div class="card-body">
-                <div class="row g-3">
-                    <div class="col-md-3">
-                        <label for="documentFilter" class="form-label"><i class="bi bi-file-earmark me-1"></i>Document</label>
-                        <select class="form-select" id="documentFilter" onchange="filterByDocument(this.value)">
-                            <option value="">All Documents</option>
-                            {% for doc in documents %}
-                                <option value="{{ doc.id }}" {% if selected_document == doc.id %}selected{% endif %}>{{ doc.filename }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="col-md-3">
-                        <label for="paragraphTypeFilter" class="form-label"><i class="bi bi-type me-1"></i>Paragraph Type</label>
-                        <select class="form-select" id="paragraphTypeFilter" onchange="filterByType(this.value)">
-                            <option value="">All Types</option>
-                            <option value="header">Headers</option>
-                            <option value="normal">Normal Paragraphs</option>
-                            <option value="list">Lists</option>
-                            <option value="table">Tables</option>
-                            <option value="boilerplate">Boilerplate</option>
-                        </select>
-                    </div>
-                    <div class="col-md-3">
-                        <label for="tagFilter" class="form-label"><i class="bi bi-tag me-1"></i>Tag</label>
-                        <select class="form-select" id="tagFilter" onchange="filterByTag(this.value)">
-                            <option value="">All Tags</option>
-                            {% for tag in tags %}
-                                <option value="{{ tag.id }}">{{ tag.name }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="col-md-3">
-                        <label for="duplicateFilter" class="form-label"><i class="bi bi-files me-1"></i>Duplicates</label>
-                        <select class="form-select" id="duplicateFilter" onchange="filterByDuplicates(this.value)">
-                            <option value="collapsed" {% if not show_all_duplicates %}selected{% endif %}>Show Once (Collapsed)</option>
-                            <option value="all" {% if show_all_duplicates %}selected{% endif %}>Show All Instances</option>
-                        </select>
-                    </div>
+<!-- Loading Overlay -->
+<div class="loading-overlay" id="loadingOverlay" style="display: none;">
+  <div class="spinner-border text-primary loading-spinner" role="status">
+    <span class="visually-hidden">Loading...</span>
+  </div>
+  <p class="mt-3" id="loadingMessage">Processing paragraphs...</p>
+</div>
 
-                
-                <!-- Sorting Options -->
-                <div class="row mt-3">
-                    <div class="col-md-3">
-                        <label for="sortOption" class="form-label"><i class="bi bi-sort-alpha-down me-1"></i>Sort By</label>
-                        <select class="form-select" id="sortOption" onchange="sortParagraphs(this.value)">
-                            <option value="position">Default Order</option>
-                            <option value="occurrences_desc" selected>Occurrences (High to Low)</option>
-                            <option value="occurrences_asc">Occurrences (Low to High)</option>
-                            <option value="document">Document Name</option>
-                        </select>
-                    </div>
-                    <div class="col-md-3">
-                        <label for="minLengthFilter" class="form-label"><i class="bi bi-text-paragraph me-1"></i>Min Length</label>
-                        <div class="input-group">
-                            <input type="number" class="form-control" id="minLengthFilter" min="0" value="0" placeholder="Min chars">
-                            <button class="btn btn-outline-secondary" type="button" id="showLengthsBtn" title="Show character counts">
-                                <i class="bi bi-info-circle"></i>
-                            </button>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <label for="searchParagraphs" class="form-label"><i class="bi bi-search me-1"></i>Search Content</label>
-                        <input type="text" class="form-control" id="searchParagraphs" placeholder="Search paragraph content...">
-                    </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Results Count and Controls -->
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <div>
-            <span class="badge bg-primary rounded-pill" id="paragraphCount">
-                {{ paragraphs|length }} paragraphs
-            </span>
-            {% if show_all_duplicates %}
-                <span class="badge bg-info rounded-pill ms-2">
-                    <i class="bi bi-files me-1"></i> Showing all duplicates
-                </span>
-            {% else %}
-                <span class="badge bg-secondary rounded-pill ms-2">
-                    <i class="bi bi-files me-1"></i> Duplicates collapsed
-                </span>
-            {% endif %}
-        </div>
-        <div>
-            <button class="btn btn-sm btn-outline-primary" id="expandAllParasBtn">
-                <i class="bi bi-arrows-expand me-1"></i> Expand All
-            </button>
-            <button class="btn btn-sm btn-outline-secondary" id="collapseAllParasBtn">
-                <i class="bi bi-arrows-collapse me-1"></i> Collapse All
-            </button>
-        </div>
-    </div>
-
-    <!-- Paragraphs List -->
-    <div id="paragraphsList">
-        {% if paragraphs %}
-            {% for para in paragraphs %}
-                <div class="card paragraph-card {{ para.paragraph_type }} mb-3" 
-                     data-type="{{ para.paragraph_type }}" 
-                     data-id="{{ para.id }}" 
-                     data-occurrences="{{ para.document_references|length }}" 
-                     data-document="{{ para.filename }}"
-                     data-tags="{{ para.tags|map(attribute='id')|join(',') }}"
-                     data-content-length="{{ para.content|length }}">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <div class="d-flex align-items-center gap-2">
-                            {% if para.paragraph_type == 'header' %}
-                                <span class="badge bg-primary">{{ para.paragraph_type }}</span>
-                            {% elif para.paragraph_type == 'normal' %}
-                                <span class="badge bg-secondary">{{ para.paragraph_type }}</span>
-                            {% elif para.paragraph_type == 'list' %}
-                                <span class="badge bg-success">{{ para.paragraph_type }}</span>
-                            {% elif para.paragraph_type == 'table' %}
-                                <span class="badge bg-danger">{{ para.paragraph_type }}</span>
-                            {% elif para.paragraph_type == 'boilerplate' %}
-                                <span class="badge bg-warning">{{ para.paragraph_type }}</span>
-                            {% else %}
-                                <span class="badge bg-secondary">{{ para.paragraph_type }}</span>
-                            {% endif %}
-                            
-                            {% if para.appears_in_multiple %}
-                                <span class="badge bg-warning">
-                                    <i class="bi bi-files me-1"></i>Duplicate
-                                </span>
-                            {% endif %}
-                            
-                            <span class="badge bg-info occurrence-badge" title="Number of occurrences across documents">
-                                <i class="bi bi-files me-1"></i>{{ para.document_references|length }}
-                            </span>
-                        </div>
-                        
-                        <div class="d-flex gap-2">
-                            <div class="paragraph-tags d-flex flex-wrap gap-1">
-                                {% for tag in para.tags %}
-                                    <span class="badge tag-badge" style="background-color: {{ tag.color }}">
-                                        {{ tag.name }}
-                                        <i class="bi bi-x ms-1 remove-tag-btn" onclick="removeTag({{ para.id }}, {{ tag.id }})"></i>
-                                    </span>
-                                {% endfor %}
-                            </div>
-                            
-                            <div class="btn-group ms-2">
-                                <button class="btn btn-sm btn-light toggle-para-btn" title="Expand/Collapse">
-                                    <i class="bi bi-arrows-expand"></i>
-                                </button>
-                                <button class="btn btn-sm btn-light" onclick="showTagModal({{ para.id }})" title="Add Tag">
-                                    <i class="bi bi-tag"></i>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="card-body">
-                        <!-- Document References - Shows where this paragraph appears -->
-                        <div class="document-references mb-3 p-3 rounded bg-light">
-                            <p class="text-muted mb-2 fw-medium">
-                                <i class="bi bi-files me-1"></i> 
-                                {% if para.appears_in_multiple %}Appears in multiple documents:{% else %}Source document:{% endif %}
-                            </p>
-                            <div class="d-flex flex-wrap gap-2">
-                                {% for filename in para.document_references %}
-                                    <a href="/document/{{ filename_to_doc_id[filename] }}" class="text-decoration-none">
-                                        <span class="badge bg-light text-dark border">
-                                            <i class="bi bi-file-earmark-text me-1"></i>{{ filename }}
-                                        </span>
-                                    </a>
-                                {% endfor %}
-                            </div>
-                        </div>
-                        
-                        {% if para.header_content %}
-                            <div class="mb-3 p-2 rounded bg-light">
-                                <strong><i class="bi bi-type-h1 me-1"></i>Header:</strong> {{ para.header_content }}
-                            </div>
-                        {% endif %}
-                        
-                        <!-- Content preview (always visible) -->
-                        <div class="paragraph-preview mb-2">
-                            {{ para.content|truncate(150) }}
-                            <button class="btn btn-sm btn-link p-0 ms-1 read-more-btn">Read more</button>
-                        </div>
-                        
-                        <!-- Full content (hidden by default) -->
-                        <div class="paragraph-full-content p-3 bg-light rounded mb-2" style="display: none;">
-                            {% if para.paragraph_type == 'table' %}
-                                <pre class="table-content">{{ para.content }}</pre>
-                            {% else %}
-                                {{ para.content }}
-                            {% endif %}
-                        </div>
-                    </div>
-                </div>
+<!-- Filter Panel (collapsed by default) -->
+<div class="card mb-3">
+  <div class="card-header py-2 d-flex justify-content-between align-items-center filter-panel-toggle" data-bs-toggle="collapse" data-bs-target="#filterCollapse" aria-expanded="false">
+    <h6 class="mb-0"><i class="bi bi-funnel me-2"></i>Filter & Sort Options</h6>
+    <button class="btn btn-sm btn-light p-1">
+      <i class="bi bi-chevron-down filter-toggle-icon"></i>
+    </button>
+  </div>
+  <div class="collapse" id="filterCollapse">
+    <div class="card-body py-2">
+      <div class="row g-2">
+        <div class="col-md-3">
+          <label for="documentFilter" class="form-label small"><i class="bi bi-file-earmark me-1"></i>Document</label>
+          <select class="form-select form-select-sm" id="documentFilter" onchange="filterByDocument(this.value)">
+            <option value="">All Documents</option>
+            {% for doc in documents %}
+              <option value="{{ doc.id }}" {% if selected_document == doc.id %}selected{% endif %}>{{ doc.filename }}</option>
             {% endfor %}
-        {% else %}
-            <div class="text-center py-5">
-                <div class="empty-state">
-                    <i class="bi bi-file-earmark-x text-muted mb-3" style="font-size: 4rem;"></i>
-                    <h5>No paragraphs found</h5>
-                    <p class="text-muted">No paragraphs match your current filter criteria</p>
-                    <a href="/paragraphs" class="btn btn-primary mt-2">
-                        <i class="bi bi-arrow-repeat me-1"></i> Reset Filters
-                    </a>
-                </div>
-            </div>
-        {% endif %}
-    </div>
-
-    <!-- Tag Modal -->
-    <div class="modal fade" id="tagModal" tabindex="-1" aria-labelledby="tagModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content border-0 shadow">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="tagModalLabel"><i class="bi bi-tag me-2"></i>Add Tag</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <input type="hidden" id="paragraphIdForTag">
-                    <div class="mb-3">
-                        <p class="alert alert-info mb-3">
-                            <i class="bi bi-info-circle me-2"></i>
-                            This tag will be applied to all instances of this paragraph across documents.
-                        </p>
-                        <label class="form-label">Select Tag</label>
-                        <div class="d-flex flex-wrap gap-2 tag-selection">
-                            {% for tag in tags %}
-                                <div class="tag-item">
-                                    <span class="badge tag-badge" style="background-color: {{ tag.color }}" onclick="addTag({{ tag.id }})">
-                                        {{ tag.name }}
-                                    </span>
-                                </div>
-                            {% endfor %}
-                        </div>
-                    </div>
-                </div>
-            </div>
+          </select>
         </div>
+        <div class="col-md-3">
+          <label for="paragraphTypeFilter" class="form-label small"><i class="bi bi-type me-1"></i>Paragraph Type</label>
+          <select class="form-select form-select-sm" id="paragraphTypeFilter" onchange="filterByType(this.value)">
+            <option value="">All Types</option>
+            <option value="header">Headers</option>
+            <option value="normal">Normal Paragraphs</option>
+            <option value="list">Lists</option>
+            <option value="table">Tables</option>
+            <option value="boilerplate">Boilerplate</option>
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label for="tagFilter" class="form-label small"><i class="bi bi-tag me-1"></i>Tag</label>
+          <select class="form-select form-select-sm" id="tagFilter" onchange="filterByTag(this.value)">
+            <option value="">All Tags</option>
+            {% for tag in tags %}
+              <option value="{{ tag.id }}">{{ tag.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label for="duplicateFilter" class="form-label small"><i class="bi bi-files me-1"></i>Duplicates</label>
+          <select class="form-select form-select-sm" id="duplicateFilter" onchange="filterByDuplicates(this.value)">
+            <option value="collapsed" {% if not show_all_duplicates %}selected{% endif %}>Show Once (Collapsed)</option>
+            <option value="all" {% if show_all_duplicates %}selected{% endif %}>Show All Instances</option>
+          </select>
+        </div>
+      </div>
+      
+      <!-- Sorting and Advanced Options -->
+      <div class="row mt-2 g-2">
+        <div class="col-md-3">
+          <label for="sortOption" class="form-label small"><i class="bi bi-sort-alpha-down me-1"></i>Sort By</label>
+          <select class="form-select form-select-sm" id="sortOption" onchange="sortParagraphs(this.value)">
+            <option value="position">Default Order</option>
+            <option value="occurrences_desc" selected>Occurrences (High to Low)</option>
+            <option value="occurrences_asc">Occurrences (Low to High)</option>
+            <option value="length_desc">Length (Long to Short)</option>
+            <option value="length_asc">Length (Short to Long)</option>
+            <option value="document">Document Name</option>
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label for="minLengthFilter" class="form-label small"><i class="bi bi-text-paragraph me-1"></i>Min Length</label>
+          <div class="input-group input-group-sm">
+            <input type="number" class="form-control form-control-sm" id="minLengthFilter" min="0" value="0" placeholder="Min chars">
+            <button class="btn btn-outline-secondary btn-sm" type="button" id="showLengthsBtn" title="Show character counts">
+              <i class="bi bi-info-circle"></i>
+            </button>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <label for="searchParagraphs" class="form-label small"><i class="bi bi-search me-1"></i>Search Content</label>
+          <div class="input-group input-group-sm">
+            <input type="text" class="form-control form-control-sm" id="searchParagraphs" placeholder="Search paragraph content...">
+            <button class="btn btn-outline-primary btn-sm" type="button" id="clearSearchBtn">
+              <i class="bi bi-x-circle"></i>
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
-{% endblock %}
+  </div>
+</div>
+
+<!-- Results Count and Controls - More compact -->
+<div class="d-flex justify-content-between align-items-center mb-2">
+  <div>
+    <span class="badge bg-primary rounded-pill" id="paragraphCount">
+      {{ paragraphs|length }} paragraphs
+    </span>
+    <span class="badge bg-info rounded-pill ms-2" id="pageInfo">
+      Page <span id="currentPage">1</span> of <span id="totalPages">1</span>
+    </span>
+    {% if show_all_duplicates %}
+      <span class="badge bg-info rounded-pill ms-2">
+        <i class="bi bi-files me-1"></i> Showing all duplicates
+      </span>
+    {% else %}
+      <span class="badge bg-secondary rounded-pill ms-2">
+        <i class="bi bi-files me-1"></i> Duplicates collapsed
+      </span>
+    {% endif %}
+  </div>
+  <div>
+    <button class="btn btn-sm btn-outline-primary py-0 px-2" id="expandAllParasBtn">
+      <i class="bi bi-arrows-expand me-1"></i> Expand All
+    </button>
+    <button class="btn btn-sm btn-outline-secondary py-0 px-2" id="collapseAllParasBtn">
+      <i class="bi bi-arrows-collapse me-1"></i> Collapse All
+    </button>
+  </div>
+</div>
+
+<!-- Paragraphs Virtual Scroll Container -->
+<div class="virtual-scroll-container">
+  <div id="paragraphsList">
+    {% if paragraphs %}
+      {% for para in paragraphs %}
+        <div class="card paragraph-card {{ para.paragraph_type }} mb-3" 
+             data-type="{{ para.paragraph_type }}" 
+             data-id="{{ para.id }}" 
+             data-occurrences="{{ para.document_references|length }}" 
+             data-document="{{ para.filename }}"
+             data-tags="{{ para.tags|map(attribute='id')|join(',') }}"
+             data-content-length="{{ para.content|length }}">
+          
+          <!-- Paragraph Selection Checkbox -->
+          <div class="paragraph-select">
+            <div class="form-check">
+              <input class="form-check-input paragraph-checkbox" type="checkbox" id="selectPara{{ para.id }}" data-para-id="{{ para.id }}">
+              <label class="form-check-label" for="selectPara{{ para.id }}"></label>
+            </div>
+          </div>
+          
+          <div class="card-header py-2">
+            <!-- All metadata, tags, and actions consolidated in the top row -->
+            <div class="d-flex justify-content-between align-items-center">
+              <!-- Type badges and occurrence info on the left -->
+              <div class="d-flex align-items-center gap-2">
+                {% if para.paragraph_type == 'header' %}
+                  <span class="badge bg-primary">{{ para.paragraph_type }}</span>
+                {% elif para.paragraph_type == 'normal' %}
+                  <span class="badge bg-secondary">{{ para.paragraph_type }}</span>
+                {% elif para.paragraph_type == 'list' %}
+                  <span class="badge bg-success">{{ para.paragraph_type }}</span>
+                {% elif para.paragraph_type == 'table' %}
+                  <span class="badge bg-danger">{{ para.paragraph_type }}</span>
+                {% elif para.paragraph_type == 'boilerplate' %}
+                  <span class="badge bg-warning">{{ para.paragraph_type }}</span>
+                {% else %}
+                  <span class="badge bg-secondary">{{ para.paragraph_type }}</span>
+                {% endif %}
+                
+                {% if para.appears_in_multiple %}
+                  <span class="badge bg-warning">
+                    <i class="bi bi-files me-1"></i>Duplicate
+                  </span>
+                {% endif %}
+                
+                <!-- Occurrence badge (clickable) -->
+                <span class="badge bg-info occurrence-badge" onclick="toggleDocumentReferences(this, {{ para.id }})" title="Click to view document references">
+                  <i class="bi bi-files me-1"></i>{{ para.document_references|length }}
+                </span>
+              </div>
+              
+              <!-- Tags and action buttons together on the right -->
+              <div class="d-flex align-items-center">
+                <!-- Tags moved to the right -->
+                <div class="paragraph-tags d-flex flex-wrap gap-1 me-2">
+                  {% for tag in para.tags %}
+                    <span class="badge tag-badge" style="background-color: {{ tag.color }}">
+                      {{ tag.name }}
+                      <i class="bi bi-x ms-1 remove-tag-btn" onclick="removeTag({{ para.id }}, {{ tag.id }})"></i>
+                    </span>
+                  {% endfor %}
+                </div>
+                
+                <!-- Action buttons -->
+                <div class="action-buttons d-flex align-items-center gap-1">
+                  <button class="btn btn-sm btn-light py-0 px-2" onclick="showTagModal({{ para.id }})" title="Add Tag">
+                    <i class="bi bi-tag"></i>
+                  </button>
+                  <button class="btn btn-sm btn-light show-stats-btn py-0 px-2" title="Show Statistics">
+                    <i class="bi bi-info-circle"></i>
+                  </button>
+                  <a href="/paragraphs?document_id={{ para.document_id }}" class="btn btn-sm btn-light py-0 px-2" title="View in Context">
+                    <i class="bi bi-eye"></i>
+                  </a>
+                  <button class="btn btn-sm btn-light toggle-para-btn ms-1" title="Expand/Collapse">
+                    <i class="bi bi-arrows-expand"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div class="card-body py-2">
+            <!-- Document References - Shows where this paragraph appears -->
+            <div class="document-references mb-2 p-2 rounded bg-light" id="docRefs-{{ para.id }}">
+              <div class="d-flex justify-content-between align-items-center mb-1">
+                <p class="text-muted mb-0 small">
+                  <i class="bi bi-files me-1"></i> 
+                  {% if para.appears_in_multiple %}Appears in multiple documents:{% else %}Source document:{% endif %}
+                </p>
+              </div>
+              <div class="d-flex flex-wrap gap-2">
+                {% for filename in para.document_references %}
+                  <a href="/document/{{ filename_to_doc_id[filename] }}" class="text-decoration-none">
+                    <span class="badge bg-light text-dark border">
+                      <i class="bi bi-file-earmark-text me-1"></i>{{ filename }}
+                    </span>
+                  </a>
+                {% endfor %}
+              </div>
+            </div>
+            
+            {% if para.header_content %}
+              <div class="mb-2 p-2 rounded bg-light">
+                <strong><i class="bi bi-type-h1 me-1"></i>Header:</strong> {{ para.header_content }}
+              </div>
+            {% endif %}
+            
+            <!-- Content preview (always visible) -->
+            <div class="paragraph-preview mb-2">
+              {{ para.content|truncate(150) }}
+              <button class="btn btn-sm btn-link p-0 ms-1 read-more-btn">Read more</button>
+            </div>
+            
+            <!-- Full content (hidden by default) -->
+            <div class="paragraph-full-content p-2 bg-light rounded mb-2" style="display: none;">
+              {% if para.paragraph_type == 'table' %}
+                <pre class="table-content">{{ para.content }}</pre>
+              {% else %}
+                {{ para.content }}
+              {% endif %}
+            </div>
+
+            <!-- Content stats (hidden by default) -->
+            <div class="content-stats p-2 bg-light rounded mb-2 d-none">
+              <div class="row text-center">
+                <div class="col-md-3">
+                  <small class="text-muted">Characters</small>
+                  <div>{{ para.content|length }}</div>
+                </div>
+                <div class="col-md-3">
+                  <small class="text-muted">Words</small>
+                  <div>{{ para.content.split()|length }}</div>
+                </div>
+                <div class="col-md-3">
+                  <small class="text-muted">Sentences</small>
+                  <div>{{ para.content.split('.')|length - 1 }}</div>
+                </div>
+                <div class="col-md-3">
+                  <small class="text-muted">Position</small>
+                  <div>#{{ para.position }}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    {% else %}
+      <div class="text-center py-4">
+        <div class="empty-state">
+          <i class="bi bi-file-earmark-x text-muted mb-2" style="font-size: 3rem;"></i>
+          <h5>No paragraphs found</h5>
+          <p class="text-muted">No paragraphs match your current filter criteria</p>
+          <a href="/paragraphs" class="btn btn-primary mt-2">
+            <i class="bi bi-arrow-repeat me-1"></i> Reset Filters
+          </a>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Sticky Pagination Controls (fixed position) -->
+<div class="sticky-pagination" id="stickyPagination">
+  <button type="button" class="btn btn-sm btn-outline-secondary me-1" id="firstPageBtn">
+    <i class="bi bi-chevron-double-left"></i>
+  </button>
+  <button type="button" class="btn btn-sm btn-outline-secondary me-1" id="prevPageBtn">
+    <i class="bi bi-chevron-left"></i>
+  </button>
+  <span class="mx-2 small">
+    Page <span id="paginationCurrentPage">1</span> of <span id="paginationTotalPages">1</span>
+  </span>
+  <button type="button" class="btn btn-sm btn-outline-secondary ms-1" id="nextPageBtn">
+    <i class="bi bi-chevron-right"></i>
+  </button>
+  <button type="button" class="btn btn-sm btn-outline-secondary ms-1" id="lastPageBtn">
+    <i class="bi bi-chevron-double-right"></i>
+  </button>
+  <select class="form-select form-select-sm ms-2" id="pageSizeSelect" style="width: auto;">
+    <option value="10">10</option>
+    <option value="25" selected>25</option>
+    <option value="50">50</option>
+    <option value="100">100</option>
+  </select>
+</div>
+
+<!-- Compact View Toggle Button -->
+<button class="btn view-toggle" id="viewToggleBtn" title="Toggle Compact View">
+  <i class="bi bi-layout-text-window-reverse"></i>
+</button>
+
+<!-- Batch Action Bar -->
+<div class="batch-action-bar" id="batchActionBar">
+  <div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center">
+      <div>
+        <span class="badge bg-primary rounded-pill" id="selectedCount">0 selected</span>
+      </div>
+      <div class="d-flex gap-2">
+        <button class="btn btn-secondary" id="cancelSelectionBtn">
+          <i class="bi bi-x me-1"></i> Cancel
+        </button>
+        <div class="dropdown">
+          <button class="btn btn-primary dropdown-toggle" type="button" id="batchTagDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+            <i class="bi bi-tag me-1"></i> Tag Selected
+          </button>
+          <ul class="dropdown-menu" aria-labelledby="batchTagDropdown" id="batchTagDropdownMenu">
+            {% for tag in tags %}
+              <li><a class="dropdown-item" href="#" onclick="batchTagSelected({{ tag.id }})">
+                <span class="badge me-2" style="background-color: {{ tag.color }}">&nbsp;</span>{{ tag.name }}
+              </a></li>
+            {% endfor %}
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Tag Modal -->
+<div class="modal fade" id="tagModal" tabindex="-1" aria-labelledby="tagModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header">
+        <h5 class="modal-title" id="tagModalLabel"><i class="bi bi-tag me-2"></i>Add Tag</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="paragraphIdForTag">
+        <div class="mb-3">
+          <p class="alert alert-info mb-3">
+            <i class="bi bi-info-circle me-2"></i>
+            This tag will be applied to all instances of this paragraph across documents.
+          </p>
+          <label class="form-label">Select Tag</label>
+          <div class="d-flex flex-wrap gap-2 tag-selection">
+            {% for tag in tags %}
+              <div class="tag-item">
+                <span class="badge tag-badge" style="background-color: {{ tag.color }}" onclick="addTag({{ tag.id }})">
+                  {{ tag.name }}
+                </span>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Statistics Modal -->
+<div class="modal fade" id="statisticsModal" tabindex="-1" aria-labelledby="statisticsModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header">
+        <h5 class="modal-title" id="statisticsModalLabel"><i class="bi bi-bar-chart me-2"></i>Paragraph Statistics</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row mb-4">
+          <!-- Type distribution -->
+          <div class="col-md-6">
+            <div class="card h-100">
+              <div class="card-header">Paragraph Types</div>
+              <div class="card-body">
+                <div class="mb-3" id="typeDistributionChart" style="height: 200px;">
+                  <!-- Chart will be rendered here -->
+                </div>
+                <div class="type-legend small">
+                  <!-- Legend will be populated by JS -->
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Length distribution -->
+          <div class="col-md-6">
+            <div class="card h-100">
+              <div class="card-header">Content Length Distribution</div>
+              <div class="card-body">
+                <div class="mb-3" id="lengthDistributionChart" style="height: 200px;">
+                  <!-- Chart will be rendered here -->
+                </div>
+                <div class="text-center small text-muted mt-2">Character count ranges</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="row">
+          <!-- Tag usage -->
+          <div class="col-md-6">
+            <div class="card h-100">
+              <div class="card-header">Tag Usage</div>
+              <div class="card-body">
+                <div id="tagUsageChart" style="height: 200px;">
+                  <!-- Chart will be rendered here -->
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Document distribution -->
+          <div class="col-md-6">
+            <div class="card h-100">
+              <div class="card-header">Top Documents</div>
+              <div class="card-body">
+                <div id="documentDistribution" style="height: 200px;">
+                  <!-- Chart will be rendered here -->
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock content %}
 
 {% block scripts %}
 <script>
-    // Filter by document - maintain the duplicate filter state
-    function filterByDocument(documentId) {
-        const duplicateFilter = document.getElementById('duplicateFilter').value;
-        let url = '/paragraphs';
-        
-        // Build the query string with proper parameters
-        const params = new URLSearchParams();
-        if (documentId) {
-            params.append('document_id', documentId);
-        }
-        if (duplicateFilter === 'all') {
-            params.append('show_all_duplicates', '1');
-        }
-        
-        // Add the query string to the URL if we have parameters
-        if (params.toString()) {
-            url += '?' + params.toString();
-        }
-        
-        window.location.href = url;
+  // Global variables for pagination
+  let allParagraphs = [];
+  let filteredParagraphs = [];
+  let currentPage = 1;
+  let pageSize = 25;
+  let totalPages = 1;
+  let compactModeEnabled = false;
+  
+  // Cache selectors for performance
+  const paragraphsListEl = document.getElementById('paragraphsList');
+  const paragraphCountEl = document.getElementById('paragraphCount');
+  const currentPageEls = document.querySelectorAll('#currentPage, #paginationCurrentPage');
+  const totalPagesEls = document.querySelectorAll('#totalPages, #paginationTotalPages');
+  const loadingOverlay = document.getElementById('loadingOverlay');
+  const batchActionBar = document.getElementById('batchActionBar');
+  const selectedCountEl = document.getElementById('selectedCount');
+  const stickyPagination = document.getElementById('stickyPagination');
+  const viewToggleBtn = document.getElementById('viewToggleBtn');
+  
+  // Initialize the page
+  document.addEventListener('DOMContentLoaded', function() {
+    // Capture all paragraphs into our array for client-side pagination
+    initializeParagraphs();
+    
+    // Set up event listeners
+    setupEventListeners();
+    
+    // Apply default sorting by occurrences (high to low)
+    sortParagraphs('occurrences_desc');
+    
+    // Initialize pagination
+    updatePagination();
+    
+    // Add click listeners for expandable content
+    setupContentToggles();
+    
+    // Setup batch selection functionality
+    setupBatchSelection();
+    
+    // Set up compact view toggle
+    setupCompactViewToggle();
+  });
+  
+  // Function to toggle document references when clicking on the occurrence badge
+  function toggleDocumentReferences(badge, paragraphId) {
+    // Find the document references container
+    const docRefsContainer = document.getElementById(`docRefs-${paragraphId}`);
+    
+    // Toggle display
+    if (docRefsContainer.classList.contains('show')) {
+      docRefsContainer.classList.remove('show');
+      badge.classList.remove('active');
+    } else {
+      // Hide all other document references first
+      document.querySelectorAll('.document-references').forEach(container => {
+        container.classList.remove('show');
+      });
+      
+      // Remove active class from all badges
+      document.querySelectorAll('.occurrence-badge').forEach(b => {
+        b.classList.remove('active');
+      });
+      
+      // Show this one
+      docRefsContainer.classList.add('show');
+      badge.classList.add('active');
+    }
+  }
+  
+  // Initialize paragraphs array from DOM
+  function initializeParagraphs() {
+    showLoading('Initializing paragraphs...');
+    
+    // Get all paragraph cards and convert to array of objects for easier filtering and sorting
+    const paragraphCards = document.querySelectorAll('.paragraph-card');
+    
+    // Process in chunks to avoid blocking the UI
+    const chunkSize = 100;
+    let processedCount = 0;
+    
+    function processChunk() {
+      const endIndex = Math.min(processedCount + chunkSize, paragraphCards.length);
+      
+      for (let i = processedCount; i < endIndex; i++) {
+        const card = paragraphCards[i];
+        allParagraphs.push({
+          element: card,
+          id: parseInt(card.dataset.id),
+          type: card.dataset.type,
+          occurrences: parseInt(card.dataset.occurrences) || 0,
+          documentName: card.dataset.document,
+          tags: card.dataset.tags ? card.dataset.tags.split(',').filter(t => t !== '') : [],
+          contentLength: parseInt(card.dataset.contentLength) || 0,
+          content: card.querySelector('.paragraph-full-content') ? 
+                   card.querySelector('.paragraph-full-content').textContent : 
+                   card.querySelector('.paragraph-preview').textContent,
+          visible: true,
+          selected: false
+        });
+      }
+      
+      processedCount = endIndex;
+      
+      if (processedCount < paragraphCards.length) {
+        // Continue processing next chunk after a short delay to allow UI updates
+        setTimeout(processChunk, 0);
+      } else {
+        // All paragraphs processed
+        filteredParagraphs = [...allParagraphs];
+        updatePagination();
+        hideLoading();
+      }
     }
     
-    // Filter for showing duplicates
-    function filterByDuplicates(mode) {
-        const documentId = new URLSearchParams(window.location.search).get('document_id');
-        let url = '/paragraphs';
-        
-        // Build the query string with proper parameters
-        const params = new URLSearchParams();
-        if (documentId) {
-            params.append('document_id', documentId);
-        }
-        if (mode === 'all') {
-            params.append('show_all_duplicates', '1');
-        }
-        
-        // Add the query string to the URL if we have parameters
-        if (params.toString()) {
-            url += '?' + params.toString();
-        }
-        
-        window.location.href = url;
+    // Start processing the first chunk
+    setTimeout(processChunk, 0);
+  }
+  
+  // Function to properly escape HTML content before display
+  function escapeHtml(html) {
+    const div = document.createElement('div');
+    div.textContent = html;
+    return div.innerHTML;
+  }
+  
+  // Filter by document
+  function filterByDocument(documentId) {
+    const duplicateFilter = document.getElementById('duplicateFilter').value;
+    let url = '/paragraphs';
+    
+    // Build the query string with proper parameters
+    const params = new URLSearchParams();
+    if (documentId) {
+      params.append('document_id', documentId);
+    }
+    if (duplicateFilter === 'all') {
+      params.append('show_all_duplicates', '1');
     }
     
-    // Filter by paragraph type
-    function filterByType(type) {
-        const paragraphs = document.querySelectorAll('.paragraph-card');
-        let visibleCount = 0;
-        
-        if (!type) {
-            paragraphs.forEach(p => {
-                p.style.display = 'block';
-                p.classList.add('highlight-sort');
-                setTimeout(() => {
-                    p.classList.remove('highlight-sort');
-                }, 1000);
-                visibleCount++;
-            });
-            
-            // Update count
-            document.getElementById('paragraphCount').textContent = visibleCount + ' paragraphs';
-            
-            // Reapply other filters
-            applySortingAndTagFilters();
-            return;
-        }
-        
-        paragraphs.forEach(p => {
-            if (p.dataset.type === type) {
-                p.style.display = 'block';
-                p.classList.add('highlight-sort');
-                setTimeout(() => {
-                    p.classList.remove('highlight-sort');
-                }, 1000);
-                visibleCount++;
-            } else {
-                p.style.display = 'none';
-            }
-        });
-        
-        // Update count
-        document.getElementById('paragraphCount').textContent = visibleCount + ' paragraphs';
-        
-        // Make sure tag filter is still applied
-        const tagFilter = document.getElementById('tagFilter').value;
-        if (tagFilter) {
-            filterByTag(tagFilter);
-        }
+    // Add the query string to the URL if we have parameters
+    if (params.toString()) {
+      url += '?' + params.toString();
     }
     
-    // Filter by tag
-    function filterByTag(tagId) {
-        if (!tagId) {
-            // If no tag selected, just reapply type filter
-            filterByType(document.getElementById('paragraphTypeFilter').value);
-            return;
-        }
-        
-        // Apply tag filter while respecting type filter
-        const typeFilter = document.getElementById('paragraphTypeFilter').value;
-        const paragraphs = document.querySelectorAll('.paragraph-card');
-        let visibleCount = 0;
-        
-        paragraphs.forEach(p => {
-            // First check if it passes the type filter
-            const passesTypeFilter = !typeFilter || p.dataset.type === typeFilter;
-            
-            // Then check if it has the selected tag
-            const tags = p.dataset.tags.split(',').filter(tag => tag !== '');  // Filter out empty tags
-            const passesTagFilter = tags.includes(tagId);
-            
-            // Only show if passes both filters
-            if (passesTypeFilter && passesTagFilter) {
-                p.style.display = 'block';
-                p.classList.add('highlight-sort');
-                setTimeout(() => {
-                    p.classList.remove('highlight-sort');
-                }, 1000);
-                visibleCount++;
-            } else {
-                p.style.display = 'none';
-            }
-        });
-        
-        // Update count
-        document.getElementById('paragraphCount').textContent = visibleCount + ' paragraphs';
+    window.location.href = url;
+  }
+  
+  // Filter for showing duplicates
+  function filterByDuplicates(mode) {
+    const documentId = new URLSearchParams(window.location.search).get('document_id');
+    let url = '/paragraphs';
+    
+    // Build the query string with proper parameters
+    const params = new URLSearchParams();
+    if (documentId) {
+      params.append('document_id', documentId);
+    }
+    if (mode === 'all') {
+      params.append('show_all_duplicates', '1');
     }
     
-    function filterByMinLength(minLength) {
-        // Get current filters to respect them
-        const typeFilter = document.getElementById('paragraphTypeFilter').value;
-        const tagFilter = document.getElementById('tagFilter').value;
-        
-        // Apply minimum length filter along with existing filters
-        const paragraphs = document.querySelectorAll('.paragraph-card');
-        let visibleCount = 0;
-        
-        paragraphs.forEach(p => {
-            // Use the content length from the database (stored in data attribute)
-            const contentLength = parseInt(p.dataset.contentLength) || 0;
-            
-            // Check type filter
-            const passesTypeFilter = !typeFilter || p.dataset.type === typeFilter;
-            
-            // Check tag filter
-            let passesTagFilter = true;
-            if (tagFilter) {
-                const tags = p.dataset.tags.split(',').filter(tag => tag !== '');
-                passesTagFilter = tags.includes(tagFilter);
-            }
-            
-            // Check length filter
-            const passesLengthFilter = contentLength >= minLength;
-            
-            // Only show if passes all filters
-            if (passesTypeFilter && passesTagFilter && passesLengthFilter) {
-                p.style.display = 'block';
-                visibleCount++;
-            } else {
-                p.style.display = 'none';
-            }
-        });
-        
-        // Update count
-        document.getElementById('paragraphCount').textContent = visibleCount + ' paragraphs';
+    // Add the query string to the URL if we have parameters
+    if (params.toString()) {
+      url += '?' + params.toString();
     }
     
-    // Sort paragraphs
-    function sortParagraphs(sortOption) {
-        const paragraphsList = document.getElementById('paragraphsList');
-        const paragraphs = Array.from(paragraphsList.children);
-        
-        // Filter out non-paragraph elements
-        const paragraphElements = paragraphs.filter(el => el.classList.contains('paragraph-card'));
-        
-        // Sort based on selected option
-        paragraphElements.sort((a, b) => {
-            switch(sortOption) {
-                case 'occurrences_desc':
-                    return parseInt(b.dataset.occurrences) - parseInt(a.dataset.occurrences);
-                case 'occurrences_asc':
-                    return parseInt(a.dataset.occurrences) - parseInt(b.dataset.occurrences);
-                case 'document':
-                    return a.dataset.document.localeCompare(b.dataset.document);
-                default: // position (default)
-                    return 0; // Keep original order
-            }
-        });
-        
-        // Re-append elements in sorted order
-        paragraphElements.forEach(p => {
-            paragraphsList.appendChild(p);
-            p.classList.add('highlight-sort');
-            setTimeout(() => {
-                p.classList.remove('highlight-sort');
-            }, 1000);
-        });
-        
-        // Show sort success message
-        const alertDiv = document.createElement('div');
-        alertDiv.className = 'alert alert-success alert-dismissible fade show position-fixed bottom-0 end-0 m-3';
-        alertDiv.innerHTML = `
-            <div class="d-flex">
-                <div class="me-2"><i class="bi bi-check-circle"></i></div>
-                <div>Sorted by ${sortOption.replace('_', ' ')}</div>
-            </div>
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        `;
-        document.body.appendChild(alertDiv);
-        
-        // Remove the alert after 2 seconds
-        setTimeout(() => {
-            alertDiv.remove();
-        }, 2000);
-        
-        // Reapply filters after sorting
-        applySortingAndTagFilters();
+    window.location.href = url;
+  }
+  
+  // Show/hide loading overlay
+  function showLoading(message = 'Processing...') {
+    document.getElementById('loadingMessage').textContent = message;
+    loadingOverlay.style.display = 'flex';
+  }
+  
+  function hideLoading() {
+    loadingOverlay.style.display = 'none';
+  }
+  
+  // Show toast notification
+  function showToast(message, type = 'success') {
+    // Create toast container if it doesn't exist
+    let toastContainer = document.querySelector('.toast-container');
+    if (!toastContainer) {
+      toastContainer = document.createElement('div');
+      toastContainer.className = 'toast-container position-fixed bottom-0 end-0 p-3';
+      document.body.appendChild(toastContainer);
     }
     
-    // Reapply any active filters after sorting
-    function applySortingAndTagFilters() {
-        const typeFilter = document.getElementById('paragraphTypeFilter').value;
-        const tagFilter = document.getElementById('tagFilter').value;
-        const minLength = parseInt(document.getElementById('minLengthFilter').value) || 0;
-        
-        if (typeFilter) {
-            filterByType(typeFilter);
-        }
-        
-        if (tagFilter) {
-            filterByTag(tagFilter);
-        }
-        
-        if (minLength > 0) {
-            filterByMinLength(minLength);
-        }
-    }
+    // Create toast element
+    const toastEl = document.createElement('div');
+    toastEl.className = `toast align-items-center text-white bg-${type} border-0`;
+    toastEl.setAttribute('role', 'alert');
+    toastEl.setAttribute('aria-live', 'assertive');
+    toastEl.setAttribute('aria-atomic', 'true');
     
-    // Show tag modal
-    function showTagModal(paragraphId) {
-        document.getElementById('paragraphIdForTag').value = paragraphId;
-        new bootstrap.Modal(document.getElementById('tagModal')).show();
-    }
+    // Toast content
+    toastEl.innerHTML = `
+      <div class="d-flex">
+        <div class="toast-body">
+          ${message}
+        </div>
+        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+      </div>
+    `;
     
-    // Add tag to paragraph and all its duplicates
-    function addTag(tagId) {
-        const paragraphId = document.getElementById('paragraphIdForTag').value;
-        
-        // Show loading state
-        const tagSelection = document.querySelector('.tag-selection');
-        tagSelection.innerHTML = `
-            <div class="w-100 text-center">
-                <div class="spinner-border text-primary" role="status">
-                    <span class="visually-hidden">Loading...</span>
-                </div>
-                <p class="mt-2 mb-0">Adding tag to all instances of this paragraph...</p>
-            </div>
-        `;
-        
-        // Debug log
-        console.log(`Tagging paragraph ${paragraphId} with tag ${tagId}, tagging all duplicates`);
-        
-        // Create FormData for more reliable parameter passing
-        const formData = new FormData();
-        formData.append('paragraph_id', paragraphId);
-        formData.append('tag_id', tagId);
-        formData.append('tag_all_duplicates', 'true');
-        
-        fetch('/tag-paragraph', {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => response.json())
-        .then(data => {
-            console.log('Tag response:', data);
-            if (data.success) {
-                // Show success message
-                const alertDiv = document.createElement('div');
-                alertDiv.className = 'alert alert-success alert-dismissible fade show position-fixed bottom-0 end-0 m-3';
-                alertDiv.innerHTML = `
-                    <div class="d-flex">
-                        <div class="me-2"><i class="bi bi-check-circle"></i></div>
-                        <div>Tag added to all instances successfully!</div>
-                    </div>
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                `;
-                document.body.appendChild(alertDiv);
-                
-                // Reload page
-                setTimeout(() => {
-                    window.location.reload();
-                }, 1000);
-            } else {
-                alert('Failed to add tag: ' + (data.message || 'Unknown error'));
-            }
-        })
-        .catch(error => {
-            console.error('Error adding tag:', error);
-            alert('An error occurred while adding the tag');
-        });
-    }
+    // Add to container
+    toastContainer.appendChild(toastEl);
     
-    // Remove tag from paragraph and all its duplicates
-    function removeTag(paragraphId, tagId) {
-        if (!confirm('Are you sure you want to remove this tag from all instances of this paragraph?')) {
-            return;
-        }
-        
-        // Debug log
-        console.log(`Removing tag ${tagId} from paragraph ${paragraphId} and all duplicates`);
-        
-        // Create FormData for more reliable parameter passing
-        const formData = new FormData();
-        formData.append('paragraph_id', paragraphId);
-        formData.append('tag_id', tagId);
-        formData.append('untag_all_duplicates', 'true');
-        
-        fetch('/untag-paragraph', {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => response.json())
-        .then(data => {
-            console.log('Untag response:', data);
-            if (data.success) {
-                // Show success message
-                const alertDiv = document.createElement('div');
-                alertDiv.className = 'alert alert-success alert-dismissible fade show position-fixed bottom-0 end-0 m-3';
-                alertDiv.innerHTML = `
-                    <div class="d-flex">
-                        <div class="me-2"><i class="bi bi-check-circle"></i></div>
-                        <div>Tag removed from all instances successfully!</div>
-                    </div>
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                `;
-                document.body.appendChild(alertDiv);
-                
-                // Reload page
-                setTimeout(() => {
-                    window.location.reload();
-                }, 1000);
-            } else {
-                alert('Failed to remove tag: ' + (data.message || 'Unknown error'));
-            }
-        })
-        .catch(error => {
-            console.error('Error removing tag:', error);
-            alert('An error occurred while removing the tag');
-        });
-    }
-    
-    // Initialize UI interactions on page load
-    document.addEventListener('DOMContentLoaded', function() {
-        // Apply default sorting by occurrences (high to low)
-        sortParagraphs('occurrences_desc');
-        
-        // Add hover effects to paragraph cards
-        const paragraphCards = document.querySelectorAll('.paragraph-card');
-        paragraphCards.forEach(card => {
-            card.addEventListener('mouseenter', function() {
-                this.classList.add('shadow');
-            });
-            card.addEventListener('mouseleave', function() {
-                this.classList.remove('shadow');
-            });
-        });
-        
-        // Add minimum length filter listener
-        const minLengthFilter = document.getElementById('minLengthFilter');
-        if (minLengthFilter) {
-            minLengthFilter.addEventListener('input', function() {
-                filterByMinLength(parseInt(this.value) || 0);
-            });
-        }
-        
-        // Add show lengths button handler
-        const showLengthsBtn = document.getElementById('showLengthsBtn');
-        if (showLengthsBtn) {
-            showLengthsBtn.addEventListener('click', function() {
-                // Add character count badges to each paragraph
-                document.querySelectorAll('.paragraph-card').forEach(card => {
-                    // Use database length from data attribute
-                    const contentLength = card.dataset.contentLength;
-                    const lengthBadge = document.createElement('span');
-                    lengthBadge.className = 'badge bg-secondary char-count-badge ms-2';
-                    lengthBadge.innerHTML = `<i class="bi bi-123"></i> ${contentLength} chars (DB)`;
-                    
-                    // Only add if not already present
-                    if (!card.querySelector('.char-count-badge')) {
-                        const badgeContainer = card.querySelector('.d-flex.align-items-center.gap-2');
-                        if (badgeContainer) {
-                            badgeContainer.appendChild(lengthBadge);
-                        }
-                    }
-                });
-            });
-        }
-        
-        // Toggle paragraph content
-        const readMoreBtns = document.querySelectorAll('.read-more-btn');
-        readMoreBtns.forEach(btn => {
-            btn.addEventListener('click', function() {
-                const paragraphCard = this.closest('.paragraph-card');
-                const preview = paragraphCard.querySelector('.paragraph-preview');
-                const fullContent = paragraphCard.querySelector('.paragraph-full-content');
-                
-                if (fullContent.style.display === 'none') {
-                    preview.style.display = 'none';
-                    fullContent.style.display = 'block';
-                    
-                    // Update any toggle buttons in this card
-                    const toggleBtn = paragraphCard.querySelector('.toggle-para-btn');
-                    if (toggleBtn) {
-                        toggleBtn.innerHTML = '<i class="bi bi-arrows-collapse"></i>';
-                        toggleBtn.title = 'Collapse';
-                    }
-                } else {
-                    preview.style.display = 'block';
-                    fullContent.style.display = 'none';
-                    
-                    // Update any toggle buttons in this card
-                    const toggleBtn = paragraphCard.querySelector('.toggle-para-btn');
-                    if (toggleBtn) {
-                        toggleBtn.innerHTML = '<i class="bi bi-arrows-expand"></i>';
-                        toggleBtn.title = 'Expand';
-                    }
-                }
-            });
-        });
-        
-        // Toggle paragraphs with the toggle buttons
-        const toggleParaBtns = document.querySelectorAll('.toggle-para-btn');
-        toggleParaBtns.forEach(btn => {
-            btn.addEventListener('click', function() {
-                const paragraphCard = this.closest('.paragraph-card');
-                const preview = paragraphCard.querySelector('.paragraph-preview');
-                const fullContent = paragraphCard.querySelector('.paragraph-full-content');
-                
-                if (fullContent.style.display === 'none') {
-                    preview.style.display = 'none';
-                    fullContent.style.display = 'block';
-                    this.innerHTML = '<i class="bi bi-arrows-collapse"></i>';
-                    this.title = 'Collapse';
-                } else {
-                    preview.style.display = 'block';
-                    fullContent.style.display = 'none';
-                    this.innerHTML = '<i class="bi bi-arrows-expand"></i>';
-                    this.title = 'Expand';
-                }
-            });
-        });
-        
-        // Expand/Collapse All buttons
-        const expandAllBtn = document.getElementById('expandAllParasBtn');
-        const collapseAllBtn = document.getElementById('collapseAllParasBtn');
-        
-        if (expandAllBtn) {
-            expandAllBtn.addEventListener('click', function() {
-                document.querySelectorAll('.paragraph-preview').forEach(preview => {
-                    preview.style.display = 'none';
-                });
-                document.querySelectorAll('.paragraph-full-content').forEach(fullContent => {
-                    fullContent.style.display = 'block';
-                });
-                document.querySelectorAll('.toggle-para-btn').forEach(button => {
-                    button.innerHTML = '<i class="bi bi-arrows-collapse"></i>';
-                    button.title = 'Collapse';
-                });
-                
-                // Show notification
-                const alertDiv = document.createElement('div');
-                alertDiv.className = 'alert alert-info alert-dismissible fade show position-fixed bottom-0 end-0 m-3';
-                alertDiv.innerHTML = `
-                    <div class="d-flex">
-                        <div class="me-2"><i class="bi bi-arrows-expand"></i></div>
-                        <div>All paragraphs expanded</div>
-                    </div>
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                `;
-                document.body.appendChild(alertDiv);
-                
-                // Remove the alert after 2 seconds
-                setTimeout(() => {
-                    alertDiv.remove();
-                }, 2000);
-            });
-        }
-        
-        if (collapseAllBtn) {
-            collapseAllBtn.addEventListener('click', function() {
-                document.querySelectorAll('.paragraph-preview').forEach(preview => {
-                    preview.style.display = 'block';
-                });
-                document.querySelectorAll('.paragraph-full-content').forEach(fullContent => {
-                    fullContent.style.display = 'none';
-                });
-                document.querySelectorAll('.toggle-para-btn').forEach(button => {
-                    button.innerHTML = '<i class="bi bi-arrows-expand"></i>';
-                    button.title = 'Expand';
-                });
-                
-                // Show notification
-                const alertDiv = document.createElement('div');
-                alertDiv.className = 'alert alert-info alert-dismissible fade show position-fixed bottom-0 end-0 m-3';
-                alertDiv.innerHTML = `
-                    <div class="d-flex">
-                        <div class="me-2"><i class="bi bi-arrows-collapse"></i></div>
-                        <div>All paragraphs collapsed</div>
-                    </div>
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                `;
-                document.body.appendChild(alertDiv);
-                
-                // Remove the alert after 2 seconds
-                setTimeout(() => {
-                    alertDiv.remove();
-                }, 2000);
-            });
-        }
-        
-        // Search paragraph content
-        const searchInput = document.getElementById('searchParagraphs');
-        if (searchInput) {
-            searchInput.addEventListener('input', function() {
-                const searchTerm = this.value.toLowerCase();
-                let visibleCount = 0;
-                
-                document.querySelectorAll('.paragraph-card').forEach(card => {
-                    const content = card.querySelector('.paragraph-full-content').textContent.toLowerCase();
-                    
-                    if (content.includes(searchTerm)) {
-                        card.style.display = 'block';
-                        
-                        // Expand the paragraph to show the match if there's a search term
-                        if (searchTerm) {
-                            card.querySelector('.paragraph-preview').style.display = 'none';
-                            card.querySelector('.paragraph-full-content').style.display = 'block';
-                            const toggleBtn = card.querySelector('.toggle-para-btn');
-                            if (toggleBtn) {
-                                toggleBtn.innerHTML = '<i class="bi bi-arrows-collapse"></i>';
-                                toggleBtn.title = 'Collapse';
-                            }
-                        }
-                        
-                        visibleCount++;
-                    } else {
-                        card.style.display = 'none';
-                    }
-                });
-                
-                // Update count
-                document.getElementById('paragraphCount').textContent = visibleCount + ' paragraphs';
-            });
-        }
+    // Initialize and show the toast
+    const toast = new bootstrap.Toast(toastEl, {
+      autohide: true,
+      delay: 3000
     });
+    toast.show();
+    
+    // Remove from DOM after it's hidden
+    toastEl.addEventListener('hidden.bs.toast', function() {
+      toastEl.remove();
+    });
+  }
+  
+  // Update pagination
+  function updatePagination() {
+    totalPages = Math.ceil(filteredParagraphs.length / pageSize);
+    
+    // Update pagination info
+    currentPageEls.forEach(el => el.textContent = currentPage);
+    totalPagesEls.forEach(el => el.textContent = totalPages);
+    
+    // Update paragraph count
+    paragraphCountEl.textContent = `${filteredParagraphs.length} paragraphs`;
+    
+    // Show current page items
+    showCurrentPageItems();
+  }
+  
+  function showCurrentPageItems() {
+    const startIndex = (currentPage - 1) * pageSize;
+    const endIndex = Math.min(startIndex + pageSize, filteredParagraphs.length);
+    
+    // Hide all paragraphs first
+    document.querySelectorAll('.paragraph-card').forEach(card => {
+      card.style.display = 'none';
+    });
+    
+    // Show only paragraphs for the current page
+    for (let i = startIndex; i < endIndex; i++) {
+      const paraObj = filteredParagraphs[i];
+      if (paraObj && paraObj.element) {
+        paraObj.element.style.display = 'block';
+      }
+    }
+    
+    // Make sure to hide all document references when switching pages
+    document.querySelectorAll('.document-references').forEach(container => {
+      container.classList.remove('show');
+    });
+    
+    // Remove active class from all badges
+    document.querySelectorAll('.occurrence-badge').forEach(badge => {
+      badge.classList.remove('active');
+    });
+  }
+  
+  function goToPage(page) {
+    if (page < 1 || page > totalPages) {
+      return;
+    }
+    
+    currentPage = page;
+    updatePagination();
+  }
+  
+  // Filter by paragraph type
+  function filterByType(type) {
+    if (!type) {
+      // Reset filter
+      filteredParagraphs = [...allParagraphs];
+    } else {
+      filteredParagraphs = allParagraphs.filter(para => para.type === type);
+    }
+    
+    // Reset to first page and update pagination
+    currentPage = 1;
+    updatePagination();
+  }
+  
+  // Filter by tag
+  function filterByTag(tagId) {
+    if (!tagId) {
+      // Reset filter
+      filteredParagraphs = [...allParagraphs];
+    } else {
+      filteredParagraphs = allParagraphs.filter(para => 
+        para.tags.includes(tagId)
+      );
+    }
+    
+    // Reset to first page and update pagination
+    currentPage = 1;
+    updatePagination();
+  }
+  
+  // Function to set up content toggles
+  function setupContentToggles() {
+    // Toggle paragraph content
+    const readMoreBtns = document.querySelectorAll('.read-more-btn');
+    readMoreBtns.forEach(btn => {
+      btn.addEventListener('click', function() {
+        const paragraphCard = this.closest('.paragraph-card');
+        const preview = paragraphCard.querySelector('.paragraph-preview');
+        const fullContent = paragraphCard.querySelector('.paragraph-full-content');
+        
+        if (fullContent.style.display === 'none') {
+          preview.style.display = 'none';
+          fullContent.style.display = 'block';
+          
+          // Update any toggle buttons in this card
+          const toggleBtn = paragraphCard.querySelector('.toggle-para-btn');
+          if (toggleBtn) {
+            toggleBtn.innerHTML = '<i class="bi bi-arrows-collapse"></i>';
+            toggleBtn.title = 'Collapse';
+          }
+        } else {
+          preview.style.display = 'block';
+          fullContent.style.display = 'none';
+          
+          // Update any toggle buttons in this card
+          const toggleBtn = paragraphCard.querySelector('.toggle-para-btn');
+          if (toggleBtn) {
+            toggleBtn.innerHTML = '<i class="bi bi-arrows-expand"></i>';
+            toggleBtn.title = 'Expand';
+          }
+        }
+      });
+    });
+    
+    // Toggle paragraphs with the toggle buttons
+    const toggleParaBtns = document.querySelectorAll('.toggle-para-btn');
+    toggleParaBtns.forEach(btn => {
+      btn.addEventListener('click', function() {
+        const paragraphCard = this.closest('.paragraph-card');
+        const preview = paragraphCard.querySelector('.paragraph-preview');
+        const fullContent = paragraphCard.querySelector('.paragraph-full-content');
+        
+        if (fullContent.style.display === 'none') {
+          preview.style.display = 'none';
+          fullContent.style.display = 'block';
+          this.innerHTML = '<i class="bi bi-arrows-collapse"></i>';
+          this.title = 'Collapse';
+        } else {
+          preview.style.display = 'block';
+          fullContent.style.display = 'none';
+          this.innerHTML = '<i class="bi bi-arrows-expand"></i>';
+          this.title = 'Expand';
+        }
+      });
+    });
+    
+    // Show/hide content stats
+    document.querySelectorAll('.show-stats-btn').forEach(btn => {
+      btn.addEventListener('click', function() {
+        const card = this.closest('.paragraph-card');
+        const statsContainer = card.querySelector('.content-stats');
+        statsContainer.classList.toggle('d-none');
+        
+        // Update button text
+        if (statsContainer.classList.contains('d-none')) {
+          this.innerHTML = '<i class="bi bi-info-circle me-1"></i>Stats';
+        } else {
+          this.innerHTML = '<i class="bi bi-x-circle me-1"></i>Hide Stats';
+        }
+      });
+    });
+  }
+  
+  // Update the setupEventListeners function to include this functionality
+  function setupEventListeners() {
+    // Pagination controls
+    document.getElementById('firstPageBtn').addEventListener('click', () => goToPage(1));
+    document.getElementById('prevPageBtn').addEventListener('click', () => goToPage(currentPage - 1));
+    document.getElementById('nextPageBtn').addEventListener('click', () => goToPage(currentPage + 1));
+    document.getElementById('lastPageBtn').addEventListener('click', () => goToPage(totalPages));
+    
+    // Page size control
+    document.getElementById('pageSizeSelect').addEventListener('change', function() {
+      pageSize = parseInt(this.value);
+      currentPage = 1;
+      updatePagination();
+    });
+    
+    // Search input
+    document.getElementById('searchParagraphs').addEventListener('input', function() {
+      const searchText = this.value.toLowerCase();
+      
+      if (!searchText) {
+        // Reset search filter
+        filteredParagraphs = [...allParagraphs];
+      } else {
+        filteredParagraphs = allParagraphs.filter(para => 
+          para.content.toLowerCase().includes(searchText)
+        );
+      }
+      
+      // Reset to first page and update pagination
+      currentPage = 1;
+      updatePagination();
+    });
+    
+    // Clear search button
+    document.getElementById('clearSearchBtn').addEventListener('click', function() {
+      document.getElementById('searchParagraphs').value = '';
+      filteredParagraphs = [...allParagraphs];
+      currentPage = 1;
+      updatePagination();
+    });
+    
+    // Min length filter
+    document.getElementById('minLengthFilter').addEventListener('input', function() {
+      const minLength = parseInt(this.value) || 0;
+      
+      if (minLength <= 0) {
+        // Reset length filter
+        filteredParagraphs = [...allParagraphs];
+      } else {
+        filteredParagraphs = allParagraphs.filter(para => 
+          para.contentLength >= minLength
+        );
+      }
+      
+      // Reset to first page and update pagination
+      currentPage = 1;
+      updatePagination();
+    });
+    
+    // Expand/Collapse buttons
+    document.getElementById('expandAllParasBtn').addEventListener('click', expandAllParagraphs);
+    document.getElementById('collapseAllParasBtn').addEventListener('click', collapseAllParagraphs);
+    
+    // Batch selection buttons
+    document.getElementById('selectAllBtn').addEventListener('click', selectAllVisible);
+    document.getElementById('deselectAllBtn').addEventListener('click', deselectAll);
+    document.getElementById('cancelSelectionBtn').addEventListener('click', cancelSelection);
+    
+    // Statistics button
+    document.getElementById('showStatsBtn').addEventListener('click', showStatisticsModal);
+    
+    // Add a global click handler to hide document references when clicking elsewhere
+    document.addEventListener('click', function(event) {
+      // If the click is not on an occurrence badge or document references container
+      if (!event.target.closest('.occurrence-badge') && !event.target.closest('.document-references')) {
+        // Hide all document references
+        document.querySelectorAll('.document-references').forEach(container => {
+          container.classList.remove('show');
+        });
+        
+        // Remove active class from all badges
+        document.querySelectorAll('.occurrence-badge').forEach(badge => {
+          badge.classList.remove('active');
+        });
+      }
+    });
+  }
+  
+  // Set up compact view toggle
+  function setupCompactViewToggle() {
+    viewToggleBtn.addEventListener('click', function() {
+      document.body.classList.toggle('compact-mode');
+      compactModeEnabled = document.body.classList.contains('compact-mode');
+      
+      // Update the icon
+      if (compactModeEnabled) {
+        viewToggleBtn.innerHTML = '<i class="bi bi-layout-text-window"></i>';
+        viewToggleBtn.title = 'Switch to Normal View';
+        showToast('Compact view enabled');
+      } else {
+        viewToggleBtn.innerHTML = '<i class="bi bi-layout-text-window-reverse"></i>';
+        viewToggleBtn.title = 'Switch to Compact View';
+        showToast('Normal view enabled');
+      }
+      
+      // Show current page items to refresh the display
+      showCurrentPageItems();
+    });
+  }
+  
+  // Tag management functions
+  function showTagModal(paragraphId) {
+    document.getElementById('paragraphIdForTag').value = paragraphId;
+    new bootstrap.Modal(document.getElementById('tagModal')).show();
+  }
+  
+  function addTag(tagId) {
+    const paragraphId = document.getElementById('paragraphIdForTag').value;
+    
+    // Show loading state
+    const tagSelection = document.querySelector('.tag-selection');
+    tagSelection.innerHTML = `
+      <div class="w-100 text-center">
+        <div class="spinner-border text-primary" role="status">
+          <span class="visually-hidden">Loading...</span>
+        </div>
+        <p class="mt-2 mb-0">Adding tag to all instances of this paragraph...</p>
+      </div>
+    `;
+    
+    // Create FormData for more reliable parameter passing
+    const formData = new FormData();
+    formData.append('paragraph_id', paragraphId);
+    formData.append('tag_id', tagId);
+    formData.append('tag_all_duplicates', 'true');
+    
+    fetch('/tag-paragraph', {
+      method: 'POST',
+      body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+      if (data.success) {
+        // Hide the modal
+        const modal = bootstrap.Modal.getInstance(document.getElementById('tagModal'));
+        modal.hide();
+        
+        // Show success message
+        showToast('Tag added to all instances successfully!');
+        
+        // Reload the page after a short delay
+        setTimeout(() => {
+          window.location.reload();
+        }, 1000);
+      } else {
+        showToast('Failed to add tag: ' + (data.message || 'Unknown error'), 'danger');
+      }
+    })
+    .catch(error => {
+      console.error('Error adding tag:', error);
+      showToast('An error occurred while adding the tag', 'danger');
+    });
+  }
+  
+  function removeTag(paragraphId, tagId) {
+    if (!confirm('Are you sure you want to remove this tag from all instances of this paragraph?')) {
+      return;
+    }
+    
+    showLoading('Removing tag...');
+    
+    // Create FormData for more reliable parameter passing
+    const formData = new FormData();
+    formData.append('paragraph_id', paragraphId);
+    formData.append('tag_id', tagId);
+    formData.append('untag_all_duplicates', 'true');
+    
+    fetch('/untag-paragraph', {
+      method: 'POST',
+      body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+      hideLoading();
+      
+      if (data.success) {
+        showToast('Tag removed from all instances successfully!');
+        
+        // Reload the page after a short delay
+        setTimeout(() => {
+          window.location.reload();
+        }, 1000);
+      } else {
+        showToast('Failed to remove tag: ' + (data.message || 'Unknown error'), 'danger');
+      }
+    })
+    .catch(error => {
+      hideLoading();
+      console.error('Error removing tag:', error);
+      showToast('An error occurred while removing the tag', 'danger');
+    });
+  }
+  
+  // Sorting functions
+  function sortParagraphs(sortOption) {
+    showLoading('Sorting paragraphs...');
+    
+    // Use spread to create a new array so we don't modify the original ordering
+    filteredParagraphs = [...filteredParagraphs];
+    
+    // Sort based on selected option
+    switch(sortOption) {
+      case 'occurrences_desc':
+        filteredParagraphs.sort((a, b) => b.occurrences - a.occurrences);
+        break;
+      case 'occurrences_asc':
+        filteredParagraphs.sort((a, b) => a.occurrences - b.occurrences);
+        break;
+      case 'length_desc':
+        filteredParagraphs.sort((a, b) => b.contentLength - a.contentLength);
+        break;
+      case 'length_asc':
+        filteredParagraphs.sort((a, b) => a.contentLength - b.contentLength);
+        break;
+      case 'document':
+        filteredParagraphs.sort((a, b) => a.documentName.localeCompare(b.documentName));
+        break;
+      case 'position':
+        // Reset to original order by re-filtering
+        filteredParagraphs = allParagraphs.filter(para => 
+          filteredParagraphs.some(fp => fp.id === para.id)
+        );
+        break;
+    }
+    
+    // Reset to first page and update pagination
+    currentPage = 1;
+    updatePagination();
+    
+    // Add highlight animation to sorted paragraphs
+    setTimeout(() => {
+      const visibleCards = document.querySelectorAll('.paragraph-card[style="display: block;"]');
+      visibleCards.forEach(card => {
+        card.classList.add('highlight-sort');
+        setTimeout(() => {
+          card.classList.remove('highlight-sort');
+        }, 1500);
+      });
+    }, 100);
+    
+    hideLoading();
+  }
+  
+  // Expand/Collapse all paragraphs
+  function expandAllParagraphs() {
+    showLoading('Expanding all paragraphs...');
+    
+    // Only expand visible paragraphs (current page)
+    document.querySelectorAll('.paragraph-card[style="display: block;"]').forEach(card => {
+      const preview = card.querySelector('.paragraph-preview');
+      const fullContent = card.querySelector('.paragraph-full-content');
+      const toggleBtn = card.querySelector('.toggle-para-btn');
+      
+      if (preview && fullContent) {
+        preview.style.display = 'none';
+        fullContent.style.display = 'block';
+        if (toggleBtn) {
+          toggleBtn.innerHTML = '<i class="bi bi-arrows-collapse"></i>';
+          toggleBtn.title = 'Collapse';
+        }
+      }
+    });
+    
+    hideLoading();
+    
+    // Show notification
+    showToast('All paragraphs expanded');
+  }
+  
+  function collapseAllParagraphs() {
+    showLoading('Collapsing all paragraphs...');
+    
+    // Only collapse visible paragraphs (current page)
+    document.querySelectorAll('.paragraph-card[style="display: block;"]').forEach(card => {
+      const preview = card.querySelector('.paragraph-preview');
+      const fullContent = card.querySelector('.paragraph-full-content');
+      const toggleBtn = card.querySelector('.toggle-para-btn');
+      
+      if (preview && fullContent) {
+        preview.style.display = 'block';
+        fullContent.style.display = 'none';
+        if (toggleBtn) {
+          toggleBtn.innerHTML = '<i class="bi bi-arrows-expand"></i>';
+          toggleBtn.title = 'Expand';
+        }
+      }
+    });
+    
+    hideLoading();
+    
+    // Show notification
+    showToast('All paragraphs collapsed');
+  }
+  
+  // Batch selection functions
+  function setupBatchSelection() {
+    // Add event listeners to all paragraph checkboxes
+    document.querySelectorAll('.paragraph-checkbox').forEach(checkbox => {
+      checkbox.addEventListener('change', function() {
+        const paraId = this.dataset.paraId;
+        const paraObj = allParagraphs.find(p => p.id.toString() === paraId);
+        
+        if (paraObj) {
+          paraObj.selected = this.checked;
+          updateBatchSelectionUI();
+        }
+      });
+    });
+  }
+  
+  function updateBatchSelectionUI() {
+    const selectedCount = allParagraphs.filter(p => p.selected).length;
+    
+    // Update counter
+    selectedCountEl.textContent = `${selectedCount} selected`;
+    
+    // Show/hide batch action bar
+    if (selectedCount > 0) {
+      batchActionBar.classList.add('visible');
+    } else {
+      batchActionBar.classList.remove('visible');
+    }
+  }
+  
+  function selectAllVisible() {
+    // Select all paragraphs currently visible on the page
+    document.querySelectorAll('.paragraph-card[style="display: block;"] .paragraph-checkbox').forEach(checkbox => {
+      checkbox.checked = true;
+      
+      const paraId = checkbox.dataset.paraId;
+      const paraObj = allParagraphs.find(p => p.id.toString() === paraId);
+      
+      if (paraObj) {
+        paraObj.selected = true;
+      }
+    });
+    
+    updateBatchSelectionUI();
+    showToast('Selected all visible paragraphs');
+  }
+  
+  function deselectAll() {
+    // Deselect all paragraphs
+    document.querySelectorAll('.paragraph-checkbox').forEach(checkbox => {
+      checkbox.checked = false;
+    });
+    
+    allParagraphs.forEach(para => {
+      para.selected = false;
+    });
+    
+    updateBatchSelectionUI();
+    showToast('Deselected all paragraphs');
+  }
+  
+  // Define cancelSelection function AFTER deselectAll is defined
+  function cancelSelection() {
+    deselectAll();
+  }
+  
+  // Statistics functions
+  function showStatisticsModal() {
+    showLoading('Generating statistics...');
+    
+    // Use setTimeout to allow the UI to update before heavy calculations
+    setTimeout(() => {
+      try {
+        // Calculate statistics from the current filtered paragraphs
+        const stats = calculateParagraphStatistics();
+        
+        // Render charts
+        renderTypeDistributionChart(stats.typeDistribution);
+        renderLengthDistributionChart(stats.lengthDistribution);
+        renderTagDistributionChart(stats.tagDistribution);
+        renderDocumentDistributionChart(stats.documentDistribution);
+        
+        // Show the modal
+        new bootstrap.Modal(document.getElementById('statisticsModal')).show();
+        
+        hideLoading();
+      } catch (error) {
+        console.error('Error generating statistics:', error);
+        hideLoading();
+        showToast('Error generating statistics', 'danger');
+      }
+    }, 100);
+  }
+  
+  function calculateParagraphStatistics() {
+    // Use all paragraphs for statistics, not just filtered
+    const paragraphs = allParagraphs;
+    
+    // Type distribution
+    const typeDistribution = {};
+    paragraphs.forEach(para => {
+      if (!typeDistribution[para.type]) {
+        typeDistribution[para.type] = 0;
+      }
+      typeDistribution[para.type]++;
+    });
+    
+    // Length distribution - group by ranges
+    const lengthRanges = [
+      { min: 0, max: 100, label: '0-100' },
+      { min: 101, max: 250, label: '101-250' },
+      { min: 251, max: 500, label: '251-500' },
+      { min: 501, max: 1000, label: '501-1000' },
+      { min: 1001, max: Infinity, label: '1000+' }
+    ];
+    
+    const lengthDistribution = {};
+    lengthRanges.forEach(range => {
+      lengthDistribution[range.label] = 0;
+    });
+    
+    paragraphs.forEach(para => {
+      const length = para.contentLength;
+      const range = lengthRanges.find(r => length >= r.min && length <= r.max);
+      if (range) {
+        lengthDistribution[range.label]++;
+      }
+    });
+    
+    // Tag distribution - count paragraphs with each tag
+    const tagDistribution = {};
+    // First get all tags
+    const allTags = {};
+    document.querySelectorAll('.tag-selection .tag-badge').forEach(tagEl => {
+      const tagName = tagEl.textContent.trim();
+      const tagColor = tagEl.style.backgroundColor;
+      allTags[tagName] = { count: 0, color: tagColor };
+    });
+    
+    // Count tag occurrences
+    paragraphs.forEach(para => {
+      // Create a lookup for this paragraph's tags
+      if (para.element) {
+        const tagElements = para.element.querySelectorAll('.tag-badge');
+        tagElements.forEach(tagEl => {
+          const tagName = tagEl.textContent.trim();
+          if (allTags[tagName]) {
+            allTags[tagName].count++;
+          }
+        });
+      }
+    });
+    
+    // Convert to format needed for chart
+    Object.keys(allTags).forEach(tagName => {
+      if (allTags[tagName].count > 0) {
+        tagDistribution[tagName] = {
+          count: allTags[tagName].count,
+          color: allTags[tagName].color
+        };
+      }
+    });
+    
+    // Document distribution - count paragraphs by document
+    const documentDistribution = {};
+    paragraphs.forEach(para => {
+      if (!documentDistribution[para.documentName]) {
+        documentDistribution[para.documentName] = 0;
+      }
+      documentDistribution[para.documentName]++;
+    });
+    
+    // Sort document distribution by count and take top 10
+    const sortedDocs = Object.entries(documentDistribution)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .reduce((obj, [key, value]) => {
+        obj[key] = value;
+        return obj;
+      }, {});
+    
+    return {
+      typeDistribution,
+      lengthDistribution,
+      tagDistribution,
+      documentDistribution: sortedDocs
+    };
+  }
+  
+  // Chart rendering functions
+  function renderTypeDistributionChart(typeDistribution) {
+    // Chart rendering code remains the same
+    const container = document.getElementById('typeDistributionChart');
+    const legend = document.querySelector('.type-legend');
+    
+    // Clear containers
+    container.innerHTML = '';
+    legend.innerHTML = '';
+    
+    // Transform data for chart
+    const labels = Object.keys(typeDistribution);
+    const data = Object.values(typeDistribution);
+    const total = data.reduce((sum, val) => sum + val, 0);
+    
+    // Color map for paragraph types
+    const colorMap = {
+      'header': '#007bff',    // primary
+      'normal': '#6c757d',    // secondary
+      'list': '#28a745',      // success
+      'table': '#dc3545',     // danger
+      'boilerplate': '#ffc107', // warning
+      'footer': '#17a2b8',    // info
+      'unknown': '#343a40'    // dark
+    };
+    
+    // Create a simple bar chart (since we may not have Chart.js available)
+    const chartHtml = `
+      <div class="d-flex justify-content-between align-items-end" style="height: 100%;">
+        ${labels.map((label, i) => {
+          const percentage = (data[i] / total * 100).toFixed(1);
+          const color = colorMap[label] || '#6c757d';
+          return `
+            <div class="d-flex flex-column align-items-center">
+              <div class="text-center small mb-1">${percentage}%</div>
+              <div style="background-color: ${color}; width: ${100 / labels.length * 0.8}%; height: ${percentage * 2}px; 
+                         max-height: 190px; min-height: 20px;"></div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+    
+    container.innerHTML = chartHtml;
+    
+    // Create legend
+    const legendHtml = labels.map(label => {
+      const count = typeDistribution[label];
+      const color = colorMap[label] || '#6c757d';
+      return `
+        <div class="d-flex align-items-center mb-1">
+          <div style="width: 12px; height: 12px; background-color: ${color}; margin-right: 5px;"></div>
+          <span>${label} (${count})</span>
+        </div>
+      `;
+    }).join('');
+    
+    legend.innerHTML = legendHtml;
+  }
+  
+  function renderLengthDistributionChart(lengthDistribution) {
+    // Other chart rendering functions remain the same
+    const container = document.getElementById('lengthDistributionChart');
+    
+    // Clear container
+    container.innerHTML = '';
+    
+    // Transform data for chart
+    const labels = Object.keys(lengthDistribution);
+    const data = Object.values(lengthDistribution);
+    const total = data.reduce((sum, val) => sum + val, 0);
+    
+    // Create a simple bar chart
+    const chartHtml = `
+      <div class="d-flex justify-content-between align-items-end" style="height: 100%;">
+        ${labels.map((label, i) => {
+          const percentage = (data[i] / total * 100).toFixed(1);
+          // Use a gradient of blue colors
+          const intensity = 55 + (i * 35 / labels.length);
+          const color = `rgba(0, 123, 255, 0.${Math.round(intensity)})`;
+          return `
+            <div class="d-flex flex-column align-items-center">
+              <div class="text-center small mb-1">${percentage}%</div>
+              <div style="background-color: ${color}; width: ${100 / labels.length * 0.8}%; height: ${percentage * 2}px; 
+                         max-height: 190px; min-height: 20px;"></div>
+              <div class="text-center small mt-1">${label}</div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+    
+    container.innerHTML = chartHtml;
+  }
+  
+  function renderTagDistributionChart(tagDistribution) {
+    const container = document.getElementById('tagUsageChart');
+    
+    // Clear container
+    container.innerHTML = '';
+    
+    // Check if we have tag data
+    if (Object.keys(tagDistribution).length === 0) {
+      container.innerHTML = '<div class="text-center text-muted py-5">No tags applied to paragraphs</div>';
+      return;
+    }
+    
+    // Transform data for chart - sort by count descending
+    const sortedTags = Object.entries(tagDistribution)
+      .sort((a, b) => b[1].count - a[1].count)
+      .slice(0, 6); // Show top 6 tags
+    
+    const labels = sortedTags.map(([name]) => name);
+    const data = sortedTags.map(([, info]) => info.count);
+    const colors = sortedTags.map(([, info]) => info.color || '#6c757d');
+    const total = data.reduce((sum, val) => sum + val, 0);
+    
+    // Create a horizontal bar chart
+    const chartHtml = `
+      <div class="mt-3">
+        ${sortedTags.map(([name, info], i) => {
+          const percentage = (info.count / total * 100).toFixed(1);
+          return `
+            <div class="mb-2">
+              <div class="d-flex justify-content-between mb-1">
+                <span style="font-size: 0.9rem;">${name}</span>
+                <span class="small">${info.count} (${percentage}%)</span>
+              </div>
+              <div class="progress" style="height: 10px;">
+                <div class="progress-bar" role="progressbar" 
+                     style="width: ${percentage}%; background-color: ${info.color || '#6c757d'};" 
+                     aria-valuenow="${percentage}" aria-valuemin="0" aria-valuemax="100"></div>
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+    
+    container.innerHTML = chartHtml;
+  }
+  
+  function renderDocumentDistributionChart(documentDistribution) {
+    const container = document.getElementById('documentDistribution');
+    
+    // Clear container
+    container.innerHTML = '';
+    
+    // Transform data for chart
+    const entries = Object.entries(documentDistribution);
+    const total = entries.reduce((sum, [, count]) => sum + count, 0);
+    
+    // Create a simple chart
+    const chartHtml = `
+      <div class="mt-3">
+        ${entries.map(([name, count], i) => {
+          const percentage = (count / total * 100).toFixed(1);
+          // Truncate long document names
+          const displayName = name.length > 20 ? name.substring(0, 18) + '...' : name;
+          // Use a gradient of colors
+          const hue = 200 + (i * 30) % 160; 
+          const color = `hsla(${hue}, 70%, 50%, 0.8)`;
+          return `
+            <div class="mb-2">
+              <div class="d-flex justify-content-between mb-1">
+                <span style="font-size: 0.9rem;" title="${name}">${displayName}</span>
+                <span class="small">${count} (${percentage}%)</span>
+              </div>
+              <div class="progress" style="height: 10px;">
+                <div class="progress-bar" role="progressbar" 
+                     style="width: ${percentage}%; background-color: ${color};" 
+                     aria-valuenow="${percentage}" aria-valuemin="0" aria-valuemax="100"></div>
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+    
+    container.innerHTML = chartHtml;
+  }
 </script>
-{% endblock %}
+{% endblock scripts %}
+```
