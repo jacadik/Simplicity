@@ -61,39 +61,51 @@ class BaseDocumentParser(ABC):
             
         return False
     
-    def _extract_list_items(self, text: str) -> List[str]:
+    def _extract_list_items(self, text: str) -> str:
         """
-        Extract individual list items from text.
+        Format list items within text, preserving them as a single paragraph.
         
         Args:
-            text: Text to extract items from
+            text: Text to process
             
         Returns:
-            List of extracted items
+            Formatted text with preserved list items on separate lines
         """
-        items = []
-        current_item = None
+        # If not a list, return as is
+        if not any(self._is_list_item(line) for line in text.split('\n')):
+            return text
         
-        for line in text.split('\n'):
-            line = line.strip()
-            if not line:
+        # Process the lines to ensure proper separation
+        lines = text.split('\n')
+        formatted_lines = []
+        in_list = False
+        
+        for line in lines:
+            line_stripped = line.strip()
+            if not line_stripped:
+                formatted_lines.append(line)
                 continue
                 
-            if self._is_list_item(line):
-                if current_item:
-                    items.append(current_item)
-                current_item = line
-            elif current_item:
-                # Continuation of previous item
-                current_item += ' ' + line
-            else:
-                # Not part of a list
-                current_item = line
-        
-        if current_item:
-            items.append(current_item)
+            is_list_item = self._is_list_item(line_stripped)
             
-        return items
+            if is_list_item:
+                in_list = True
+                # Ensure each list item is on its own line and preserve indentation
+                if formatted_lines and formatted_lines[-1].strip():
+                    formatted_lines.append(line)
+                else:
+                    formatted_lines.append(line)
+            else:
+                # If we were in a list and now we're not, add a line break
+                if in_list and formatted_lines and formatted_lines[-1].strip():
+                    formatted_lines.append(line)
+                    in_list = False
+                else:
+                    formatted_lines.append(line)
+                    in_list = False
+        
+        # Join with newlines to preserve the structure
+        return '\n'.join(formatted_lines)
     
     def _format_table(self, rows: List[List[str]]) -> str:
         """

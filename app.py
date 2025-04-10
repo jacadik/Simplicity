@@ -17,8 +17,13 @@ from utils.document_metadata_extractor import DocumentMetadataExtractor
 from utils.excel_exporter import export_to_excel
 from utils.thread_pool_manager import ThreadPoolManager
 from utils.document_batch_processor import DocumentBatchProcessor
-from utils.database.models import Document, Paragraph, Tag, SimilarityResult, Cluster, cluster_paragraphs
+from utils.database.models import Document, Paragraph, Tag, SimilarityResult, Cluster, cluster_paragraphs, paragraph_tags
 from utils.database.manager import DatabaseManager
+
+# New imports for enhanced query capabilities
+from sqlalchemy import func, or_, and_, text, distinct, case
+from sqlalchemy.sql.expression import cast
+from sqlalchemy.types import String
 
 # Initialize insert page extractor
 from utils.insert_page_extractor import InsertPageExtractor
@@ -164,7 +169,6 @@ def handle_echo(data):
     socketio.emit('echo_response', {'received': data, 'time': time.time()})
 
 # Thread-safe progress callback
-
 def progress_callback(completed, total, result):
     """Send progress updates via Socket.IO."""
     app.logger.info(f"Progress: {completed}/{total} - Processing: {result.get('filename', 'Unknown')}")
@@ -483,139 +487,273 @@ def view_paragraphs():
     document_id = request.args.get('document_id', type=int)
     show_all_duplicates = request.args.get('show_all_duplicates', type=int, default=0)
     
-    # When viewing a specific document, or when explicitly requested, don't collapse duplicates
-    collapse_duplicates = not (document_id is not None or show_all_duplicates == 1)
-    
-    paragraphs = db_manager.get_paragraphs(document_id, collapse_duplicates=collapse_duplicates)
+    # Get documents and tags for filters
     documents = db_manager.get_documents()
+    tags = db_manager.get_tags()
     
-    # Create a dictionary to map filenames to document IDs for easy lookup
+    # Create a dictionary to map filenames to document IDs for easy lookup in the template
     filename_to_doc_id = {doc['filename']: doc['id'] for doc in documents}
     
-    tags = db_manager.get_tags()
+    # Get initial statistics to show before paragraphs are loaded
+    try:
+        session = db_manager.Session()
+        total_paragraphs = session.query(Paragraph).count()
+        session.close()
+    except Exception as e:
+        app.logger.error(f"Error getting paragraph count: {str(e)}")
+        total_paragraphs = 0
     
     return render_template(
         'paragraphs.html', 
-        paragraphs=paragraphs, 
         documents=documents, 
         tags=tags, 
         selected_document=document_id,
         show_all_duplicates=show_all_duplicates,
-        filename_to_doc_id=filename_to_doc_id  # Add this dictionary to template context
+        filename_to_doc_id=filename_to_doc_id,
+        total_paragraphs=total_paragraphs,
+        # Do not pass paragraphs - they'll be loaded via AJAX
     )
 
-@app.route('/document/<int:document_id>')
-def view_document(document_id):
-    """View a document with its extracted paragraphs."""
-    # Get document information
-    session = db_manager.Session()
-    document = session.query(Document).get(document_id)
-    
-    if not document:
-        flash('Document not found', 'danger')
-        return redirect(url_for('index'))
-    
-    # Get paragraphs for this document
-    paragraphs = db_manager.get_paragraphs(document_id, collapse_duplicates=False)
-    
-    # Get file metadata
-    file_metadata = db_manager.get_document_file_metadata(document_id)
-    
-    # Determine file type for proper rendering
-    file_type = document.file_type.lower()
-    
-    return render_template(
-        'document_view.html',
-        document=document,
-        paragraphs=paragraphs,
-        file_type=file_type,
-        file_metadata=file_metadata
-    )
+# New API endpoints for optimized paragraph rendering
+# Fix for api_get_paragraphs function in app.py
 
-@app.route('/serve-document/<int:document_id>')
-def serve_document(document_id):
-    """Serve the document file for viewing."""
-    session = db_manager.Session()
-    document = session.query(Document).get(document_id)
-    
-    if not document or not os.path.exists(document.file_path):
-        flash('Document not found', 'danger')
-        return redirect(url_for('index'))
-    
-    return send_file(
-        document.file_path,
-        as_attachment=False,
-        download_name=document.filename
-    )
-    
-@app.route('/similarity')
-def view_similarity():
-    """View similarity analysis with threshold adjustment."""
-    # Get threshold as percentage (0-100), default to 80%
-    threshold_pct = request.args.get('threshold', type=float, default=80.0)
-    
-    # Convert percentage to decimal (0-1) for database query
-    threshold = threshold_pct / 100.0
-    
-    # Get similarities using the decimal threshold
-    similarities = db_manager.get_similar_paragraphs(threshold)
-    
-    # Pass the percentage threshold to the template
-    return render_template('similarity.html', similarities=similarities, threshold=threshold_pct)
-
-@app.route('/analyze-similarity', methods=['POST'])
-def analyze_similarity():
-    """Run similarity analysis on paragraphs."""
-    # Get threshold as percentage (0-100)
-    threshold_pct = float(request.form.get('threshold', 80.0))
-    
-    # Convert percentage to decimal (0-1) for similarity analyzer
-    threshold = threshold_pct / 100.0
-    
-    # Get all paragraphs - use collapse_duplicates=False to get ALL paragraphs
-    paragraphs = db_manager.get_paragraphs(collapse_duplicates=False)
-    
-    if not paragraphs:
-        flash('No paragraphs available for analysis', 'warning')
-        return redirect(url_for('view_similarity'))
-    
-    logger.info(f"Retrieved {len(paragraphs)} paragraphs for similarity analysis")
-    
-    # Prepare data for similarity analysis
-    para_data = []
-    for para in paragraphs:
-        para_data.append({
-            'id': para['id'],
-            'content': para['content'],
-            'doc_id': para['document_id']
+@app.route('/api/paragraphs')
+def api_get_paragraphs():
+    """API endpoint for paginated paragraphs with filtering options."""
+    try:
+        # Parse pagination parameters
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 25, type=int)
+        
+        # Limit per_page to reasonable values
+        per_page = min(100, max(10, per_page))
+        
+        # Parse filter parameters
+        document_id = request.args.get('document_id', type=int)
+        paragraph_type = request.args.get('type')
+        tag_id = request.args.get('tag_id', type=int)
+        min_length = request.args.get('min_length', 0, type=int)
+        search_query = request.args.get('search')
+        
+        # FIXED: Always default to collapsed (0) unless explicitly set to 1
+        # Ensure parameter is explicitly read as string and compared
+        show_all_duplicates = request.args.get('show_all_duplicates', '0') == '1'
+        
+        # Add debug logging
+        app.logger.info(f"API request with params: show_all_duplicates={show_all_duplicates}, document_id={document_id}")
+        
+        # Parse sorting parameters
+        sort_by = request.args.get('sort_by', 'position')
+        sort_direction = request.args.get('sort_direction', 'asc')
+        
+        # Create a database session
+        session = db_manager.Session()
+        
+        # Build the base query
+        query = session.query(
+            Paragraph,
+            Document.filename,
+            Document.upload_date
+        ).join(
+            Document,
+            Paragraph.document_id == Document.id
+        )
+        
+        # Apply filters
+        if document_id:
+            query = query.filter(Paragraph.document_id == document_id)
+        
+        if paragraph_type:
+            query = query.filter(Paragraph.paragraph_type == paragraph_type)
+        
+        if tag_id:
+            query = query.join(
+                paragraph_tags,
+                Paragraph.id == paragraph_tags.c.paragraph_id
+            ).filter(paragraph_tags.c.tag_id == tag_id)
+        
+        if min_length > 0:
+            query = query.filter(func.length(Paragraph.content) >= min_length)
+        
+        if search_query:
+            search_term = f"%{search_query}%"
+            query = query.filter(Paragraph.content.ilike(search_term))
+        
+        # Apply sorting
+        if sort_by == 'position':
+            if sort_direction == 'asc':
+                query = query.order_by(Paragraph.position.asc())
+            else:
+                query = query.order_by(Paragraph.position.desc())
+        elif sort_by == 'length':
+            if sort_direction == 'asc':
+                query = query.order_by(func.length(Paragraph.content).asc())
+            else:
+                query = query.order_by(func.length(Paragraph.content).desc())
+        elif sort_by == 'document':
+            if sort_direction == 'asc':
+                query = query.order_by(Document.filename.asc())
+            else:
+                query = query.order_by(Document.filename.desc())
+        
+        # Special case for sorting by occurrences
+        duplicate_counts = None
+        if sort_by == 'occurrences':
+            # Create a subquery to count occurrences of each content
+            duplicate_counts = session.query(
+                Paragraph.content,
+                func.count(Paragraph.id).label('occurrence_count')
+            ).group_by(Paragraph.content).subquery()
+            
+            query = query.outerjoin(
+                duplicate_counts,
+                Paragraph.content == duplicate_counts.c.content
+            )
+            
+            if sort_direction == 'asc':
+                query = query.order_by(
+                    func.coalesce(duplicate_counts.c.occurrence_count, 1).asc()
+                )
+            else:
+                query = query.order_by(
+                    func.coalesce(duplicate_counts.c.occurrence_count, 1).desc()
+                )
+        
+        # FIXED: Handle duplicate collapsing if requested, even when document_id is specified
+        if not show_all_duplicates:
+            app.logger.info("Collapsing duplicates in query")
+            
+            # First, find content that appears multiple times
+            duplicate_content_query = session.query(
+                Paragraph.content
+            ).group_by(
+                Paragraph.content
+            ).having(
+                func.count() > 1
+            ).subquery()
+            
+            # Only show the first occurrence of each duplicate content
+            unique_paragraphs_query = session.query(
+                func.min(Paragraph.id).label('min_id')
+            ).join(
+                duplicate_content_query,
+                Paragraph.content == duplicate_content_query.c.content
+            ).group_by(
+                Paragraph.content
+            ).subquery()
+            
+            # Now get all unique content paragraphs and first instances of duplicates
+            query = query.filter(
+                or_(
+                    Paragraph.id.in_(session.query(unique_paragraphs_query.c.min_id)),
+                    ~Paragraph.content.in_(session.query(duplicate_content_query.c.content))
+                )
+            )
+        
+        # Count total filtered records (before pagination)
+        total_count = query.count()
+        
+        # Calculate total pages
+        total_pages = (total_count + per_page - 1) // per_page
+        
+        # Ensure page is within valid range
+        if page < 1:
+            page = 1
+        elif page > total_pages and total_pages > 0:
+            page = total_pages
+        
+        # Apply pagination
+        query = query.offset((page - 1) * per_page).limit(per_page)
+        
+        # Execute query
+        results = query.all()
+        
+        # Process results
+        paragraphs_data = []
+        for para, filename, upload_date in results:
+            # Get tags for this paragraph
+            tags = []
+            for tag in para.tags:
+                tags.append({
+                    'id': tag.id,
+                    'name': tag.name,
+                    'color': tag.color
+                })
+            
+            # FIXED: Get document references (where this paragraph appears) regardless of document_id filter
+            # This ensures we always show all related documents for duplicate paragraphs
+            if not show_all_duplicates:
+                # Find all paragraphs with the same content
+                same_content_paras = session.query(
+                    Paragraph.id,
+                    Paragraph.document_id,
+                    Document.filename
+                ).join(
+                    Document,
+                    Paragraph.document_id == Document.id
+                ).filter(
+                    Paragraph.content == para.content
+                ).all()
+                
+                doc_refs = []
+                for _, doc_id, doc_filename in same_content_paras:
+                    doc_refs.append({
+                        'id': doc_id,
+                        'filename': doc_filename
+                    })
+                
+                appears_in_multiple = len(doc_refs) > 1
+            else:
+                doc_refs = [{
+                    'id': para.document_id,
+                    'filename': filename
+                }]
+                appears_in_multiple = False
+            
+            # Word count (to avoid recalculating in JavaScript)
+            word_count = len(para.content.split()) if para.content else 0
+            
+            paragraphs_data.append({
+                'id': para.id,
+                'content': para.content,
+                'documentId': para.document_id,
+                'documentName': filename,
+                'type': para.paragraph_type,
+                'position': para.position,
+                'headerContent': para.header_content,
+                'contentLength': len(para.content) if para.content else 0,
+                'wordCount': word_count,
+                'tags': tags,
+                'documentReferences': doc_refs,
+                'occurrences': len(doc_refs),
+                'appearsInMultiple': appears_in_multiple
+            })
+        
+        # Close the session
+        session.close()
+        
+        # Return JSON response
+        return jsonify({
+            'paragraphs': paragraphs_data,
+            'current_page': page,
+            'per_page': per_page,
+            'total_pages': total_pages,
+            'total_items': total_count
         })
-    
-    # Clear existing similarity results before finding new ones
-    db_manager.clear_similarity_results()
-    
-    # Find exact matches first
-    logger.info("Finding exact matches...")
-    exact_matches = similarity_analyzer.find_exact_matches(para_data)
-    logger.info(f"Found {len(exact_matches)} exact matches")
-    
-    # Find similar paragraphs with the converted threshold
-    logger.info("Finding similar paragraphs...")
-    similar_paragraphs = similarity_analyzer.find_similar_paragraphs(para_data, threshold)
-    logger.info(f"Found {len(similar_paragraphs)} similar paragraphs")
-    
-    # Combine results
-    all_results = exact_matches + similar_paragraphs
-    
-    if all_results:
-        # Save results to database
-        logger.info(f"Saving {len(all_results)} similarity results to database")
-        db_manager.add_similarity_results(all_results)
-        flash(f'Found {len(exact_matches)} exact matches and {len(similar_paragraphs)} similar paragraphs', 'success')
-    else:
-        flash('No similarities found', 'info')
-    
-    # Redirect to similarity view with the same threshold percentage
-    return redirect(url_for('view_similarity', threshold=threshold_pct))
+        
+    except Exception as e:
+        app.logger.error(f"API error retrieving paragraphs: {str(e)}", exc_info=True)
+        
+        # Return error response
+        return jsonify({
+            'error': 'Internal server error',
+            'message': str(e),
+            'paragraphs': [],
+            'current_page': 1,
+            'per_page': per_page,
+            'total_pages': 0,
+            'total_items': 0
+        }), 500
 
 @app.route('/tags')
 def manage_tags():
@@ -836,340 +974,15 @@ def create_clusters():
     
     return redirect(url_for('view_clusters'))
 
-@app.route('/delete-cluster/<int:cluster_id>')
-def delete_cluster(cluster_id):
-    """Delete a specific cluster."""
-    if db_manager.delete_cluster(cluster_id):
-        flash('Cluster deleted successfully', 'success')
-    else:
-        flash('Failed to delete cluster', 'danger')
-    
-    return redirect(url_for('view_clusters'))
-    
-@app.route('/export')
-def export_data():
-    """Export data to Excel."""
+# This goes at the very end of your app.py file
+# After all other routes, functions, and code
+
+# Run the application with standard Flask method
+if __name__ == "__main__":
+    print("Starting the Flask server on http://0.0.0.0:5000...")
     try:
-        # Create a temporary file
-        with tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False) as temp:
-            temp_path = temp.name
-        
-        # Generate a meaningful filename for the download
-        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-        download_filename = f'paragraph_analysis_{timestamp}.xlsx'
-        
-        # Use the standalone excel_exporter if available
-        try:
-            from utils.excel_exporter import export_to_excel as standalone_export
-            
-            # Call the standalone exporter with our database URL
-            if standalone_export(DB_URL, temp_path, logger):
-                return send_file(
-                    temp_path,
-                    as_attachment=True,
-                    download_name=download_filename,
-                    max_age=0
-                )
-            else:
-                flash('Failed to export data', 'danger')
-                return redirect(url_for('index'))
-                
-        except ImportError:
-            # Fall back to the database manager's export method
-            logger.info("Standalone exporter not available, using database manager's export method")
-            if db_manager.export_to_excel(temp_path):
-                return send_file(
-                    temp_path,
-                    as_attachment=True,
-                    download_name=download_filename,
-                    max_age=0
-                )
-            else:
-                flash('Failed to export data', 'danger')
-                return redirect(url_for('index'))
-                
+        app.run(debug=True, host='0.0.0.0', port=5000)
     except Exception as e:
-        logger.error(f"Error exporting data: {str(e)}", exc_info=True)
-        flash('An error occurred during export', 'danger')
-        return redirect(url_for('index'))
-
-
-@app.route('/inserts', methods=['GET'])
-def view_inserts():
-    """View and manage inserts."""
-    inserts = db_manager.get_inserts()
-    return render_template('inserts.html', inserts=inserts)
-
-@app.route('/upload-insert', methods=['POST'])
-def upload_insert():
-    """Handle insert upload with custom name."""
-    if 'insert_file' not in request.files:
-        flash('No file selected', 'danger')
-        return redirect(url_for('view_inserts'))
-        
-    file = request.files['insert_file']
-    insert_name = request.form.get('insert_name', '').strip()
-    
-    if not file or file.filename == '':
-        flash('No file selected', 'danger')
-        return redirect(url_for('view_inserts'))
-        
-    if not insert_name:
-        flash('Insert name is required', 'danger')
-        return redirect(url_for('view_inserts'))
-    
-    if not allowed_file(file.filename):
-        flash('Invalid file type. Allowed types: PDF, DOC, DOCX', 'danger')
-        return redirect(url_for('view_inserts'))
-    
-    try:
-        # Process the insert
-        filename = secure_filename(file.filename)
-        file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        
-        # Add timestamp to filename if it already exists
-        if os.path.exists(file_path):
-            name, ext = os.path.splitext(filename)
-            timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
-            filename = f"{name}_{timestamp}{ext}"
-            file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        
-        # Save the file
-        file.save(file_path)
-        
-        # Extract pages from the insert
-        file_type = filename.rsplit('.', 1)[1].lower()
-        
-        # Add insert to database
-        insert_id = db_manager.add_insert(insert_name, filename, file_type, file_path)
-        
-        if insert_id > 0:
-            # Extract pages and store them
-            pages = insert_page_extractor.extract_pages(file_path, insert_id)
-            
-            if pages:
-                db_manager.add_insert_pages(pages)
-                flash(f'Insert "{insert_name}" added successfully with {len(pages)} pages', 'success')
-            else:
-                flash(f'Insert "{insert_name}" added but no pages could be extracted', 'warning')
-        else:
-            flash('Failed to add insert', 'danger')
-            
-    except Exception as e:
-        logger.error(f"Error processing insert: {str(e)}", exc_info=True)
-        flash(f'Error processing insert: {str(e)}', 'danger')
-    
-    return redirect(url_for('view_inserts'))
-
-@app.route('/find-insert-matches/<int:insert_id>', methods=['GET'])
-def find_insert_matches(insert_id):
-    """Find documents that contain the given insert."""
-    # Get the insert
-    inserts = db_manager.get_inserts()
-    insert = next((i for i in inserts if i['id'] == insert_id), None)
-    
-    if not insert:
-        flash('Insert not found', 'danger')
-        return redirect(url_for('view_inserts'))
-    
-    # Get the insert pages
-    insert_pages = db_manager.get_insert_pages(insert_id)
-    
-    if not insert_pages:
-        flash('No pages found for this insert', 'danger')
-        return redirect(url_for('view_inserts'))
-    
-    # Get all documents
-    documents = db_manager.get_documents()
-    
-    if not documents:
-        flash('No documents available for comparison', 'warning')
-        return render_template('insert_matches.html', insert=insert, matches=[])
-    
-    # For each document, get its pages
-    document_pages = {}
-    for doc in documents:
-        # Get the document's paragraphs and organize them by page
-        # This is a simplified approach - you may need to adapt this to your document structure
-        paragraphs = db_manager.get_paragraphs(doc['id'], collapse_duplicates=False)
-        
-        # Group paragraphs by page
-        pages = {}
-        for para in paragraphs:
-            page_num = para.get('page_number', 0)
-            if page_num not in pages:
-                pages[page_num] = []
-            pages[page_num].append(para)
-        
-        # Convert to page content by joining paragraphs
-        doc_pages = []
-        for page_num, page_paras in sorted(pages.items()):
-            content = '\n'.join(p['content'] for p in page_paras)
-            doc_pages.append({
-                'content': content,
-                'page_number': page_num,
-                'document_id': doc['id']
-            })
-        
-        document_pages[doc['id']] = doc_pages
-    
-    # Create an insert matcher and find matches
-    insert_matcher = InsertMatcher(
-        similarity_analyzer=similarity_analyzer,
-        similarity_threshold=0.3  # Adjust threshold as needed
-    )
-    
-    matches = insert_matcher.find_insert_matches(
-        insert_id=insert_id,
-        insert_pages=insert_pages,
-        documents=documents,
-        document_pages=document_pages
-    )
-    
-    return render_template('insert_matches.html', insert=insert, matches=matches)
-
-@app.route('/delete-insert/<int:insert_id>')
-def delete_insert(insert_id):
-    """Delete an insert and its pages."""
-    try:
-        # Get the insert to verify it exists
-        inserts = db_manager.get_inserts()
-        insert = next((i for i in inserts if i['id'] == insert_id), None)
-        
-        if not insert:
-            flash('Insert not found', 'danger')
-            return redirect(url_for('view_inserts'))
-        
-        # First, we need to implement the delete_insert method in DatabaseManager
-        if db_manager.delete_insert(insert_id):
-            # Try to delete the file from disk if it exists
-            if os.path.exists(insert['file_path']):
-                try:
-                    os.remove(insert['file_path'])
-                    flash(f'Insert "{insert["name"]}" and file deleted successfully', 'success')
-                except:
-                    # If file delete fails, just report the database record was deleted
-                    flash(f'Insert "{insert["name"]}" deleted from database (file may remain on disk)', 'success')
-            else:
-                flash(f'Insert "{insert["name"]}" deleted successfully', 'success')
-        else:
-            flash('Failed to delete insert', 'danger')
-            
-    except Exception as e:
-        logger.error(f"Error deleting insert: {str(e)}", exc_info=True)
-        flash(f'Error deleting insert: {str(e)}', 'danger')
-        
-    return redirect(url_for('view_inserts'))
-
-@app.route('/view-insert/<int:insert_id>')
-def view_insert(insert_id):
-    """View an insert with its extracted pages."""
-    # Get the insert
-    inserts = db_manager.get_inserts()
-    insert = next((i for i in inserts if i['id'] == insert_id), None)
-    
-    if not insert:
-        flash('Insert not found', 'danger')
-        return redirect(url_for('view_inserts'))
-    
-    # Get the insert pages
-    pages = db_manager.get_insert_pages(insert_id)
-    
-    # Determine file type for proper rendering
-    file_type = insert['filename'].split('.')[-1].lower()
-    
-    # Get file size in formatted string (e.g., "123 KB")
-    file_size_formatted = "Unknown"
-    try:
-        if os.path.exists(insert['file_path']):
-            file_size = os.path.getsize(insert['file_path'])
-            # Format file size
-            if file_size < 1024:
-                file_size_formatted = f"{file_size} B"
-            elif file_size < 1024 * 1024:
-                file_size_formatted = f"{file_size / 1024:.1f} KB"
-            else:
-                file_size_formatted = f"{file_size / (1024 * 1024):.1f} MB"
-    except Exception as e:
-        logger.error(f"Error getting file size for insert {insert_id}: {str(e)}")
-    
-    # Get usage statistics for this insert (if available)
-    usage_stats = None
-    try:
-        # This is a placeholder - you would implement this based on your data model
-        # For example, you might query the database for documents that match this insert
-        matches = []  # You would get this from your database
-        
-        if matches:
-            # Calculate usage statistics
-            usage_stats = {
-                'document_count': len(matches),
-                'avg_match_score': sum(match.get('match_score', 0) * 100 for match in matches) / len(matches),
-                'last_match_date': max(match.get('match_date', '') for match in matches if match.get('match_date'))
-            }
-    except Exception as e:
-        logger.error(f"Error getting usage statistics for insert {insert_id}: {str(e)}")
-    
-    return render_template(
-        'insert_view.html',
-        insert=insert,
-        pages=pages,
-        file_type=file_type,
-        file_size_formatted=file_size_formatted,
-        usage_stats=usage_stats
-    )
-
-@app.route('/serve-insert/<int:insert_id>')
-def serve_insert(insert_id):
-    """Serve the insert file for viewing."""
-    # Get the insert
-    inserts = db_manager.get_inserts()
-    insert = next((i for i in inserts if i['id'] == insert_id), None)
-    
-    if not insert or not os.path.exists(insert['file_path']):
-        flash('Insert file not found', 'danger')
-        return redirect(url_for('view_inserts'))
-    
-    return send_file(
-        insert['file_path'],
-        as_attachment=False,
-        download_name=insert['filename']
-    )
-
-@app.route('/api/document-statistics')
-def api_document_statistics():
-    """API endpoint for document statistics."""
-    try:
-        stats = db_manager.get_document_statistics()
-        return jsonify(stats)
-    except Exception as e:
-        app.logger.error(f"Error in document statistics API: {str(e)}")
-        # Return a minimal response with error info
-        return jsonify({
-            'error': str(e),
-            'total_documents': 0,
-            'total_paragraphs': 0,
-            'duplicates': 0,
-            'unique_paragraphs': 0
-        })
-
-@app.errorhandler(413)
-def request_entity_too_large(error):
-    """Handle file too large error."""
-    flash('File too large', 'danger')
-    return redirect(url_for('index'))
-
-@app.errorhandler(404)
-def page_not_found(error):
-    """Handle 404 error."""
-    return render_template('404.html'), 404
-
-@app.errorhandler(500)
-def internal_server_error(error):
-    """Handle 500 error."""
-    logger.error(f"Internal server error: {str(e)}", exc_info=True)
-    return render_template('500.html'), 500
-
-if __name__ == '__main__':
-    # NOTE: Using socketio.run instead of app.run is critical for Socket.IO to work
-    socketio.run(app, debug=True)
+        print(f"Error starting server: {e}")
+        import traceback
+        traceback.print_exc()

@@ -1,6 +1,6 @@
 """
 PDF Parser module for extracting paragraphs from PDF documents.
-Enhanced with column detection, table handling, and layout analysis.
+Enhanced with column detection, table handling, layout analysis, and list handling.
 """
 
 import re
@@ -82,7 +82,16 @@ class PDFParser(BaseDocumentParser):
                 
                 # Process text content
                 page_elements = self._process_page_with_layout(page, table_rects, page_num)
-                raw_paragraphs.extend(page_elements)
+                
+                # Process each extracted element to ensure proper list formatting
+                processed_elements = []
+                for element in page_elements:
+                    # Process any lists in the content
+                    if 'content' in element:
+                        element['content'] = self._process_paragraph_content(element['content'])
+                    processed_elements.append(element)
+                
+                raw_paragraphs.extend(processed_elements)
             
             # Process extracted content with paragraph extractor
             paragraphs = self.paragraph_extractor.process_raw_paragraphs(raw_paragraphs, doc_id)
@@ -98,13 +107,21 @@ class PDFParser(BaseDocumentParser):
                     enhanced_paragraphs = []
                     for raw_para in raw_paragraphs:
                         if isinstance(raw_para.get('content'), str) and len(raw_para['content']) > 1000:
-                            additional_paras = self._split_long_text(raw_para['content'])
-                            for p in additional_paras:
-                                enhanced_paragraphs.append({
-                                    'content': p,
-                                    'type': 'unknown',
-                                    'page': raw_para['page']
-                                })
+                            # Process the content to ensure proper list formatting
+                            content = self._process_paragraph_content(raw_para['content'])
+                            
+                            # If the content is too long, split it into smaller chunks
+                            if len(content) > 1000:
+                                additional_paras = self._split_long_text(content)
+                                for p in additional_paras:
+                                    enhanced_paragraphs.append({
+                                        'content': p,
+                                        'type': 'unknown',
+                                        'page': raw_para.get('page', 0)
+                                    })
+                            else:
+                                raw_para['content'] = content
+                                enhanced_paragraphs.append(raw_para)
                         else:
                             enhanced_paragraphs.append(raw_para)
                     
@@ -233,13 +250,14 @@ class PDFParser(BaseDocumentParser):
                         continue
                     
                     element_type = 'paragraph'
-                    if self._is_list_item(para):
-                        element_type = 'list'
-                    elif len(para) < 100 and (para.isupper() or para[-1] not in '.?!:;,'):
+                    if len(para) < 100 and (para.isupper() or para[-1] not in '.?!:;,'):
                         element_type = 'heading'
                     
+                    # Process paragraph content for lists
+                    processed_content = self._process_paragraph_content(para)
+                    
                     page_elements.append({
-                        'content': para,
+                        'content': processed_content,
                         'type': element_type,
                         'page': page_num + 1
                     })
@@ -501,14 +519,13 @@ class PDFParser(BaseDocumentParser):
                 
                 # Classify as heading
                 if (is_bold and font_size > 10) or font_size > 14:
-                    element_type = 'heading'
+                    element_type = 'header'
                     metadata['level'] = 1 if font_size > 16 else 2
             
-            # Check for list items
-            if self._is_list_item(text):
+            # Check for list content - keep as one paragraph but mark as list
+            if self._contains_list_items(text):
                 element_type = 'list'
-                list_items = self._extract_list_items(text)
-                metadata['items'] = list_items
+                metadata['contains_list'] = True
             
             # Check for table of contents entry
             elif self._is_toc_entry(text):
@@ -524,6 +541,22 @@ class PDFParser(BaseDocumentParser):
             elements.append(element)
         
         return elements
+    
+    def _contains_list_items(self, text: str) -> bool:
+        """
+        Check if text contains list items.
+        
+        Args:
+            text: Text to check
+            
+        Returns:
+            True if text contains list items, False otherwise
+        """
+        lines = text.split('\n')
+        for line in lines:
+            if self._is_list_item(line.strip()):
+                return True
+        return False
     
     def _filter_headers_footers(self, elements, page_height):
         """
@@ -633,58 +666,6 @@ class PDFParser(BaseDocumentParser):
             result.append(f"{indent}{title} .................. {page}")
         
         return "\n".join(result)
-    
-    def _is_list_item(self, text):
-        """
-        Check if a line of text is a list item.
-        
-        Args:
-            text: Text to check
-            
-        Returns:
-            Boolean indicating if text is a list item
-        """
-        text = text.strip()
-        if not text:
-            return False
-            
-        # Check for bullet points
-        bullet_match = re.match(r'^\s*[•\-\*\+○◦➢➣➤►▶→➥➔❖]\s+', text)
-        if bullet_match:
-            return True
-            
-        # Check for numbered list patterns
-        number_match = re.match(r'^\s*(\d+[\.\)]\s+|\([a-z\d]\)\s+|[a-z\d][\.\)]\s+|[ivxIVX]+[\.\)]\s+)', text)
-        if number_match:
-            return True
-            
-        return False
-    
-    def _extract_list_items(self, text):
-        """
-        Extract individual list items from text.
-        
-        Args:
-            text: List text
-            
-        Returns:
-            List of extracted items
-        """
-        items = []
-        for line in text.split('\n'):
-            line = line.strip()
-            if not line:
-                continue
-                
-            if self._is_list_item(line):
-                items.append(line)
-            elif items:
-                # Continuation of previous item
-                items[-1] += ' ' + line
-            else:
-                items.append(line)
-                
-        return items
     
     def _is_toc_entry(self, text):
         """

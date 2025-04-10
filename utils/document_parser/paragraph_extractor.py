@@ -103,10 +103,7 @@ class ParagraphExtractor:
             # Pass through already classified paragraphs
             if para_type != 'unknown':
                 # Ensure column is preserved
-                if 'column' in para:
-                    classified.append(para)
-                else:
-                    classified.append(para)
+                classified.append(para)
                 continue
             
             # Check if paragraph is a header
@@ -121,9 +118,11 @@ class ParagraphExtractor:
                 classified.append(para)
                 continue
             
-            # Check if paragraph is a list
-            if self._is_list_item(content):
-                para['type'] = 'list'
+            # Check if paragraph contains list items
+            # Note: We're keeping lists in the same paragraph, not splitting them
+            if self._contains_list_items(content):
+                para['type'] = 'normal'  # Still mark as normal, but with list content
+                para['has_list'] = True  # Add flag to indicate it contains a list
                 classified.append(para)
                 continue
             
@@ -212,28 +211,11 @@ class ParagraphExtractor:
                     if 'metadata' in para:
                         current_element['metadata'] = para['metadata']
                 else:
-                    # If current element is a table and this is also a table row, always combine
-                    # regardless of column, ensuring table rows stay together
-                    if current_type == 'table' and para_type == 'table':
+                    # Always combine consecutive elements of the same type
+                    if current_type == para_type:
                         current_element['content'] += '\n' + para['content']
-                    # For list items, only combine in the same column
-                    elif current_type == 'list' and para_type == 'list':
-                        if column is None or current_element.get('column') is None or column == current_element['column']:
-                            current_element['content'] += '\n' + para['content']
-                        else:
-                            # If different columns, add current list and start a new one
-                            combined.append(current_element)
-                            current_element = {
-                                'content': para['content'],
-                                'type': para_type,
-                                'position': para.get('position', 0),
-                                'column': column
-                            }
-                            if 'metadata' in para:
-                                current_element['metadata'] = para['metadata']
-                    # If current element is a list and this is a table row (or vice versa)
-                    # finish the current element and start a new one
                     else:
+                        # Different types - finish current element and start a new one
                         combined.append(current_element)
                         current_element = {
                             'content': para['content'],
@@ -245,6 +227,20 @@ class ParagraphExtractor:
                         if 'metadata' in para:
                             current_element['metadata'] = para['metadata']
             else:
+                # For normal paragraphs, check if they have list content and handle lists
+                has_list = para.get('has_list', False)
+                
+                if has_list and i > 0 and paragraphs[i-1]['type'] == 'normal':
+                    # Combine with previous paragraph if it's normal type
+                    prev_para = paragraphs[i-1]
+                    if self._paragraph_introduces_list(prev_para):
+                        self.logger.debug("Combining paragraph with list content")
+                        
+                        # If previous paragraph is already in combined, update it
+                        if combined and combined[-1]['content'] == prev_para['content']:
+                            combined[-1]['content'] += '\n' + para['content']
+                            continue
+                
                 if current_element is not None:
                     combined.append(current_element)
                     current_element = None
@@ -256,22 +252,6 @@ class ParagraphExtractor:
             combined.append(current_element)
         
         return combined
-    
-    def _combine_lists(self, paragraphs: List[Dict]) -> List[Dict]:
-        """
-        Combine consecutive list items into a single paragraph and
-        attach lists to their introducing paragraphs.
-        
-        DEPRECATED: Use _combine_structure_elements instead which handles both lists and tables.
-        This method is kept for backward compatibility.
-        
-        Args:
-            paragraphs: List of paragraphs
-            
-        Returns:
-            List of paragraphs with combined lists
-        """
-        return self._combine_structure_elements(paragraphs)
     
     def _associate_headers(self, paragraphs: List[Dict]) -> List[Dict]:
         """
@@ -386,82 +366,47 @@ class ParagraphExtractor:
             
         return False
     
-    def _is_list_item(self, content: str) -> bool:
+    def _contains_list_items(self, text: str) -> bool:
         """
-        Determine if a paragraph is a list item.
+        Check if text contains list items.
         
         Args:
-            content: Paragraph content
+            text: Text to check
             
         Returns:
-            True if paragraph is a list item, False otherwise
+            True if text contains list items, False otherwise
         """
+        lines = text.split('\n')
+        for line in lines:
+            if self._is_list_item(line.strip()):
+                return True
+        return False
+    
+    def _is_list_item(self, text: str) -> bool:
+        """
+        Check if a line of text is a list item.
+        
+        Args:
+            text: Text to check
+            
+        Returns:
+            True if text is a list item, False otherwise
+        """
+        text = text.strip()
+        if not text:
+            return False
+            
         # Check for bullet points
-        if re.match(r'^\s*[•\-\*\+○◦➢➣➤►▶→➥➔❖]\s+', content):
+        bullet_match = re.match(r'^\s*[•\-\*\+○◦➢➣➤►▶→➥➔❖]\s+', text)
+        if bullet_match:
             return True
             
         # Check for numbered lists
-        if re.match(r'^\s*(\d+[\.\)]\s+|\([a-z\d]\)\s+|[a-z\d][\.\)]\s+|[ivxIVX]+[\.\)]\s+)', content):
+        number_match = re.match(r'^\s*(\d+[\.\)]\s+|\([a-z\d]\)\s+|[a-z\d][\.\)]\s+|[ivxIVX]+[\.\)]\s+)', text)
+        if number_match:
             return True
             
-        # Check for multi-line lists with continuation lines
-        lines = content.split('\n')
-        if len(lines) > 1:
-            if any(self._is_list_item(line) for line in lines):
-                return True
-                
         return False
-    
-    def _extract_list_items(self, text: str) -> List[str]:
-        """
-        Extract individual list items from text.
-        
-        Args:
-            text: Text to extract items from
-            
-        Returns:
-            List of extracted items
-        """
-        items = []
-        current_item = None
-        
-        for line in text.split('\n'):
-            line = line.strip()
-            if not line:
-                continue
-                
-            if self._is_list_item(line):
-                if current_item:
-                    items.append(current_item)
-                current_item = line
-            elif current_item:
-                # Continuation of previous item
-                current_item += ' ' + line
-            else:
-                # Not part of a list
-                current_item = line
-        
-        if current_item:
-            items.append(current_item)
-            
-        return items
-    
-    def _extract_table_rows(self, text: str) -> List[str]:
-        """
-        Extract individual table rows from text.
-        
-        Args:
-            text: Text to extract rows from
-            
-        Returns:
-            List of extracted rows
-        """
-        # Simple approach: split by newlines
-        rows = []
-        for line in text.split('\n'):
-            if line.strip():
-                rows.append(line.strip())
-        return rows
     
     def _is_address(self, content: str) -> bool:
         """

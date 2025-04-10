@@ -902,4 +902,88 @@ pre.table-content {
     width: 1.5rem;
     height: 1.5rem;
 }
-```
+
+/* Aggressive fixes for paragraph spacing issues */
+
+/* Target the main container and items directly */
+#paragraphsList > div.paragraph-card,
+#paragraphsList > div.card {
+    margin-bottom: 0.25rem !important;
+    margin-top: 0 !important;
+}
+
+/* Fix for absolutely positioned cards in virtual scroll */
+#paragraphsList > div[style*="position: absolute"] {
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+    height: auto !important;
+    padding: 0 !important;
+}
+
+/* Adjust the itemHeight variable in JavaScript (add this to inline script) */
+document.addEventListener('DOMContentLoaded', function() {
+    if (typeof itemHeight !== 'undefined') {
+        itemHeight = 180; /* Reduce from default 220 */
+        console.log('Adjusted itemHeight to reduce spacing');
+    }
+});
+
+/* Fix any padding inside the cards */
+.paragraph-card .card-header {
+    padding: 0.25rem 0.5rem !important;
+}
+
+.paragraph-card .card-body {
+    padding: 0.25rem 0.5rem !important;
+}
+
+/* If a virtual scroll spacer exists, ensure it's not adding space */
+#virtual-scroll-spacer {
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+/* Fix spacing between paragraphs and header/footer within cards */
+.paragraph-preview, 
+.paragraph-full-content {
+    margin-bottom: 0.25rem !important;
+}
+
+/* Ensure no additional margins are coming from document references */
+.document-references {
+    margin-bottom: 0.25rem !important;
+}
+
+/* Remove extra space from content stats if present */
+.content-stats {
+    margin-bottom: 0.25rem !important;
+    padding: 0.25rem !important;
+}
+
+/* Target spacing between elements inside cards */
+.paragraph-card > * + * {
+    margin-top: 0.25rem !important;
+}
+
+/* Fix for any Bootstrap spacing utilities that might be applied */
+.paragraph-card .mb-1, 
+.paragraph-card .mb-2, 
+.paragraph-card .mb-3, 
+.paragraph-card .mb-4, 
+.paragraph-card .mb-5 {
+    margin-bottom: 0.25rem !important;
+}
+
+/* Fix for gap between adjacent card elements */
+.virtual-scroll-container #paragraphsList > div + div {
+    margin-top: 0 !important;
+}
+
+.paragraph-full-content {
+    white-space: pre-line;  /* This preserves line breaks in the content */
+  }
+  
+  /* Specific styling for list content */
+  .list-content {
+    padding-left: 20px;
+  }

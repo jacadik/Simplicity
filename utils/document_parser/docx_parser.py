@@ -70,10 +70,10 @@ class DOCXParser(BaseDocumentParser):
                     level = int(level_match.group(1)) if level_match else 1
                     metadata['level'] = level
                 
-                # Check for list paragraphs
-                elif para_style.startswith('List') or self._is_list_item(text):
+                # Check for list paragraphs and collect them as a group
+                if para_style.startswith('List') or self._is_list_item(text):
                     # Collect consecutive list items
-                    list_items = [text]
+                    list_text = text
                     j = i + 1
                     
                     while j < len(doc.paragraphs):
@@ -86,17 +86,20 @@ class DOCXParser(BaseDocumentParser):
                             continue
                             
                         if next_style.startswith('List') or self._is_list_item(next_text):
-                            list_items.append(next_text)
+                            list_text += '\n' + next_text
                             j += 1
                         else:
                             break
                     
+                    # Format the list content to ensure proper line separation
+                    formatted_list_content = self._process_paragraph_content(list_text)
+                    
                     element_type = 'list'
-                    metadata['items'] = list_items
+                    metadata['list_content'] = True
                     
                     # Create list element
                     raw_paragraphs.append({
-                        'content': '\n'.join(list_items),
+                        'content': formatted_list_content,
                         'type': element_type,
                         'style': para_style,
                         'position': position,
@@ -108,9 +111,12 @@ class DOCXParser(BaseDocumentParser):
                     i = j
                     continue
                 
+                # Process the paragraph content (for lists and other formatting)
+                processed_content = self._process_paragraph_content(text)
+                
                 # Add the paragraph
                 raw_paragraphs.append({
-                    'content': text,
+                    'content': processed_content,
                     'type': element_type,
                     'style': para_style,
                     'position': position,
